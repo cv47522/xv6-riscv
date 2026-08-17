@@ -88,8 +88,9 @@ logstress      2 21 36232
 forphan        2 22 35080
 dorphan        2 23 34520
 sync           2 24 33760
-memdump        2 25 35664
-console        3 26 0
+ex1copy        2 25 34136
+memdump        2 26 35664
+console        3 27 0
 ```
 
 The four columns are `name`, `type`, `inode number`, `size in bytes` — see the `printf` in `user/ls.c:49`. The type codes come from `kernel/stat.h`:
@@ -104,21 +105,49 @@ Two things worth noticing. `console` has size 0 because it is a device, not stor
 
 `findtest.sh`, `sixfive.txt`, and `memdump` are present because `conf/lab.mk` currently selects `LAB=util`. See [03-lab-workflow.md](03-lab-workflow.md).
 
-## Essential key bindings
+## Keyboard controls
 
-| Keys                  | Effect                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **`Ctrl-a` then `x`** | Quit QEMU. This is the one you need most and the least guessable.                                             |
-| **`Ctrl-a` then `c`** | Switch to the QEMU monitor (`info registers`, `info mem`). `Ctrl-a c` again returns to xv6.                   |
-| **`Ctrl-p`**          | Print the process table. xv6 has no `ps`; this is the substitute, handled by `procdump()` in `kernel/proc.c`. |
-| **`Ctrl-d`**          | End of input — exits the shell.                                                                               |
+The same terminal carries two control layers. xv6 handles console-editing and process keys inside the guest, while QEMU consumes escape sequences before they reach xv6.
 
-> [!TIP]
-> `Ctrl-a` is a prefix, not a command. Press and release it, then press the second key. If you are inside `tmux` or `screen`, `Ctrl-a` is likely their own prefix and will be swallowed — press it twice, or rebind it.
+### xv6 console keys
+
+| Keys                                       | Effect                                                                                                                                                         |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`Ctrl-d`**                               | Submit end-of-file (EOF). A program blocked in `read(0, ...)` receives the bytes already typed first; at an empty input position, its next `read()` returns 0. |
+| **`Ctrl-u`**                               | Erase the current input line.                                                                                                                                  |
+| **`Ctrl-h`** or **Backspace**             | Erase the previous input character; xv6 accepts byte `0x08` or `0x7f` for this action.                                                                        |
+| **`Ctrl-p`**                               | Print the process table. xv6 has no `ps`; `consoleintr()` calls `procdump()` directly.                                                                         |
+
+`Ctrl-d` does not quit QEMU. At the shell prompt it makes `sh` exit, but `init` immediately starts a replacement shell. Inside a program such as `ex1copy`, it ends standard input so the program can return normally.
+
+### QEMU escape sequences
+
+| Keys                  | Effect                                               |
+| --------------------- | ---------------------------------------------------- |
+| **`Ctrl-a` then `x`** | Quit the entire QEMU emulator.                       |
+| **`Ctrl-a` then `c`** | Switch between the xv6 console and the QEMU monitor. |
+| **`Ctrl-a` then `h`** | Print QEMU's escape-key help.                        |
+
+> [!IMPORTANT]
+> `Ctrl-a` is a prefix, not a chord. Hold `Ctrl`, press `a`, release both keys, and then press plain `x`, `c`, or `h` without `Ctrl`. The sequence must be typed in the terminal that directly owns the QEMU process.
+
+GNU Screen uses `Ctrl-a` as its default prefix; `Ctrl-a` then `a` sends a literal `Ctrl-a` through to QEMU. tmux normally uses `Ctrl-b`, but a configuration that remaps its prefix to `Ctrl-a` must use its configured `send-prefix` binding. A terminal application can also intercept the key before QEMU sees it; `Ctrl-a` then `h` is the quickest check because QEMU should print help.
+
+To find emulator processes from another host terminal, run:
+
+```bash
+pgrep -af qemu-system-riscv64
+```
+
+Stop only the stale process you identified:
+
+```bash
+kill PID
+```
 
 ## Available commands
 
-The full set is what `ls` showed: `cat`, `echo`, `grep`, `kill`, `ln`, `ls`, `mkdir`, `rm`, `sh`, `wc`, plus test programs (`usertests`, `forktest`, `stressfs`, `grind`, `zombie`).
+The full set is what `ls` showed: `cat`, `echo`, `ex1copy`, `grep`, `kill`, `ln`, `ls`, `mkdir`, `rm`, `sh`, `wc`, plus test programs (`usertests`, `forktest`, `stressfs`, `grind`, `zombie`).
 
 The shell supports pipes, redirection, and background jobs:
 
@@ -131,6 +160,64 @@ $ usertests &
 ```
 
 It does **not** support quoting, globbing, environment variables, `cd` with no argument, or command history. `user/sh.c` is around 500 lines and reading it is a genuinely good use of an hour.
+
+## Adding and running a user exercise
+
+A C file on the host is not automatically visible inside xv6. `make qemu` builds a fresh `fs.img` from the files named in the Makefile, and the xv6 shell can execute only binaries installed in that image.
+
+Use this checklist for a standalone exercise:
+
+1. Put the source directly under `user/`, for example `user/ex1copy.c`. The current `mkfs` importer strips one leading `user/` component and rejects another slash, so `user/exercises/ex1copy.c` cannot be installed directly.
+2. Keep the guest command name at most 14 bytes. `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts that every imported basename fits. The host binary has a leading underscore, but `mkfs` removes it: `user/_ex1copy` becomes the xv6 command `ex1copy`.
+3. Include xv6's headers, usually `kernel/types.h` followed by `user/user.h`. Do not include the host `<stdio.h>`: xv6 is freestanding and links against `ULIB`, not the host C library.
+4. Use integer file descriptors with xv6 system calls. By Unix convention, 0 is standard input, 1 is standard output, and 2 is standard error; they are not C `FILE *` streams such as `stdin` and `stdout`.
+5. Add the linked target to `UPROGS` in the Makefile:
+
+   ```makefile
+   $U/_ex1copy\
+   ```
+
+6. Build a fresh image and start QEMU:
+
+   ```bash
+   make qemu
+   ```
+
+7. Confirm and run the guest command:
+
+   ```text
+   $ ls
+   $ ex1copy
+   ```
+
+If the shell prints `exec ex1copy failed`, first check that `ls` contains `ex1copy`, then check the spelling in `UPROGS`. If the build reaches `mkfs` and aborts, check for a nested path or a basename longer than 14 bytes. Run `make clean` only when changing `conf/lab.mk` or diagnosing a genuinely stale build; ordinary source and `UPROGS` dependencies rebuild automatically.
+
+For the generic model behind system calls and descriptors, see [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#file-descriptors-open-file-descriptions-and-pipes). This guide owns only the xv6 build and console details.
+
+### `ex1copy`: waiting is part of the interface
+
+The official [MIT 6.1810 Lecture 1 example](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c) is a filter: it copies every byte from descriptor 0 to descriptor 1 until `read()` returns 0 for EOF. It intentionally has no prompt and does not stop after one line.
+
+Interactively, type a line, press Enter, and then press `Ctrl-d` at the next empty input position:
+
+```text
+$ ex1copy
+hello
+hello
+$
+```
+
+The first `hello` is the console echoing the keys you typed. The second is `ex1copy` writing the bytes returned by `read()`. The program then calls `read()` again; only after the buffered input is consumed does that read sleep because xv6 console input is line-buffered. Pressing `Ctrl-d` makes that read return 0 and restores the shell prompt. The wait is expected input-filter behavior, not a deadlock.
+
+A finite pipeline supplies EOF automatically when its writer exits:
+
+```text
+$ echo hello | ex1copy
+hello
+$
+```
+
+That pipeline is why `ex1copy` must not print instructions or its own prompt: filters should copy data without adding bytes.
 
 > [!WARNING]
 > `make qemu` depends on `newfs.img`, which rotates the existing `fs.img` aside and builds a fresh one. Any file you create inside xv6 is gone on the next `make qemu`. Use `make qemu-fs` to boot the existing image and keep guest files across reboots.
@@ -282,7 +369,8 @@ For grading a lab specifically, see [03-lab-workflow.md](03-lab-workflow.md).
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | **`ERROR: Need qemu version >= 7.2`**                 | QEMU too old. Ubuntu 24.04 or newer, or build QEMU from source.                                                                      |
 | **`Couldn't find a riscv64 version of GCC/binutils`** | The cross toolchain is not on `PATH`. See [01-environment-setup.md](01-environment-setup.md).                                        |
-| **`exec ... failed` for a program you just wrote**    | It is not in `UPROGS` in the Makefile, so it never made it into `fs.img`.                                                            |
+| **`exec ... failed` for a program you just wrote**    | The command is absent from `fs.img`, usually because it is missing from `UPROGS`; nested source paths and guest names longer than 14 bytes also cannot be imported by this `mkfs`. |
+| **`ex1copy` copies a line and then appears to hang**  | It is waiting for more standard input. Press `Ctrl-d` at an empty input position to send EOF, or feed it finite input through a pipe. |
 | **Build succeeds but changes have no effect**         | A stale object tree, most often after switching `conf/lab.mk`. Run `make clean`.                                                     |
 | **Terminal is wrecked after a crash**                 | QEMU left the terminal in raw mode. Run `reset` — it will work even though you cannot see what you are typing.                       |
 | **`make clean` fails**                                | Another xv6 instance is still running and holding files. Find it with `ps` and kill it.                                              |
