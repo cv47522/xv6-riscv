@@ -62,6 +62,16 @@ git config rerere.enabled true
 
 ## How to approach a lab
 
+Across the course, labs exercise three overlapping kinds of work, with each exercise having a primary engineering focus.
+
+| Kind of work | What you do |
+| ------------ | ----------- |
+| **User-space systems programming** | Build Unix-style utilities from the existing xv6 system-call interface. |
+| **Operating-system primitives** | Implement mechanisms such as trap handling, page-table operations, or synchronization. |
+| **Kernel extensions** | Extend the kernel by changing behavior or exposing interfaces, for example with networking, copy-on-write fork, or mmap. |
+
+The workflow is collaborative about understanding and individual about implementation: discuss concepts, invariants, and debugging evidence, but write and explain your own code. The [MIT collaboration policy](https://pdos.csail.mit.edu/6.1810/2026/general.html#collaboration) is the authority for enrolled students; this repository records an engineering habit, not enforcement or grading logistics.
+
 Every exercise in the 6.1810 handouts carries a difficulty rating. It estimates time, not volume of code — most solutions are tens to a few hundred lines, but the code is conceptually complicated and the details matter a lot.
 
 | Rating       | Expected time     | What it usually means                                   |
