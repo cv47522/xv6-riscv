@@ -36,7 +36,8 @@ A new file, `docs/book/00-ostep-concordance.md`, maps one concept across all fou
 | **fork/exec/wait** | `The_Process_Abstraction.md` §7 | `cpu-process-api/fork_*.c` | 1 `unix.tex` | `proc.c` `kfork()`, `exec.c` `kexec()` | util |
 | **process states, PCB** | `The_Process_Abstraction.md` §4–5 | `cpu-process-intro/` | 1 `unix.tex` | `proc.c` `allocproc()` | — |
 | **limited direct execution** | `The_Process_Abstraction.md` §8 | `cpu-process-mechanisms/lde_cost.c` | 4 `trap.tex` | `trap.c` `usertrap()` | traps |
-| **context switch** | `CPU_Scheduling.md` | — | 7 `sched.tex` | `swtch.S`, `proc.c` `sched()` | — |
+| **context switch** | `CPU_Scheduling.md` | — | 8 `sched.tex` | `swtch.S`, `proc.c` `sched()` | — |
+| **sleep/wakeup** | `Condition_Variables_And_Semaphores.md` | — | 9 `sleep.tex` | `proc.c` `sleep()`, `wakeup()` | — |
 | **paging, Sv39** | `Paging.md` | `vm-paging/` | 3 `mem.tex` | `vm.c` `walk()` | pgtbl |
 | **file descriptors, pipes** | `The_Process_Abstraction.md` §7 | `cpu-process-api/homework/parent_children_pipe.c` | 1 `unix.tex` | `pipe.c` `pipealloc()`, `user/sh.c` `runcmd()` | util |
 
@@ -68,11 +69,23 @@ The "Suggested shape" block in `docs/book/README.md` is replaced by one that enf
 
 ### Backlinks
 
-Each OSTEP note gains a single line in its **existing** `## Related Notes` section. No new sections and no new files are added to that repository.
+Each OSTEP note that has an xv6 counterpart gains a single line in its `## Related Notes` section:
 
 ```markdown
 - [xv6 Ch 1 — Operating system interfaces](../xv6-riscv/docs/book/ch01-operating-system-interfaces.md) — the same `fork`/`exec`/`wait`, implemented in ~6k readable lines (kernel-side: `kfork`/`kexec`/`kwait`).
 ```
+
+Thirteen OSTEP notes have a counterpart, and they fall into three groups:
+
+| Group | Notes | Change |
+| ----- | ----- | ------ |
+| **Has `## Related Notes`** | `The_Process_Abstraction.md`, `Paging.md`, `Address_Spaces_And_Translation.md`, `CPU_Scheduling.md` | Append one line |
+| **Written, section missing** | `Introduction_to_Operating_Systems.md`, `Memory_Management.md` | Insert the section, then the line |
+| **Placeholder** | `Swapping_And_VM_Systems.md`, `IO_Devices_And_Disks.md`, `Concurrency_Threads_And_Locks.md`, `Condition_Variables_And_Semaphores.md`, `File_Systems.md`, `Crash_Consistency_And_Journaling.md`, `Concurrency_Bugs_And_Events.md` | Append the section after the placeholder blockquote |
+
+Creating the section is not a deviation from the repository's conventions. `templates/NOTE_TEMPLATE.md` already lists `## Related Notes` as a standard section and orders it `Useful Links` → `Prerequisites` → `Related Notes` → `Terminology`, so in the two written notes it is inserted between `## Useful Links` and `## Terminology`, which is exactly where the four notes that already have it keep it. Seeding it early pre-populates a heading each note will carry once written. Placeholder blockquotes and their pointers to `TODO.md#note-map` are left untouched.
+
+Five OSTEP notes get no backlink because the xv6 book has no counterpart chapter: `SSDs_And_Data_Integrity.md`, `Distributed_Systems.md`, `Registers_Caches_And_Buffers.md`, `C_Library_Reference.md`, and `Linux_Reference.md`.
 
 ### Terminology
 
@@ -82,16 +95,37 @@ The two glossaries stay separate but stop competing. `04-terminology.md` holds x
 
 Cross-repo links use relative paths: `../../operating-system/…` from `docs/book/`, and `../xv6-riscv/…` from the OSTEP repository root. These are clickable in the editor, survive renames, and 404 on both web UIs by design. `docs/book/README.md` states this explicitly, along with the assumption that both repositories sit side by side under `~/personal/`, so the dead web links are not later "fixed" into absolute URLs.
 
+## Chapter map
+
+The book has **thirteen** chapters, which `docs/book/README.md` currently gets wrong: its table lists ten, omits *Page faults*, *Sleep and Wakeup*, and *Logging*, and misnumbers every chapter from five onward. The mapping below is taken from the `\chapter{}` line of each source file in the order `book.tex` includes them, and correcting the README table is part of this work.
+
+| # | Chapter | Source | OSTEP counterpart |
+| - | ------- | ------ | ----------------- |
+| 1 | Operating system interfaces | `unix.tex` | `The_Process_Abstraction.md` |
+| 2 | Operating system organization | `first.tex` | `Introduction_to_Operating_Systems.md` |
+| 3 | Page tables | `mem.tex` | `Paging.md`, `Address_Spaces_And_Translation.md` |
+| 4 | Traps and system calls | `trap.tex` | `The_Process_Abstraction.md` §8 |
+| 5 | Page faults | `pgfault.tex` | `Memory_Management.md`, `Swapping_And_VM_Systems.md` |
+| 6 | Interrupts and device drivers | `interrupt.tex` | `IO_Devices_And_Disks.md` |
+| 7 | Locking | `lock.tex` | `Concurrency_Threads_And_Locks.md` |
+| 8 | Scheduling | `sched.tex` | `CPU_Scheduling.md` |
+| 9 | Sleep and Wakeup | `sleep.tex` | `Condition_Variables_And_Semaphores.md` |
+| 10 | File system | `fs.tex` | `File_Systems.md` |
+| 11 | Logging | `log.tex` | `Crash_Consistency_And_Journaling.md` |
+| 12 | Concurrency revisited | `lock2.tex` | `Concurrency_Bugs_And_Events.md` |
+| 13 | Summary | `sum.tex` | — |
+
 ## Scope
 
 In this pass:
 
 - Add `docs/book/00-ostep-concordance.md` with the seed rows.
-- Update `docs/book/README.md` with the new chapter-note shape, the link convention, and a pointer to the concordance.
-- Write `docs/book/ch01-operating-system-interfaces.md` under the rule, as the proof that the rule produces a useful note.
-- Add one backlink line to `../operating-system/The_Process_Abstraction.md`.
+- Update `docs/book/README.md`: correct the chapter table to the thirteen chapters above, and add the new chapter-note shape, the link convention, and a pointer to the concordance.
+- Stub all thirteen chapter notes under `docs/book/`, each carrying its title, its `> **Theory:**` line pointing at the OSTEP counterpart, the section headings from the shape above, and a placeholder marker in the style the OSTEP repository already uses for unwritten notes.
+- Write `docs/book/ch01-operating-system-interfaces.md` in full under the rule, as the proof that the rule produces a useful note.
+- Add the backlink line to all thirteen OSTEP notes with a counterpart, creating the `## Related Notes` section in the nine that lack it.
 
-Deliberately excluded: backlinks in the remaining OSTEP notes. Each is added when its chapter is reached, so no link ever points at a note that does not exist yet.
+Stubbing every chapter up front means the concordance and both sets of backlinks are complete and symmetric from the first commit, and no link ever dangles. The cost is thirteen mostly-empty files; the benefit is that the structure is visible as a whole, which is what makes an omission like the three missing chapters obvious.
 
 ## Constraints
 
@@ -99,7 +133,7 @@ Deliberately excluded: backlinks in the remaining OSTEP notes. Each is added whe
 - Restate rather than transcribe; the xv6 book text is not copied into the notes.
 - Reference kernel code by symbol name first, line number second.
 - Add new vocabulary to a glossary rather than defining it inline.
-- Changes to `../operating-system/` are limited to appending backlink lines within existing sections.
+- Changes to `../operating-system/` are limited to the backlink line and, where absent, the `## Related Notes` heading that holds it. No existing prose in that repository is edited, reordered, or reflowed, and it is committed separately because it is a separate repository.
 
 ## Accepted trade-off
 
@@ -107,7 +141,9 @@ Chapter notes stop being standalone. Reading `ch01-operating-system-interfaces.m
 
 ## Verification
 
-- Confirm every relative cross-repo path resolves from its containing file.
+- Confirm every relative cross-repo path resolves from its containing file, in both directions, by testing the paths rather than reading them.
+- Confirm the corrected chapter table matches the `\chapter{}` lines of `../xv6-riscv-book/*.tex` in `book.tex` include order.
+- Confirm each of the thirteen stubs exists, is reachable from the corrected README table, and carries a `> **Theory:**` line whose target resolves.
 - Confirm every heading anchor referenced by a cross-repo link exists in the target note.
 - Confirm every symbol named in the concordance exists at the cited file, by grep rather than by memory.
 - Confirm `ch01-operating-system-interfaces.md` defines no concept that the ownership rule assigns to the OSTEP repository.
