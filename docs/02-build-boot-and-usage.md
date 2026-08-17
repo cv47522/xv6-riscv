@@ -88,7 +88,7 @@ logstress      2 21 36232
 forphan        2 22 35080
 dorphan        2 23 34520
 sync           2 24 33760
-ex1copy        2 25 34136
+ex1copy        2 25 34560
 memdump        2 26 35664
 console        3 27 0
 ```
@@ -161,21 +161,27 @@ $ usertests &
 
 It does **not** support quoting, globbing, environment variables, `cd` with no argument, or command history. `user/sh.c` is around 500 lines and reading it is a genuinely good use of an hour.
 
+> [!WARNING]
+> `make qemu` depends on `newfs.img`, which rotates the existing `fs.img` aside to `fs.img.bk` and builds a fresh one. Any file you create inside xv6 is gone on the next `make qemu`. Use `make qemu-fs` to boot the existing image and keep guest files across reboots.
+
 ## Adding and running a user exercise
 
 A C file on the host is not automatically visible inside xv6. `make qemu` builds a fresh `fs.img` from the files named in the Makefile, and the xv6 shell can execute only binaries installed in that image.
 
 Use this checklist for a standalone exercise:
 
-1. Put the source directly under `user/`, for example `user/ex1copy.c`. The current `mkfs` importer strips one leading `user/` component and rejects another slash, so `user/exercises/ex1copy.c` cannot be installed directly.
+1. Put the source directly under `user/`, for example `user/ex1copy.c`. `mkfs` imports the _linked binary_, never the source, and it strips one leading `user/` component and then asserts that no second slash remains — so a source under `user/exercises/` compiles and links cleanly, and then aborts the image step as `user/exercises/_ex1copy`.
 2. **Keep the guest command name at most 14 bytes**. `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts that every imported basename fits. The host binary has a leading underscore, but `mkfs` removes it: `user/_ex1copy` becomes the xv6 command `ex1copy`.
 3. Include xv6's headers, usually `kernel/types.h` followed by `user/user.h`. **Do not include the host `<stdio.h>`**: xv6 is freestanding and links against `ULIB`, not the host C library.
 4. Use integer file descriptors with xv6 system calls. **By Unix convention, 0 is standard input, 1 is standard output, and 2 is standard error**; they are not C `FILE *` streams such as `stdin` and `stdout`.
-5. Add the linked target to `UPROGS` in the Makefile:
+5. Append the linked target to the base `UPROGS` list in the Makefile, indented with a tab like the entries around it. `$U/_ex1copy` is currently the last one, so a new `ex2` goes straight after it:
 
     ```makefile
     $U/_ex1copy\
+    $U/_ex2\
     ```
+
+    **Every entry ends with a backslash, including the last one** — the blank line that follows is what terminates the variable. Adding an exercise is therefore a one-line append, with no edit to the line above it.
 
 6. Build a fresh image and start QEMU:
 
@@ -183,16 +189,21 @@ Use this checklist for a standalone exercise:
     make qemu
     ```
 
-7. Confirm and run the guest command:
+7. Confirm the command reached the image, then run it. The `grep` prints one `ls` row if the program is installed and nothing at all if it is not:
 
     ```text
-    $ ls
+    $ ls | grep ex1copy
     $ ex1copy
     ```
 
-If the shell prints `exec ex1copy failed`, first check that `ls` contains `ex1copy`, then check the spelling in `UPROGS`. If the build reaches `mkfs` and aborts, check for a nested path or a basename longer than 14 bytes. Run `make clean` only when changing `conf/lab.mk` or diagnosing a genuinely stale build; ordinary source and `UPROGS` dependencies rebuild automatically.
+If the shell prints `exec ex1copy failed`, that `grep` printed nothing: check the spelling in `UPROGS`. If the build reaches `mkfs` and aborts, check for a nested path or a basename longer than 14 bytes. Run `make clean` only when changing `conf/lab.mk` or diagnosing a genuinely stale build; ordinary source and `UPROGS` dependencies rebuild automatically.
 
-For the signature, return value, and failure mode of any call you reach for, see [05-syscall-reference.md](05-syscall-reference.md) — xv6 has no man pages, so that file is the lookup. For the generic model behind system calls and descriptors, see [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#file-descriptors-open-file-descriptions-and-pipes). This guide owns only the xv6 build and console details.
+To pin the behaviour down rather than re-checking it by hand after every edit, write a focused grader beside the lab ones. [`grade-ex1copy`](../grade-ex1copy) is the pattern: three tests, driving QEMU through `gradelib.py` and asserting on the console transcript. The harness is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
+
+For the signature, return value, and failure mode of any call you reach for, see [05-syscall-reference.md](05-syscall-reference.md) — xv6 has no man pages, so that file is the lookup. For the generic model behind system calls and descriptors, see [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#file-descriptors-open-file-descriptions-and-pipes).
+
+> [!NOTE]
+> This section owns the mechanics that every exercise shares. The exercises themselves — what each one does, how it behaves, and which lecture idea it carries — live in [07-exercises.md](07-exercises.md), one section each, so this guide does not grow a subsection per `.c` file.
 
 ### Why sources and build products stay flat
 
@@ -208,7 +219,7 @@ Adding a tenth or a fiftieth exercise does not justify `user/exercises/`, and th
 The artifacts are already invisible where it counts. `.gitignore` covers `_*`, `*.o`, `*.d`, `*.asm`, `*.sym`, `*.img`, and `*.img.bk`, and `git ls-files` returns nothing generated — so the clutter is a file-listing annoyance, never a diff or a commit. Moving it into a `build/` tree would buy a tidier `ls` and cost the four mechanisms above.
 
 > [!IMPORTANT]
-> The decisive reason is merge cost. The Makefile carries `ifeq ($(LAB),...)` blocks for all nine labs and is merged from `labs/<lab>` at the start of each one — see [03-lab-workflow.md](03-lab-workflow.md). Restructuring the build turns every future lab merge into a conflict on the single file most likely to have changed upstream, in exchange for cosmetics.
+> The decisive reason is merge cost. The Makefile carries an `ifeq ($(LAB),...)` block for every lab — eleven of them, counting `thread` and `lazy`, which have no branch on the `labs` remote — and is merged from `labs/<lab>` at the start of each one, see [03-lab-workflow.md](03-lab-workflow.md). Restructuring the build turns every future lab merge into a conflict on the single file most likely to have changed upstream, in exchange for cosmetics.
 
 Two of these products are worth keeping close rather than tolerating. `kernel/kernel.asm` and each program's `.asm` are the primary debugging artifacts in the traps and pgtbl labs, and `grep -n '<address>' kernel/kernel.asm` is a one-step operation precisely because the file sits next to the source it disassembles.
 
@@ -230,63 +241,6 @@ The conventions below are enforced by tooling or by the absence of a C library, 
 
 > [!WARNING]
 > Do not run `make fmt` to fix one file. It reformats every source in `kernel/`, `user/`, and `mkfs/`, and a whole-tree reformat makes the next lab merge conflict on nearly every file. Match the surrounding style by hand instead.
-
-### `ex1copy`: waiting is part of the interface
-
-The official [MIT 6.1810 Lecture 1 example](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c) is a filter: it copies every byte from descriptor 0 to descriptor 1 until `read()` returns 0 for EOF. It does not stop after one line, and it adds nothing to the data it copies.
-
-Interactively, type a line, press Enter, and then press `Ctrl-d` at the next empty input position:
-
-```text
-$ ex1copy
-ex1copy: copying standard input to standard output.
-ex1copy: type a line and press Enter. Ctrl-d on an empty line finishes.
-hello
-hello
-$
-```
-
-The first `hello` is the console echoing the keys you typed. The second is `ex1copy` writing the bytes returned by `read()`. The program then calls `read()` again; only after the buffered input is consumed does that read sleep because xv6 console input is line-buffered. Pressing `Ctrl-d` makes that read return 0 and restores the shell prompt. The wait is expected input-filter behavior, not a deadlock.
-
-A finite pipeline supplies EOF automatically when its writer exits, and the two hint lines are gone:
-
-```text
-$ echo hello | ex1copy
-hello
-$
-```
-
-That difference is the point. A filter must not add bytes to its output, so the hint is bound by two rules that the program enforces itself:
-
-| Rule                                        | Mechanism                                                                                                                                                              |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **It never travels with the data**          | The hint is written to descriptor 2, never 1, so `ex1copy > out` and `ex1copy \| wc` see only copied bytes.                                                            |
-| **It only appears when a human is waiting** | `fstat(0, &st)` decides: `T_DEVICE` means the console, so print it; `T_FILE` means a redirect, so stay quiet; and a pipe makes `fstat()` fail outright, so stay quiet. |
-
-That last case is not a special case in `ex1copy` — `filestat()` in `kernel/file.c` serves `FD_INODE` and `FD_DEVICE` and returns -1 for `FD_PIPE`, so one `fstat()` call separates all three sources for free.
-
-> [!NOTE]
-> Without the hint, an interactive run is visually identical to a hung program: no prompt, no output, no cursor movement. That is the single most common first-encounter confusion with Unix filters, and it is why the troubleshooting table below still carries a row for it — `cat` with no arguments behaves exactly the same way and says nothing at all.
-
-### What lecture 1 uses `ex1copy` to teach
-
-Twenty lines of C carry most of the Unix I/O model. The commentary block at the top of `user/ex1copy.c` is the long form; this is the map from each teaching point to the code in this tree that implements it.
-
-| Teaching point                                                                                                 | Where it lives here                                                                                                                                                                      |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`read()` and `write()` look like function calls but jump into the kernel, preserving user/kernel isolation** | `user/usys.S` loads a syscall number into `a7` and executes `ecall`; `kernel/syscall.c` dispatches to `sys_read` and `sys_write` in `kernel/sysfile.c`.                                  |
-| **The first argument is a file descriptor, naming an already-open file**                                       | Resolved through `p->ofile[NOFILE]` in `kernel/proc.h`. `NOFILE` is 16, so one process can hold many descriptors.                                                                        |
-| **An FD may be a file, a pipe, a device, or the console**                                                      | `struct file` carries a type tag; `kernel/file.c` `fileread()` branches on it, so the caller's code is identical for all four.                                                           |
-| **FD 0 is standard input and FD 1 is standard output, by convention**                                          | `user/sh.c` arranges the descriptors before `exec`, and `user/init.c` guarantees 0, 1, and 2 exist at boot.                                                                              |
-| **The second and third arguments are a destination address and a maximum byte count**                          | `read()` may return fewer bytes than requested and never more, which is why the program writes `n` and not `sizeof(buf)`.                                                                |
-| **The return value is a byte count, `0` for EOF, or `-1` for an error**                                        | All three outcomes appear in the loop: positive drives the copy, zero exits it, negative reaches the `read error` branch.                                                                |
-| **Unix I/O is untyped 8-bit bytes**                                                                            | Nothing in `ex1copy` inspects `buf`. Interpreting the bytes as text, a record, or an image is the application's job, never the kernel's.                                                 |
-| **A program can still ask what kind of thing a descriptor names**                                              | `fstat(0, &st)` reports `T_DEVICE` for the console and `T_FILE` for a redirect, and fails for a pipe. `ex1copy` uses it for one decision only: whether a human is sitting there waiting. |
-
-The lecture ends on an open question — how do you make a _new_ file descriptor? — and the answer is `open()`, `pipe()`, and `dup()` in `user/user.h`. `user/sh.c` builds every redirection and pipeline out of those three plus `close()`, resting entirely on `fdalloc()`'s lowest-unused-descriptor rule; see [book/ch01](book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection).
-
-> [!WARNING]
-> `make qemu` depends on `newfs.img`, which rotates the existing `fs.img` aside and builds a fresh one. Any file you create inside xv6 is gone on the next `make qemu`. Use `make qemu-fs` to boot the existing image and keep guest files across reboots.
 
 ## Debugging
 
@@ -431,15 +385,15 @@ For grading a lab specifically, see [03-lab-workflow.md](03-lab-workflow.md).
 
 ## When things go wrong
 
-| Symptom                                               | Cause and fix                                                                                                                                                                                                                                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`ERROR: Need qemu version >= 7.2`**                 | QEMU too old. Ubuntu 24.04 or newer, or build QEMU from source.                                                                                                                                                                                                                           |
-| **`Couldn't find a riscv64 version of GCC/binutils`** | The cross toolchain is not on `PATH`. See [01-environment-setup.md](01-environment-setup.md).                                                                                                                                                                                             |
-| **`exec ... failed` for a program you just wrote**    | The command is absent from `fs.img`, usually because it is missing from `UPROGS`; nested source paths and guest names longer than 14 bytes also cannot be imported by this `mkfs`.                                                                                                        |
-| **`ex1copy` copies a line and then appears to hang**  | It is waiting for more standard input, as its two startup lines on descriptor 2 say. Press `Ctrl-d` at an empty input position to send EOF, or feed it finite input through a pipe. Any other filter — `cat` with no arguments, `wc`, `grep` — does the same thing without announcing it. |
-| **Build succeeds but changes have no effect**         | A stale object tree, most often after switching `conf/lab.mk`. Run `make clean`.                                                                                                                                                                                                          |
-| **Terminal is wrecked after a crash**                 | QEMU left the terminal in raw mode. Run `reset` — it will work even though you cannot see what you are typing.                                                                                                                                                                            |
-| **`make clean` fails**                                | Another xv6 instance is still running and holding files. Find it with `ps` and kill it.                                                                                                                                                                                                   |
-| **Hangs forever with no output**                      | Usually a kernel panic before the console is up, or an infinite loop in early boot. Attach with `make qemu-gdb` and break on `main`.                                                                                                                                                      |
-| **Hangs after booting normally**                      | Likely a deadlock. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](#backtraces-panics-and-hangs).                                                                                                                                                             |
-| **A fault message with an `sepc` value**              | Turn the address into a line with `addr2line -e kernel/kernel <sepc>`, or search for it in `kernel/kernel.asm`.                                                                                                                                                                           |
+| Symptom                                               | Cause and fix                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`ERROR: Need qemu version >= 7.2`**                 | QEMU too old. Ubuntu 24.04 or newer, or build QEMU from source.                                                                                                                                                                                                                                                                       |
+| **`Couldn't find a riscv64 version of GCC/binutils`** | The cross toolchain is not on `PATH`. See [01-environment-setup.md](01-environment-setup.md).                                                                                                                                                                                                                                         |
+| **`exec ... failed` for a program you just wrote**    | The command is absent from `fs.img`, usually because it is missing from `UPROGS`; nested source paths and guest names longer than 14 bytes also cannot be imported by this `mkfs`.                                                                                                                                                    |
+| **A filter copies a line and then appears to hang**   | It is waiting for more standard input. Press `Ctrl-d` at an empty input position to send EOF, or feed it finite input through a pipe. `ex1copy` says so on descriptor 2 — see [07-exercises.md](07-exercises.md#waiting-is-part-of-the-interface); `cat` with no arguments, `wc`, and `grep` behave identically and announce nothing. |
+| **Build succeeds but changes have no effect**         | A stale object tree, most often after switching `conf/lab.mk`. Run `make clean`.                                                                                                                                                                                                                                                      |
+| **Terminal is wrecked after a crash**                 | QEMU left the terminal in raw mode. Run `reset` — it will work even though you cannot see what you are typing.                                                                                                                                                                                                                        |
+| **`make clean` fails**                                | Another xv6 instance is still running and holding files. Find it with `ps` and kill it.                                                                                                                                                                                                                                               |
+| **Hangs forever with no output**                      | Usually a kernel panic before the console is up, or an infinite loop in early boot. Attach with `make qemu-gdb` and break on `main`.                                                                                                                                                                                                  |
+| **Hangs after booting normally**                      | Likely a deadlock. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](#backtraces-panics-and-hangs).                                                                                                                                                                                                         |
+| **A fault message with an `sepc` value**              | Turn the address into a line with `addr2line -e kernel/kernel <sepc>`, or search for it in `kernel/kernel.asm`.                                                                                                                                                                                                                       |

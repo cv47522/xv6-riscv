@@ -80,6 +80,7 @@
 //   one open file               kernel/file.c  (struct file, filestat())
 //   console line buffering      kernel/console.c
 //   descriptor plumbing         user/sh.c  (redirection and pipelines)
+//   this exercise, written up   docs/07-exercises.md
 //   the long-form notes         docs/book/ch01-operating-system-interfaces.md
 //
 // ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ If you are setting this up for the first time, read these in order. Each one ass
 | **[04-terminology.md](04-terminology.md)**                       | Glossary. Every acronym expanded — xv6, RISC-V, QEMU, hart, PLIC, and the rest.                                                                                             |
 | **[05-syscall-reference.md](05-syscall-reference.md)**           | All 22 system calls by group — signature, return value, failure mode, and implementing file. xv6 has no man pages; this is the lookup. Not read in order; consulted.        |
 | **[06-build-artifacts.md](06-build-artifacts.md)**               | What `.o`, `.d`, `.asm`, `.sym`, `.S`, `.pl`, and `.ld` files are, which are generated, and why a kernel needs file types an ordinary C project does not.                   |
+| **[07-exercises.md](07-exercises.md)**                           | The lecture exercises under `user/`, one section each: behaviour, the idea each one carries, and its regression tests. Grows as exercises are added.                        |
 | **[book/](book/)**                                               | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                                         |
 | **[book/00-ostep-concordance.md](book/00-ostep-concordance.md)** | One concept per row, mapped across the xv6 book, the OSTEP notes in `../operating-system/`, this tree's source, and the exercises. Read it before writing any chapter note. |
 
