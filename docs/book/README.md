@@ -12,18 +12,21 @@ Chapter notes from [xv6: a simple, Unix-like teaching operating system](https://
 
 Tick these off as you go, and link each to its notes file once written.
 
-| #      | Chapter                       | Mostly about                             | Notes |
-| ------ | ----------------------------- | ---------------------------------------- | ----- |
-| **1**  | Operating system interfaces   | Processes, files, pipes, the shell       | —     |
-| **2**  | Operating system organization | Kernel/user split, privilege modes, boot | —     |
-| **3**  | Page tables                   | Sv39, address spaces, `kernel/vm.c`      | —     |
-| **4**  | Traps and system calls        | `ecall`, trampoline, trapframe           | —     |
-| **5**  | Interrupts and device drivers | UART, PLIC, virtio disk                  | —     |
-| **6**  | Locking                       | Spinlocks, races, deadlock               | —     |
-| **7**  | Scheduling                    | Context switching, sleep/wakeup          | —     |
-| **8**  | File system                   | Inodes, logging, the buffer cache        | —     |
-| **9**  | Concurrency revisited         | Lock-free tricks, memory ordering        | —     |
-| **10** | Summary                       | —                                        | —     |
+| #      | Chapter                       | Mostly about                                  | Case     | Notes |
+| ------ | ----------------------------- | ---------------------------------------------- | -------- | ----- |
+| **1**  | Operating system interfaces   | Processes, files, pipes, the shell            | linked   | —     |
+| **2**  | Operating system organization | Kernel/user split, machine modes, boot        | mixed    | —     |
+| **3**  | Page tables                   | Sv39, address spaces, `kernel/vm.c`           | linked   | —     |
+| **4**  | Traps and system calls        | `ecall`, trampoline, trapframe                | mixed    | —     |
+| **5**  | Page faults                   | COW, lazy allocation, demand paging           | loan     | —     |
+| **6**  | Interrupts and device drivers | UART, PLIC, virtio disk                       | loan     | —     |
+| **7**  | Locking                       | Spinlocks, races, deadlock                    | loan     | —     |
+| **8**  | Scheduling                    | Context switching, `swtch.S`                  | linked   | —     |
+| **9**  | Sleep and Wakeup              | Sleep/wakeup, condition variables             | loan     | —     |
+| **10** | File system                   | Inodes, the buffer cache                      | loan     | —     |
+| **11** | Logging                       | Journaling, crash consistency                 | loan     | —     |
+| **12** | Concurrency revisited         | Memory ordering, fences, lock-free            | loan     | —     |
+| **13** | Summary                       | —                                             | xv6-only | —     |
 
 ## Naming
 
@@ -31,33 +34,59 @@ One file per chapter, numbered so they sort correctly:
 
 ```
 ch01-operating-system-interfaces.md
-ch03-page-tables.md
+ch05-page-faults.md
+ch13-summary.md
 ```
 
-## Suggested shape
+## How a chapter note is written
 
-Nothing enforced, but notes are more useful later if they connect the reading to the code:
+The rule that keeps these notes short: **`../operating-system/` owns concepts; this directory owns xv6's realization of them.** The test when placement is unclear is *would this sentence still be true on Linux?* Yes means it belongs in the OSTEP note; no means it belongs here. A chapter note that explains what `fork` *is* has violated the rule.
+
+That rule assumes the concept note exists, and for most chapters it does not yet. So every concept falls into one of three cases, recorded in [00-ostep-concordance.md](00-ostep-concordance.md):
+
+| Case | When | Where the explanation goes |
+| ---- | ---- | -------------------------- |
+| **linked** | The OSTEP counterpart is written | Link to it; define nothing here. |
+| **loan** | The OSTEP counterpart is a placeholder | Write a short `## Concept on loan` block here, naming its destination. |
+| **xv6-only** | No OSTEP counterpart exists | This note owns it permanently. |
+
+A loan is a debt, not a home. `grep -rn '^## Concept on loan' docs/book/` lists every one outstanding. When the OSTEP note is finally written, move the block there, replace it with a link, and flip the concordance row to `linked`.
+
+### Shape
 
 ```markdown
 # Chapter N: Title
 
-## Key ideas
+> **Theory:** [OSTEP — …][ostep-x]. Read that first; this note does not re-explain it.
 
-What the chapter is actually arguing, in your own words.
-
+## What xv6 actually does
+## Concept on loan: <topic>        <- only while the OSTEP note is a placeholder
+## Divergences
 ## Code walked through
-
-- `kernel/vm.c:57` — walk() descends the three-level page table
-- `kernel/proc.c:112` — allocproc() sets up a new process
-
 ## Questions I had
+## Lab connection
 
-Things that were not obvious, and what resolved them.
-
-## Connections
-
-Which lab this chapter prepares you for; which earlier chapter it builds on.
+[ostep-x]: ../../../operating-system/<Note>.md#<anchor>
 ```
+
+`What xv6 actually does` is the only mandatory section. For an `xv6-only` chapter, the blockquote instead states that no OSTEP counterpart exists, so the note stands alone by design.
+
+`Divergences` covers three kinds, each of which would otherwise look like somebody's mistake:
+
+- **Naming** — this tree's `kfork`/`kexec`/`kwait`/`kexit` against `fork`/`exec`/`wait` in both the book prose and OSTEP.
+- **Architecture** — RISC-V `ra`/`sp`/`s0`–`s11` against the x86 `eip`/`esp`/`ebx`/`ebp` in OSTEP's figures.
+- **Vintage** — OSTEP's xv6 material predates the 2019 RISC-V port and describes `xv6-public`, the older x86 tree.
+
+Only chapters that actually diverge carry the section, and it links the concordance appendix rather than restating the correspondence table.
+
+## Cross-repo links
+
+Links into the OSTEP notes are **relative and editor-only**: `../../../operating-system/…` from this directory, which sits two levels below the repository root. They are ctrl-clickable in an editor and survive renames.
+
+> [!IMPORTANT]
+> These links 404 on GitHub, by design. The two repositories live on different hosts, so no relative path can render on both. Do not "fix" them into absolute URLs. They assume both repositories sit side by side under `~/personal/`.
+
+Run [check-notes.sh](check-notes.sh) after editing to confirm every link still resolves.
 
 > [!TIP]
 > Add new vocabulary to [../04-terminology.md](../04-terminology.md) rather than defining it inline. That keeps one authoritative definition and lets chapter notes stay short.
