@@ -257,6 +257,23 @@ check_syscalls() {
   done
 }
 
+# 8. Documentation paths cited inside C sources actually resolve. Nothing
+#    else guards these: check_links reads only markdown, so a comment in
+#    user/*.c or kernel/*.c that points a reader at a note under docs/ rots
+#    silently the moment that note is renamed.
+check_source_doc_refs() {
+  echo "== docs/ paths cited in C sources resolve =="
+  local f path
+  for f in "$REPO"/user/*.c "$REPO"/kernel/*.c "$REPO"/mkfs/*.c; do
+    [ -e "$f" ] || continue
+    grep -oE 'docs/[A-Za-z0-9._/-]+\.(md|sh)' "$f" | sort -u |
+    while IFS= read -r path; do
+      [ -e "$REPO/$path" ] ||
+        bad "${f#"$REPO"/} cites $path, which does not exist"
+    done
+  done
+}
+
 check_links
 check_chapters
 check_symbols
@@ -264,6 +281,7 @@ check_status
 check_cases
 check_backlinks
 check_syscalls
+check_source_doc_refs
 
 echo
 if [ -s "$FAILS" ]; then

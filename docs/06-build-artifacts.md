@@ -209,7 +209,9 @@ The difference is one layer thick, and it is the _library_ layer, not the kernel
 | `exit(EXIT_FAILURE)`      | `<stdlib.h>`   | `exit(1)`                                                                                                                     |
 | `return EXIT_SUCCESS`     | `<stdlib.h>`   | `return 0`                                                                                                                    |
 
-The pattern: **the system calls transfer unchanged, and everything glibc built on top of them does not.** `$PATH` lookup, variadic `exec` variants, buffered stdio, and `errno` are library conveniences, not kernel features — which is exactly the distinction the `man` section 2 versus section 3 split encodes. See [05-syscall-reference.md](05-syscall-reference.md) for what this tree does provide.
+The pattern: **the system calls transfer unchanged, and everything glibc built on top of them does not.** `$PATH` lookup, variadic `exec` variants, buffered stdio, and `errno` are library conveniences, not kernel features — which is exactly the distinction the `man` section 2 versus section 3 split encodes. [05-syscall-reference.md](05-syscall-reference.md) lists what this tree does provide.
+
+Names that survive the move can still carry different values. The `O_*` open flags are the sharpest case — `O_CREATE` is `0x200` here against `O_CREAT` at `0x40` on Linux, differing in spelling _and_ number — and the full comparison, along with the arity, `errno`, `lseek`, and limit differences, is tabulated in [Divergences from POSIX](05-syscall-reference.md#divergences-from-posix).
 
 ## Why this tree needs `.d` files
 
