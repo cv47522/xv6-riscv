@@ -16,15 +16,60 @@ The book chapter is a tour of the interface. This note is a tour of the code sit
 
 `kfork()` in `kernel/proc.c` is about forty-five lines, and every one of them is doing one of five jobs.
 
-- **Claim a slot.** `allocproc()` linear-scans the fixed `proc[NPROC]` array for a `UNUSED` entry and returns it with `p->lock` still held. It assigns a fresh pid, `kalloc()`s the trapframe page, builds an empty user page table with `proc_pagetable()` — which maps only the trampoline and trapframe pages, both without `PTE_U` — and points `p->context.ra` at `forkret`. The kernel stack is not allocated here: `procinit()` hands every slot a permanent `KSTACK(i)` at boot, so a slot's kernel stack outlives the processes that pass through it.
-- **Duplicate the memory.** `uvmcopy()` in `kernel/vm.c` steps through the parent's address space one `PGSIZE` at a time, `walk()`s the parent PTE, `kalloc()`s a fresh physical page, `memmove()`s 4096 bytes into it, and `mappages()` it into the child at the *same* virtual address with the *same* flag bits. The copy is eager and byte-for-byte; there is no copy-on-write anywhere in the base tree, which is exactly the gap the `cow` lab fills ([ch05](ch05-page-faults.md)). Note that it `continue`s past PTEs that are absent or lack `PTE_V` rather than treating them as errors, and that failure part-way through unwinds with `uvmunmap(new, 0, i / PGSIZE, 1)` — the child never survives a partial address space.
-- **Duplicate the register state.** `*(np->trapframe) = *(p->trapframe)` copies the saved user registers wholesale, then `np->trapframe->a0 = 0` overwrites the return-value register. This single assignment is the whole of "returns twice" as a mechanism: there is no second return anywhere, only two saved register sets, one of which has had a zero written into the slot the other will find the new pid in. Neither process returns until the trap path restores its own trapframe.
-- **Duplicate the descriptor table.** A loop over `NOFILE` entries calls `filedup()` on each non-null `p->ofile[i]`, and `idup()` on `p->cwd`. Both are reference-count bumps, not copies — see below.
-- **Publish it.** The parent link is set under the global `wait_lock` rather than `np->lock`, and the state flips to `RUNNABLE` last, so the scheduler cannot pick the child up before it is complete.
+```mermaid
+flowchart LR
+    A["1. Claim an UNUSED slot"] --> B["2. Duplicate memory"]
+    B --> C["3. Duplicate registers"]
+    C --> D["4. Duplicate descriptors"]
+    D --> E["5. Publish as RUNNABLE"]
+
+    classDef processing fill:#fffff0,stroke:#cc6
+    classDef commit fill:#f0ffff,stroke:#6cc
+    class A,B,C,D processing
+    class E commit
+```
+
+1. **Claim a slot with `allocproc()`.**
+    - **Selection:** Linear-scan the fixed `proc[NPROC]` array for an `UNUSED` entry and return it with `p->lock` still held.
+    - **Setup:** Assign a fresh pid, `kalloc()` the trapframe page, build an empty user page table with `proc_pagetable()`, and point `p->context.ra` at `forkret`.
+    - **Mapping invariant:** The new page table initially maps only the trampoline and trapframe pages, both without `PTE_U`.
+    - **Lifetime invariant:** `procinit()` gives every slot a permanent `KSTACK(i)` at boot, so the kernel stack is not allocated here and outlives the processes that pass through the slot.
+2. **Duplicate the memory with `uvmcopy()`.**
+    - **Copy:** Step through the parent's address space one `PGSIZE` at a time, `walk()` the parent PTE, `kalloc()` a fresh physical page, `memmove()` 4096 bytes, and `mappages()` the page into the child at the same virtual address with the same flag bits.
+    - **Policy:** The copy is eager and byte-for-byte; the base tree has no copy-on-write, which is exactly the gap the `cow` lab fills ([ch05](ch05-page-faults.md)).
+    - **Sparse mappings:** `continue` past PTEs that are absent or lack `PTE_V` rather than treating them as errors.
+    - **Failure invariant:** Unwind a partial copy with `uvmunmap(new, 0, i / PGSIZE, 1)`, so the child never survives with a partial address space.
+3. **Duplicate the register state.**
+    - **Copy:** `*(np->trapframe) = *(p->trapframe)` copies the saved user registers wholesale.
+    - **Return split:** `np->trapframe->a0 = 0` overwrites the child's return-value register. There is no second return anywhere, only two saved register sets: the child finds zero in `a0`, while the parent finds the new pid.
+    - **Restore:** Neither process returns until the trap path restores its own trapframe.
+4. **Duplicate the descriptor table.** A loop over `NOFILE` entries calls `filedup()` on each non-null `p->ofile[i]`, and `idup()` on `p->cwd`. Both operations bump reference counts rather than copying the underlying objects.
+5. **Publish the child.** Set the parent link under the global `wait_lock`, not `np->lock`, and flip the state to `RUNNABLE` last, so the scheduler cannot select an incomplete child.
 
 ### Replacing the image: `kexec()`
 
-`kexec()` in `kernel/exec.c` is written so that it can fail safely, and the structure follows from that. It never touches `p->pagetable` until the very end. Everything — the ELF header read by `readi()`, each program header fed to `loadseg()`, the stack — is built inside a *second* page table obtained from `proc_pagetable(p)`. Only at the "commit to the user image" comment does it swap `p->pagetable`, `p->sz`, `p->trapframe->epc`, and `p->trapframe->sp`, then free the old table. Any failure before that point jumps to `bad:`, frees the half-built table, and returns -1 into a process whose image was never disturbed. That is why a failed `exec` can return at all, and why `user/sh.c` can print `exec %s failed` on the line after the call.
+`kexec()` in `kernel/exec.c` treats image replacement as a transaction: build a complete replacement away from the live process, then commit once it is safe.
+
+```mermaid
+flowchart LR
+    A["Create a spare page table"] --> B["readi(): read ELF header"]
+    B --> C["loadseg(): load each program segment"]
+    C --> D["Build the user stack"]
+    B -->|failure| F["bad: free the spare table<br/>return -1<br/>old image intact"]
+    C -->|failure| F
+    D -->|failure| F
+    D --> E["Commit pagetable, sz,<br/>epc, and sp"]
+    E --> G["Free the old page table"]
+
+    classDef processing fill:#fffff0,stroke:#cc6
+    classDef commit fill:#f0ffff,stroke:#6cc
+    classDef failure fill:#ffd9d9,stroke:#c66
+    class A,B,C,D processing
+    class E,G commit
+    class F failure
+```
+
+Until the commit, `p->pagetable` is untouched: the ELF header, program segments, and stack all live in a second page table from `proc_pagetable(p)`. At the `commit to the user image` comment, `kexec()` swaps `p->pagetable`, `p->sz`, `p->trapframe->epc`, and `p->trapframe->sp`, then frees the old table. Any earlier failure jumps to `bad:`, frees the half-built table, and returns -1 into the undisturbed image. That is why a failed `exec` can return and why `user/sh.c` can print `exec %s failed` on the line after the call.
 
 Three details are specific to this tree:
 
@@ -38,40 +83,131 @@ What `kexec()` deliberately does **not** touch is `p->ofile` and `p->cwd`. That 
 
 There are two tables, not one, and the split is where all the interesting behaviour lives.
 
-| Level | Where | Contents |
-| ----- | ----- | -------- |
-| Per-process | `struct file *ofile[NOFILE]` in `struct proc` (`kernel/proc.h`), `NOFILE` = 16 | pointers, indexed by the descriptor number itself |
-| System-wide | `ftable.file[NFILE]` in `kernel/file.c`, `NFILE` = 100 | the `struct file` objects, each with `ref`, `readable`, `writable`, a type tag, and `off` |
+| Level       | Where                                                                          | Contents                                                                                  |
+| ----------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| **Per-process** | `struct file *ofile[NOFILE]` in `struct proc` (`kernel/proc.h`), `NOFILE` = 16 | pointers, indexed by the descriptor number itself                                         |
+| **System-wide** | `ftable.file[NFILE]` in `kernel/file.c`, `NFILE` = 100                         | the `struct file` objects, each with `ref`, `readable`, `writable`, a type tag, and `off` |
 
-`fdalloc()` in `kernel/sysfile.c` scans `ofile` from index 0 and takes the first null slot. The "lowest unused descriptor" rule the book leans on so heavily is that four-line loop; nothing else enforces it. `filealloc()` takes `ftable.lock` and returns the first entry whose `ref` is zero, which is why a process can exhaust the *system's* 100 open files without exhausting its own 16.
+```mermaid
+flowchart LR
+    subgraph parent["Parent process"]
+        P["ofile[fd]"]
+    end
+    subgraph child["Child process"]
+        C["ofile[fd]"]
+    end
+    F["shared struct file<br/>ref · off · mode · type"]
+    U["underlying inode or pipe"]
+    P --> F
+    C --> F
+    F --> U
 
-The consequences fall out of where `off` lives. It sits in the shared `struct file`, not in the per-process slot, so `filedup()` — which only increments `f->ref` under the table lock — leaves parent and child pointing at one offset. Two descriptors share a position in a file precisely when they were reached from a common `struct file`, and `open()`ing the same path twice gets two `struct file` entries and therefore two offsets. `kexit()` closes the loop from the other end: it walks `ofile` calling `fileclose()` on every entry, so a reference count reaching zero at process death is what tears the underlying object down.
+    classDef routing fill:#f0f0ff,stroke:#66c
+    classDef storage fill:#f0ffff,stroke:#6cc
+    class P,C routing
+    class F,U storage
+```
 
-Put `kfork()`, `kexec()`, and `fdalloc()` together and shell redirection needs no kernel support whatsoever. The child begins with pointer-identical `ofile` entries; it `close()`s one index, which nulls that slot; the following `open()` calls `fdalloc()`, which hands back the same index because it is now the lowest free one; and `kexec()` then replaces the address space while leaving `ofile` exactly as the child arranged it. No kernel path knows that a redirection happened.
+`fdalloc()` in `kernel/sysfile.c` scans `ofile` from index 0 and takes the first null slot. The "lowest unused descriptor" rule the book leans on so heavily is that four-line loop; nothing else enforces it. `filealloc()` takes `ftable.lock` and returns the first entry whose `ref` is zero, which is why a process can exhaust the _system's_ 100 open files without exhausting its own 16.
+
+The consequences fall out of where `off` lives: in the shared `struct file`, not in the per-process slot.
+
+| Operation                                        | Result                                                                                                                          |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `filedup()` or `kfork()`                         | Increment `f->ref` under `ftable.lock` and leave both descriptor slots pointing at one `struct file`, so they share one offset. |
+| Two independent `open()` calls for the same path | Allocate two `struct file` entries, so the descriptors have independent offsets.                                                |
+| `kexit()` and `fileclose()`                      | Walk `ofile`, drop references, and tear down the underlying pipe or inode when the last reference reaches zero.                 |
+
+Put `kfork()`, `kexec()`, and `fdalloc()` together, and shell redirection needs no dedicated kernel operation:
+
+1. The child starts with pointer-identical `ofile` entries inherited from the parent.
+2. `close()` nulls the descriptor slot selected for redirection.
+3. The following `open()` calls `fdalloc()`, which reclaims that index because it is now the lowest free slot.
+4. `kexec()` replaces the address space while preserving `ofile` exactly as the child arranged it.
+
+No kernel path knows that a redirection happened.
 
 ### Pipes
 
-`struct pipe` in `kernel/pipe.c` is one `kalloc()`ed page holding a `PIPESIZE` (512-byte) `data` array, a spinlock, two monotonically increasing counters `nread` and `nwrite`, and the `readopen` / `writeopen` flags. The counters never wrap: indexing is `pi->data[pi->nread % PIPESIZE]`, "empty" is `nread == nwrite`, and "full" is `nwrite == nread + PIPESIZE`.
+`struct pipe` in `kernel/pipe.c` occupies one `kalloc()`ed page.
+
+| Field                   | Role                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `data[PIPESIZE]`        | The 512-byte circular buffer.                                                                                                   |
+| `lock`                  | The spinlock protecting the pipe state.                                                                                         |
+| `nread`, `nwrite`       | Monotonically increasing counters; indexing uses `counter % PIPESIZE`, so the counters themselves never wrap around the buffer. |
+| `readopen`, `writeopen` | Whether any references to the corresponding endpoint remain.                                                                    |
+
+The buffer is empty when `nread == nwrite` and full when `nwrite == nread + PIPESIZE`.
 
 `pipealloc()` takes two `struct file` from `filealloc()` and points both at the same `struct pipe`, tagging one `FD_PIPE` with `readable = 1` and the other with `writable = 1`. So one buffer becomes two independently reference-counted objects, and `sys_pipe()` merely `fdalloc()`s both and `copyout()`s the pair of integers into the user's `int p[2]`.
 
-That structure is what makes end-of-file work. `piperead()` sleeps while `nread == nwrite && pi->writeopen`, so it returns 0 only when `writeopen` has been cleared — and `pipeclose()` clears it when the *writable* `struct file`'s last reference goes away, freeing the page only once both flags are down. Every process holding a copy of the write descriptor therefore keeps the reader blocked, which is why the shell's pipeline code closes descriptors so aggressively. This tree splits the classic blocking primitive into `sleep_prepare(&pi->nread)`, a lock release, and then `sleep()`; the reasoning belongs to [ch09](ch09-sleep-and-wakeup.md).
+That structure makes blocking, end-of-file, and deallocation distinct outcomes:
+
+| Condition                       | Reader or kernel action | Meaning                                                                    |
+| ------------------------------- | ----------------------- | -------------------------------------------------------------------------- |
+| `nread < nwrite`                | Read available bytes.   | Buffered data exists.                                                      |
+| `nread == nwrite && writeopen`  | Sleep.                  | The pipe is empty, but at least one writer reference remains.              |
+| `nread == nwrite && !writeopen` | Return `0`.             | The last writable `struct file` reference is gone, so the reader sees EOF. |
+| `!readopen && !writeopen`       | Free the pipe page.     | No endpoint references remain.                                             |
+
+`pipeclose()` clears an endpoint flag only when that endpoint's last `struct file` reference goes away. Every process holding a copy of the write descriptor therefore keeps `writeopen` set and the empty reader asleep, which is why the shell closes pipeline descriptors so aggressively.
+
+> [!NOTE]
+> This tree splits the classic blocking primitive into `sleep_prepare(&pi->nread)`, a lock release, and then `sleep()`; the reasoning belongs to [ch09](ch09-sleep-and-wakeup.md).
 
 ### The shell is just another program
 
 `user/sh.c` compiles into `_sh`, lands in `fs.img` beside `_cat` and `_ls`, and links against `user/ulib.c` like any other user program. It holds no privilege and gets no special treatment; `user/init.c` starts it with the same `exec` any program would use.
 
-`main()` opens `"console"` in a loop until the returned descriptor is 3 or higher, then closes that one. The idiom guarantees that 0, 1, and 2 exist without the shell having to know which of them were already open — a point that matters for the `util` lab, where the grader runs `sh < findtest.sh` and fd 0 is a file rather than the console. Then the loop: `getcmd()` writes the `$ ` prompt to fd **2** and reads a line via `gets()` from fd 0, `fork1()` splits, the child runs `runcmd(parsecmd(cmd))`, and the parent `wait(0)`s.
+`main()` first opens `"console"` until the returned descriptor is 3 or higher, then closes that one. This guarantees that descriptors 0, 1, and 2 exist without assuming which were already open.
 
-`cd` is handled in `main()` before the fork, and the comment says why: `chdir` in a child would replace that child's `p->cwd` inode pointer and then die with it. Nothing about `cd` requires kernel involvement; it requires only *not forking*.
+```mermaid
+flowchart LR
+    A["Ensure fds 0, 1, and 2 exist"] --> B["getcmd(): write '$ ' to fd 2<br/>gets() from fd 0"]
+    B --> C["fork1()"]
+    C -->|child| D["parsecmd() → runcmd()"]
+    C -->|parent| E["wait(0)"]
+    E --> B
+
+    classDef processing fill:#fffff0,stroke:#cc6
+    classDef routing fill:#f0f0ff,stroke:#66c
+    class A,B,D,E processing
+    class C routing
+```
+
+> [!NOTE]
+> Reading commands from fd 0 matters for the `util` lab, where the grader runs `sh < findtest.sh` and fd 0 is a file rather than the console.
+
+`cd` is handled in `main()` before the fork, and the comment says why: `chdir` in a child would replace that child's `p->cwd` inode pointer and then die with it. Nothing about `cd` requires kernel involvement; it requires only _not forking_.
 
 `runcmd()` is declared `__attribute__((noreturn))` and every arm ends by falling through to `exit(0)`, so calling it consumes the current process. Each command type is a handful of lines:
 
 - **EXEC** — `exec(ecmd->argv[0], ecmd->argv)`, then an error message that only executes if the call came back.
 - **REDIR** — `close(rcmd->fd)`, `open(rcmd->file, rcmd->mode)`, then recurse into the wrapped command. Three lines, resting entirely on `fdalloc()`'s lowest-free rule.
-- **PIPE** — `pipe(p)` and two `fork1()`s; the left child does `close(1); dup(p[1])`, the right does `close(0); dup(p[0])`, both then close the raw `p[0]` and `p[1]`, and the parent closes both and waits twice. Because each child recurses into `runcmd()`, `a | b | c` nests: the right-hand child forks two more children of its own, and every non-leaf process exists only to wait.
+- **PIPE** — `pipe(p)` and two `fork1()`s; the left child does `close(1); dup(p[1])`, the right does `close(0); dup(p[0])`, and both close the raw `p[0]` and `p[1]`. The parent closes both descriptors and waits twice.
 - **LIST** — fork the left side, wait, then recurse into the right side in the current process.
 - **BACK** — fork and do not wait.
+
+Because each pipeline child recurses into `runcmd()`, `a | b | c` nests through the right-hand child. Every non-leaf process exists only to coordinate descriptors and wait:
+
+```mermaid
+flowchart TD
+    P0["pipeline coordinator<br/>a | (b | c)"]
+    A["leaf: exec a"]
+    P1["right-hand coordinator<br/>b | c"]
+    B["leaf: exec b"]
+    C["leaf: exec c"]
+    P0 -->|left fork| A
+    P0 -->|right fork| P1
+    P1 -->|left fork| B
+    P1 -->|right fork| C
+
+    classDef routing fill:#f0f0ff,stroke:#66c
+    classDef processing fill:#fffff0,stroke:#cc6
+    class P0,P1 routing
+    class A,B,C processing
+```
 
 The parser (`parsecmd()` and its helpers) is the larger half of the file and is entirely user-space; the kernel has no notion of the shell's grammar, of `|`, or of `>`.
 
@@ -83,23 +219,23 @@ The parser (`parsecmd()` and its helpers) is the larger half of the file and is 
 
 ## Code walked through
 
-| File | Symbol | What it does |
-| ---- | ------ | ------------ |
-| `kernel/proc.c` | `allocproc()` | Claims an `UNUSED` slot, allocates the trapframe page and page table, arms `context.ra` for `forkret` |
-| `kernel/proc.c` | `kfork()` | Copies memory, trapframe, descriptors, and cwd; zeroes the child's `a0`; publishes as `RUNNABLE` |
-| `kernel/proc.c` | `kexit()` | `fileclose()`s every `ofile` entry, reparents children to init, becomes a `ZOMBIE` |
-| `kernel/vm.c` | `uvmcopy()` | Page-by-page eager copy of the parent address space into the child's page table |
-| `kernel/vm.c` | `uvmclear()` | Drops `PTE_U` on the stack guard page during exec |
-| `kernel/exec.c` | `kexec()` | Builds the new image in a spare page table, then swaps it in as one commit |
-| `kernel/exec.c` | `loadseg()` | Reads one ELF program-header segment from the inode into the new page table |
-| `kernel/file.c` | `filealloc()` | Hands out one of the 100 system-wide `struct file` entries |
-| `kernel/file.c` | `filedup()` / `fileclose()` | Bump and drop `f->ref`; the drop to zero releases the pipe or inode |
-| `kernel/sysfile.c` | `fdalloc()` | The lowest-unused-descriptor rule, as a scan of `p->ofile` |
-| `kernel/sysfile.c` | `sys_pipe()` | Allocates two descriptors for `pipealloc()`'s pair and copies them out |
-| `kernel/pipe.c` | `pipealloc()` | One page of buffer exposed as two oppositely-permissioned `struct file` |
-| `kernel/pipe.c` | `piperead()` / `pipeclose()` | Blocking on empty, and turning the last write-end close into EOF |
-| `user/sh.c` | `main()` | Guarantees fds 0–2, reads a line, forks, waits; special-cases `cd` |
-| `user/sh.c` | `runcmd()` | One arm per command type; never returns |
+| File               | Symbol                       | What it does                                                                                          |
+| ------------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `kernel/proc.c`    | `allocproc()`                | Claims an `UNUSED` slot, allocates the trapframe page and page table, arms `context.ra` for `forkret` |
+| `kernel/proc.c`    | `kfork()`                    | Copies memory, trapframe, descriptors, and cwd; zeroes the child's `a0`; publishes as `RUNNABLE`      |
+| `kernel/proc.c`    | `kexit()`                    | `fileclose()`s every `ofile` entry, reparents children to init, becomes a `ZOMBIE`                    |
+| `kernel/vm.c`      | `uvmcopy()`                  | Page-by-page eager copy of the parent address space into the child's page table                       |
+| `kernel/vm.c`      | `uvmclear()`                 | Drops `PTE_U` on the stack guard page during exec                                                     |
+| `kernel/exec.c`    | `kexec()`                    | Builds the new image in a spare page table, then swaps it in as one commit                            |
+| `kernel/exec.c`    | `loadseg()`                  | Reads one ELF program-header segment from the inode into the new page table                           |
+| `kernel/file.c`    | `filealloc()`                | Hands out one of the 100 system-wide `struct file` entries                                            |
+| `kernel/file.c`    | `filedup()` / `fileclose()`  | Bump and drop `f->ref`; the drop to zero releases the pipe or inode                                   |
+| `kernel/sysfile.c` | `fdalloc()`                  | The lowest-unused-descriptor rule, as a scan of `p->ofile`                                            |
+| `kernel/sysfile.c` | `sys_pipe()`                 | Allocates two descriptors for `pipealloc()`'s pair and copies them out                                |
+| `kernel/pipe.c`    | `pipealloc()`                | One page of buffer exposed as two oppositely-permissioned `struct file`                               |
+| `kernel/pipe.c`    | `piperead()` / `pipeclose()` | Blocking on empty, and turning the last write-end close into EOF                                      |
+| `user/sh.c`        | `main()`                     | Guarantees fds 0–2, reads a line, forks, waits; special-cases `cd`                                    |
+| `user/sh.c`        | `runcmd()`                   | One arm per command type; never returns                                                               |
 
 ## Questions I had
 

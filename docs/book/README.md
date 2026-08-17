@@ -12,21 +12,21 @@ Chapter notes from [xv6: a simple, Unix-like teaching operating system](https://
 
 Tick these off as you go, and link each to its notes file once written.
 
-| #      | Chapter                       | Mostly about                                  | Case     | Notes |
-| ------ | ----------------------------- | ---------------------------------------------- | -------- | ----- |
-| **1**  | Operating system interfaces   | Processes, files, pipes, the shell            | linked   | [ch01](ch01-operating-system-interfaces.md) |
-| **2**  | Operating system organization | Kernel/user split, machine modes, boot        | mixed    | [ch02](ch02-operating-system-organization.md) |
-| **3**  | Page tables                   | Sv39, address spaces, `kernel/vm.c`           | linked   | [ch03](ch03-page-tables.md) |
-| **4**  | Traps and system calls        | `ecall`, trampoline, trapframe                | mixed    | [ch04](ch04-traps-and-system-calls.md) |
-| **5**  | Page faults                   | COW, lazy allocation, demand paging           | loan     | [ch05](ch05-page-faults.md) |
-| **6**  | Interrupts and device drivers | UART, PLIC, virtio disk                       | loan     | [ch06](ch06-interrupts-and-device-drivers.md) |
-| **7**  | Locking                       | Spinlocks, races, deadlock                    | loan     | [ch07](ch07-locking.md) |
-| **8**  | Scheduling                    | Context switching, `swtch.S`                  | linked   | [ch08](ch08-scheduling.md) |
-| **9**  | Sleep and Wakeup              | Sleep/wakeup, condition variables             | loan     | [ch09](ch09-sleep-and-wakeup.md) |
-| **10** | File system                   | Inodes, the buffer cache                      | loan     | [ch10](ch10-file-system.md) |
-| **11** | Logging                       | Journaling, crash consistency                 | loan     | [ch11](ch11-logging.md) |
-| **12** | Concurrency revisited         | Memory ordering, fences, lock-free            | loan     | [ch12](ch12-concurrency-revisited.md) |
-| **13** | Summary                       | —                                             | xv6-only | [ch13](ch13-summary.md) |
+| #      | Chapter                       | Mostly about                           | Case     | Notes                                         |
+| ------ | ----------------------------- | -------------------------------------- | -------- | --------------------------------------------- |
+| **1**  | Operating system interfaces   | Processes, files, pipes, the shell     | linked   | [ch01](ch01-operating-system-interfaces.md)   |
+| **2**  | Operating system organization | Kernel/user split, machine modes, boot | mixed    | [ch02](ch02-operating-system-organization.md) |
+| **3**  | Page tables                   | Sv39, address spaces, `kernel/vm.c`    | linked   | [ch03](ch03-page-tables.md)                   |
+| **4**  | Traps and system calls        | `ecall`, trampoline, trapframe         | mixed    | [ch04](ch04-traps-and-system-calls.md)        |
+| **5**  | Page faults                   | COW, lazy allocation, demand paging    | loan     | [ch05](ch05-page-faults.md)                   |
+| **6**  | Interrupts and device drivers | UART, PLIC, virtio disk                | loan     | [ch06](ch06-interrupts-and-device-drivers.md) |
+| **7**  | Locking                       | Spinlocks, races, deadlock             | loan     | [ch07](ch07-locking.md)                       |
+| **8**  | Scheduling                    | Context switching, `swtch.S`           | linked   | [ch08](ch08-scheduling.md)                    |
+| **9**  | Sleep and Wakeup              | Sleep/wakeup, condition variables      | loan     | [ch09](ch09-sleep-and-wakeup.md)              |
+| **10** | File system                   | Inodes, the buffer cache               | loan     | [ch10](ch10-file-system.md)                   |
+| **11** | Logging                       | Journaling, crash consistency          | loan     | [ch11](ch11-logging.md)                       |
+| **12** | Concurrency revisited         | Memory ordering, fences, lock-free     | loan     | [ch12](ch12-concurrency-revisited.md)         |
+| **13** | Summary                       | —                                      | xv6-only | [ch13](ch13-summary.md)                       |
 
 ## Naming
 
@@ -40,17 +40,50 @@ ch13-summary.md
 
 ## How a chapter note is written
 
-The rule that keeps these notes short: **`../operating-system/` owns concepts; this directory owns xv6's realization of them.** The test when placement is unclear is *would this sentence still be true on Linux?* Yes means it belongs in the OSTEP note; no means it belongs here. A chapter note that explains what `fork` *is* has violated the rule.
+The rule that keeps these notes short is ownership: **`../operating-system/` owns portable concepts; this directory owns xv6's realization of them.** When placement is unclear, apply one test:
+
+Diagram colors used throughout these notes: blue marks decisions or routing, green marks data movement, yellow marks processing, cyan marks commits or stored results, and red marks stalls or failures. Labels always carry the same meaning without color.
+
+```mermaid
+flowchart TD
+    A["Would this sentence still be true on Linux?"]
+    A -->|yes| B["Put it in the OSTEP concept note"]
+    A -->|no| C["Put it in the xv6 chapter note"]
+
+    classDef decision fill:#f0f0ff,stroke:#66c
+    classDef commit fill:#f0ffff,stroke:#6cc
+    class A decision
+    class B,C commit
+```
+
+A chapter note that explains what `fork` _is_ has violated the rule; it should explain how this xv6 tree realizes `fork` instead.
 
 That rule assumes the concept note exists, and for most chapters it does not yet. So every concept falls into one of three cases, recorded in [00-ostep-concordance.md](00-ostep-concordance.md):
 
-| Case | When | Where the explanation goes |
-| ---- | ---- | -------------------------- |
-| **linked** | The OSTEP counterpart is written | Link to it; define nothing here. |
-| **loan** | The OSTEP counterpart is a placeholder | Write a short `## Concept on loan` block here, naming its destination. |
-| **xv6-only** | No OSTEP counterpart exists | This note owns it permanently. |
+| Case         | When                                   | Where the explanation goes                                             |
+| ------------ | -------------------------------------- | ---------------------------------------------------------------------- |
+| **linked**   | The OSTEP counterpart is written       | Link to it; define nothing here.                                       |
+| **loan**     | The OSTEP counterpart is a placeholder | Write a short `## Concept on loan` block here, naming its destination. |
+| **xv6-only** | No OSTEP counterpart exists            | This note owns it permanently.                                         |
 
-A loan is a debt, not a home. `grep -rn '^## Concept on loan' docs/book/` lists every one outstanding. When the OSTEP note is finally written, move the block there, replace it with a link, and flip the concordance row to `linked`.
+A loan is a debt, not a home. Its lifecycle is explicit:
+
+```mermaid
+flowchart LR
+    A["OSTEP note is a placeholder"] --> B["Hold the concept temporarily<br/>in the xv6 note"]
+    B -->|OSTEP note is written| C["Move the concept<br/>to OSTEP"]
+    C --> D["Replace the loan block<br/>with a theory link"]
+    D --> E["Set the concordance<br/>status to linked"]
+
+    classDef routing fill:#f0f0ff,stroke:#66c
+    classDef processing fill:#fffff0,stroke:#cc6
+    classDef commit fill:#f0ffff,stroke:#6cc
+    class A,B routing
+    class C,D processing
+    class E commit
+```
+
+`grep -rn '^## Concept on loan' docs/book/` lists every outstanding loan.
 
 ### Shape
 
@@ -60,10 +93,15 @@ A loan is a debt, not a home. `grep -rn '^## Concept on loan' docs/book/` lists 
 > **Theory:** [OSTEP — …][ostep-x]. Read that first; this note does not re-explain it.
 
 ## What xv6 actually does
-## Concept on loan: <topic>        <- only while the OSTEP note is a placeholder
+
+## Concept on loan: <topic> <- only while the OSTEP note is a placeholder
+
 ## Divergences
+
 ## Code walked through
+
 ## Questions I had
+
 ## Lab connection
 
 [ostep-x]: ../../../operating-system/<Note>.md#<anchor>
@@ -73,13 +111,16 @@ A loan is a debt, not a home. `grep -rn '^## Concept on loan' docs/book/` lists 
 
 The opening blockquote has one variant per case, and picking the wrong one sends the reader somewhere useless — a `linked` blockquote on a `loan` chapter points at a file that says only `Placeholder — not yet written`:
 
-| Case | Opening blockquote |
-| ---- | ------------------ |
-| **linked** | `> **Theory:** [OSTEP — …][ostep]. Read that first; this note does not re-explain it.` |
-| **loan** | `> **Theory on loan.** [OSTEP — …][ostep] is not written yet, so this note holds the concept itself for now. When that note is written, move the material there and replace this with a theory link — see [00-ostep-concordance.md](00-ostep-concordance.md).` |
-| **xv6-only** | `> **No OSTEP counterpart.** This chapter is xv6-only, so this note stands alone by design and owns its material permanently.` |
+| Case         | Opening blockquote                                                                                                                                                                                                                                             |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **linked**   | `> **Theory:** [OSTEP — …][ostep]. Read that first; this note does not re-explain it.`                                                                                                                                                                         |
+| **loan**     | `> **Theory on loan.** [OSTEP — …][ostep] is not written yet, so this note holds the concept itself for now. When that note is written, move the material there and replace this with a theory link — see [00-ostep-concordance.md](00-ostep-concordance.md).` |
+| **xv6-only** | `> **No OSTEP counterpart.** This chapter is xv6-only, so this note stands alone by design and owns its material permanently.`                                                                                                                                 |
 
-A `loan` chapter still carries its `[ostep]:` definition at the bottom, because the destination is known even though the note behind it is empty. That definition is what makes repaying the debt a two-line edit rather than a search. For a `mixed` chapter — some concepts linked, some on loan or xv6-only — use the variant that fits the chapter's dominant concept and let the per-concept rows in the concordance carry the detail.
+A `loan` chapter still carries its `[ostep]:` definition at the bottom because the destination is known even while the note behind it is empty. That definition makes repaying the debt a two-line edit rather than a search.
+
+> [!NOTE]
+> For a `mixed` chapter — some concepts linked, some on loan or xv6-only — use the opening variant that fits the dominant concept, and let the per-concept rows in the concordance carry the detail.
 
 `Divergences` covers three kinds, each of which would otherwise look like somebody's mistake:
 
