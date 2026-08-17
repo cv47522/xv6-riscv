@@ -168,9 +168,9 @@ A C file on the host is not automatically visible inside xv6. `make qemu` builds
 Use this checklist for a standalone exercise:
 
 1. Put the source directly under `user/`, for example `user/ex1copy.c`. The current `mkfs` importer strips one leading `user/` component and rejects another slash, so `user/exercises/ex1copy.c` cannot be installed directly.
-2. Keep the guest command name at most 14 bytes. `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts that every imported basename fits. The host binary has a leading underscore, but `mkfs` removes it: `user/_ex1copy` becomes the xv6 command `ex1copy`.
-3. Include xv6's headers, usually `kernel/types.h` followed by `user/user.h`. Do not include the host `<stdio.h>`: xv6 is freestanding and links against `ULIB`, not the host C library.
-4. Use integer file descriptors with xv6 system calls. By Unix convention, 0 is standard input, 1 is standard output, and 2 is standard error; they are not C `FILE *` streams such as `stdin` and `stdout`.
+2. **Keep the guest command name at most 14 bytes**. `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts that every imported basename fits. The host binary has a leading underscore, but `mkfs` removes it: `user/_ex1copy` becomes the xv6 command `ex1copy`.
+3. Include xv6's headers, usually `kernel/types.h` followed by `user/user.h`. **Do not include the host `<stdio.h>`**: xv6 is freestanding and links against `ULIB`, not the host C library.
+4. Use integer file descriptors with xv6 system calls. **By Unix convention, 0 is standard input, 1 is standard output, and 2 is standard error**; they are not C `FILE *` streams such as `stdin` and `stdout`.
 5. Add the linked target to `UPROGS` in the Makefile:
 
     ```makefile
@@ -192,7 +192,7 @@ Use this checklist for a standalone exercise:
 
 If the shell prints `exec ex1copy failed`, first check that `ls` contains `ex1copy`, then check the spelling in `UPROGS`. If the build reaches `mkfs` and aborts, check for a nested path or a basename longer than 14 bytes. Run `make clean` only when changing `conf/lab.mk` or diagnosing a genuinely stale build; ordinary source and `UPROGS` dependencies rebuild automatically.
 
-For the generic model behind system calls and descriptors, see [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#file-descriptors-open-file-descriptions-and-pipes). This guide owns only the xv6 build and console details.
+For the signature, return value, and failure mode of any call you reach for, see [05-syscall-reference.md](05-syscall-reference.md) — xv6 has no man pages, so that file is the lookup. For the generic model behind system calls and descriptors, see [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#file-descriptors-open-file-descriptions-and-pipes). This guide owns only the xv6 build and console details.
 
 ### Why sources and build products stay flat
 

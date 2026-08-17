@@ -407,7 +407,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 .PRECIOUS: %.o
 
 # ---------------------------------------------------------------------------
-#  The programs that go into the filesystem image
+#  The User programs that go into the filesystem image
 # ---------------------------------------------------------------------------
 #  Anything listed here gets built by the `_%` rule above and copied into
 #  fs.img, which is how it becomes runnable inside xv6.  Adding a new user

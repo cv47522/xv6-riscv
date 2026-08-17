@@ -12,14 +12,15 @@ Personal notes and guides for learning [xv6-riscv](https://github.com/mit-pdos/x
 
 If you are setting this up for the first time, read these in order. Each one assumes the previous.
 
-| Guide                                                        | What it covers                                                                                                                                                    |
-| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **[00-repo-workflow.md](00-repo-workflow.md)**               | How this repository is wired: remotes, branches, tags, and the exact commands to sync, push, and recover. Read this first — it explains _where_ everything lives. |
-| **[01-environment-setup.md](01-environment-setup.md)**       | Installing the toolchain, and what each `apt` package actually does.                                                                                              |
-| **[02-build-boot-and-usage.md](02-build-boot-and-usage.md)** | `make qemu`, reading the boot output, using the xv6 shell, and the debugging toolkit: gdb, `kernel.asm`, `addr2line`, and the QEMU monitor.                       |
-| **[03-lab-workflow.md](03-lab-workflow.md)**                 | Running the 6.1810 labs from this repo: `conf/lab.mk`, `make grade`, merging each lab branch, and how to approach a lab.                                          |
-| **[04-terminology.md](04-terminology.md)**                   | Glossary. Every acronym expanded — xv6, RISC-V, QEMU, hart, PLIC, and the rest.                                                                                   |
-| **[book/](book/)**                                           | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                               |
+| Guide                                                            | What it covers                                                                                                                                                              |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[00-repo-workflow.md](00-repo-workflow.md)**                   | How this repository is wired: remotes, branches, tags, and the exact commands to sync, push, and recover. Read this first — it explains _where_ everything lives.           |
+| **[01-environment-setup.md](01-environment-setup.md)**           | Installing the toolchain, and what each `apt` package actually does.                                                                                                        |
+| **[02-build-boot-and-usage.md](02-build-boot-and-usage.md)**     | `make qemu`, reading the boot output, using the xv6 shell, and the debugging toolkit: gdb, `kernel.asm`, `addr2line`, and the QEMU monitor.                                 |
+| **[03-lab-workflow.md](03-lab-workflow.md)**                     | Running the 6.1810 labs from this repo: `conf/lab.mk`, `make grade`, merging each lab branch, and how to approach a lab.                                                    |
+| **[04-terminology.md](04-terminology.md)**                       | Glossary. Every acronym expanded — xv6, RISC-V, QEMU, hart, PLIC, and the rest.                                                                                             |
+| **[05-syscall-reference.md](05-syscall-reference.md)**           | All 22 system calls by group — signature, return value, failure mode, and implementing file. xv6 has no man pages; this is the lookup. Not read in order; consulted.        |
+| **[book/](book/)**                                               | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                                         |
 | **[book/00-ostep-concordance.md](book/00-ostep-concordance.md)** | One concept per row, mapped across the xv6 book, the OSTEP notes in `../operating-system/`, this tree's source, and the exercises. Read it before writing any chapter note. |
 
 > [!TIP]
