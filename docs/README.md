@@ -20,6 +20,7 @@ If you are setting this up for the first time, read these in order. Each one ass
 | **[03-lab-workflow.md](03-lab-workflow.md)**                     | Running the 6.1810 labs from this repo: `conf/lab.mk`, `make grade`, merging each lab branch, and how to approach a lab.                                                    |
 | **[04-terminology.md](04-terminology.md)**                       | Glossary. Every acronym expanded — xv6, RISC-V, QEMU, hart, PLIC, and the rest.                                                                                             |
 | **[05-syscall-reference.md](05-syscall-reference.md)**           | All 22 system calls by group — signature, return value, failure mode, and implementing file. xv6 has no man pages; this is the lookup. Not read in order; consulted.        |
+| **[06-build-artifacts.md](06-build-artifacts.md)**               | What `.o`, `.d`, `.asm`, `.sym`, `.S`, `.pl`, and `.ld` files are, which are generated, and why a kernel needs file types an ordinary C project does not.                   |
 | **[book/](book/)**                                               | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                                         |
 | **[book/00-ostep-concordance.md](book/00-ostep-concordance.md)** | One concept per row, mapped across the xv6 book, the OSTEP notes in `../operating-system/`, this tree's source, and the exercises. Read it before writing any chapter note. |
 

@@ -214,6 +214,8 @@ These are the places where habits from Linux produce code that compiles and then
 > [!WARNING]
 > `exit` is declared `int exit(int)` but is `__attribute__((noreturn))`, so the compiler will treat any code after it as unreachable. Its argument is genuinely delivered: the parent's `wait(&status)` receives it.
 
+Reaching for `<unistd.h>` to get the POSIX spelling of any of these is a trap worth knowing about in detail: the header is present in the cross toolchain's sysroot, it compiles, and some of its declarations then bind silently to xv6's stubs. See [Why you cannot use the host's headers](06-build-artifacts.md#why-you-cannot-use-the-hosts-headers).
+
 ## Verifying this file
 
 [`book/check-notes.sh`](book/check-notes.sh) checks this reference against the tree on every run, in both directions: every `entry("...")` in `user/usys.pl` must appear here, and every `SYS_*` number quoted here must match `kernel/syscall.h`. A call added to the tree without a row here fails the check, and so does a stale number.

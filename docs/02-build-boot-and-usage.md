@@ -212,6 +212,8 @@ The artifacts are already invisible where it counts. `.gitignore` covers `_*`, `
 
 Two of these products are worth keeping close rather than tolerating. `kernel/kernel.asm` and each program's `.asm` are the primary debugging artifacts in the traps and pgtbl labs, and `grep -n '<address>' kernel/kernel.asm` is a one-step operation precisely because the file sits next to the source it disassembles.
 
+For what each of these extensions actually is — and why this tree needs `.S`, `.pl`, `.ld`, and `.d` files at all when a plain C project does not — see [06-build-artifacts.md](06-build-artifacts.md).
+
 ### House style for a new user program
 
 The conventions below are enforced by tooling or by the absence of a C library, not by preference, so a program that ignores them either gets rewritten or does not compile.
