@@ -14,19 +14,19 @@ Tick these off as you go, and link each to its notes file once written.
 
 | #      | Chapter                       | Mostly about                                  | Case     | Notes |
 | ------ | ----------------------------- | ---------------------------------------------- | -------- | ----- |
-| **1**  | Operating system interfaces   | Processes, files, pipes, the shell            | linked   | —     |
-| **2**  | Operating system organization | Kernel/user split, machine modes, boot        | mixed    | —     |
-| **3**  | Page tables                   | Sv39, address spaces, `kernel/vm.c`           | linked   | —     |
-| **4**  | Traps and system calls        | `ecall`, trampoline, trapframe                | mixed    | —     |
-| **5**  | Page faults                   | COW, lazy allocation, demand paging           | loan     | —     |
-| **6**  | Interrupts and device drivers | UART, PLIC, virtio disk                       | loan     | —     |
-| **7**  | Locking                       | Spinlocks, races, deadlock                    | loan     | —     |
-| **8**  | Scheduling                    | Context switching, `swtch.S`                  | linked   | —     |
-| **9**  | Sleep and Wakeup              | Sleep/wakeup, condition variables             | loan     | —     |
-| **10** | File system                   | Inodes, the buffer cache                      | loan     | —     |
-| **11** | Logging                       | Journaling, crash consistency                 | loan     | —     |
-| **12** | Concurrency revisited         | Memory ordering, fences, lock-free            | loan     | —     |
-| **13** | Summary                       | —                                             | xv6-only | —     |
+| **1**  | Operating system interfaces   | Processes, files, pipes, the shell            | linked   | [ch01](ch01-operating-system-interfaces.md) |
+| **2**  | Operating system organization | Kernel/user split, machine modes, boot        | mixed    | [ch02](ch02-operating-system-organization.md) |
+| **3**  | Page tables                   | Sv39, address spaces, `kernel/vm.c`           | linked   | [ch03](ch03-page-tables.md) |
+| **4**  | Traps and system calls        | `ecall`, trampoline, trapframe                | mixed    | [ch04](ch04-traps-and-system-calls.md) |
+| **5**  | Page faults                   | COW, lazy allocation, demand paging           | loan     | [ch05](ch05-page-faults.md) |
+| **6**  | Interrupts and device drivers | UART, PLIC, virtio disk                       | loan     | [ch06](ch06-interrupts-and-device-drivers.md) |
+| **7**  | Locking                       | Spinlocks, races, deadlock                    | loan     | [ch07](ch07-locking.md) |
+| **8**  | Scheduling                    | Context switching, `swtch.S`                  | linked   | [ch08](ch08-scheduling.md) |
+| **9**  | Sleep and Wakeup              | Sleep/wakeup, condition variables             | loan     | [ch09](ch09-sleep-and-wakeup.md) |
+| **10** | File system                   | Inodes, the buffer cache                      | loan     | [ch10](ch10-file-system.md) |
+| **11** | Logging                       | Journaling, crash consistency                 | loan     | [ch11](ch11-logging.md) |
+| **12** | Concurrency revisited         | Memory ordering, fences, lock-free            | loan     | [ch12](ch12-concurrency-revisited.md) |
+| **13** | Summary                       | —                                             | xv6-only | [ch13](ch13-summary.md) |
 
 ## Naming
 
