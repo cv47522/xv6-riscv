@@ -103,7 +103,7 @@ Symbol names lead and line numbers follow, because `proc.c` `kfork()` survives a
 
 The `Exercise` column spans `codes/`, `../ostep-homework/`, and `../ostep-projects/` — three repositories, distinguished by path when written out in full. The six xv6-based entries in `ostep-projects` are annotated as targeting `xv6-public`, so they are never mistaken for labs runnable in this tree.
 
-The concordance does not overlap the chapter checklist in `docs/book/README.md`. That table tracks progress per chapter; this one tracks one concept across six sources. They share no columns, so they cannot drift into contradicting each other.
+The concordance does not overlap the chapter checklist in `docs/book/README.md`. That table tracks progress per chapter; this one tracks one concept across six sources. They now share one column — the chapter table's `Case` summarizes the statuses of that chapter's concordance rows — so they can drift into contradicting each other, and `check_cases` in `docs/book/check-notes.sh` is what stops them: it recomputes each chapter's `Case` from the concordance and fails when the two disagree.
 
 ### Chapter-note shape
 
