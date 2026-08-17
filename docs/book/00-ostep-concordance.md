@@ -16,13 +16,13 @@ Statuses are defined in [README.md](README.md#how-a-chapter-note-is-written): **
 | ------- | ---------- | ------ | ---------- | -------- | ------ |
 | **fork/exec/wait** | `The_Process_Abstraction.md` §7 | 1 | `kernel/proc.c` `kfork()`, `kernel/exec.c` `kexec()` | `codes/` `cpu-process-api/fork_*.c` | linked |
 | **process states, PCB** | `The_Process_Abstraction.md` §4–5 | 1 | `kernel/proc.c` `allocproc()` | `codes/` `cpu-process-intro/` | linked |
-| **fds, pipes, shell** | `The_Process_Abstraction.md` §7 | 1 | `kernel/pipe.c` `pipealloc()`, `user/sh.c` `runcmd()` | `codes/` `parent_children_pipe.c` | linked |
+| **fds, pipes, shell** | `The_Process_Abstraction.md` §7 | 1 | `kernel/pipe.c` `pipealloc()`, `user/sh.c` `runcmd()` | `codes/` `cpu-process-api/homework/parent_children_pipe.c` | linked |
 | **kernel/user split** | `Introduction_to_Operating_Systems.md` | 2 | `kernel/main.c`, `kernel/proc.c` `allocproc()` | — | linked |
 | **machine mode, boot** | — | 2 | `kernel/entry.S`, `kernel/start.c` | — | xv6-only |
 | **paging, Sv39** | `Paging.md` | 3 | `kernel/vm.c` `walk()`, `uvmalloc()` | `ostep-homework/vm-paging/` | linked |
 | **address spaces** | `Address_Spaces_And_Translation.md` | 3 | `kernel/vm.c` `uvmcopy()` | `ostep-homework/vm-mechanism/` | linked |
 | **memory layout, segments** | `Memory_Management.md` | 3 | `kernel/memlayout.h`, `user/user.ld` | `ostep-homework/vm-freespace/` | linked |
-| **limited direct execution** | `The_Process_Abstraction.md` §8 | 4 | `kernel/trap.c` `usertrap()`, `kerneltrap()` | `codes/` `lde_cost.c` | linked |
+| **limited direct execution** | `The_Process_Abstraction.md` §8 | 4 | `kernel/trap.c` `usertrap()`, `kerneltrap()` | `codes/` `cpu-process-mechanisms/lde_cost.c` | linked |
 | **trampoline, trapframe** | — | 4 | `kernel/trampoline.S` | lab: traps | xv6-only |
 | **page faults, COW** | `Swapping_And_VM_Systems.md` | 5 | `kernel/trap.c` `usertrap()`, `kernel/vm.c` `uvmcopy()` | lab: cow | loan |
 | **device drivers, PLIC** | `IO_Devices_And_Disks.md` | 6 | `kernel/uart.c` `uartintr()`, `kernel/plic.c` `plic_claim()` | `ostep-homework/file-devices/` | loan |

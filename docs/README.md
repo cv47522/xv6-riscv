@@ -20,6 +20,7 @@ If you are setting this up for the first time, read these in order. Each one ass
 | **[03-lab-workflow.md](03-lab-workflow.md)**                 | Running the 6.1810 labs from this repo: `conf/lab.mk`, `make grade`, merging each lab branch, and how to approach a lab.                                          |
 | **[04-terminology.md](04-terminology.md)**                   | Glossary. Every acronym expanded — xv6, RISC-V, QEMU, hart, PLIC, and the rest.                                                                                   |
 | **[book/](book/)**                                           | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                               |
+| **[book/00-ostep-concordance.md](book/00-ostep-concordance.md)** | One concept per row, mapped across the xv6 book, the OSTEP notes in `../operating-system/`, this tree's source, and the exercises. Read it before writing any chapter note. |
 
 > [!TIP]
 > The glossary is the hub. Rather than re-explaining a term in each guide, the other documents link into [04-terminology.md](04-terminology.md). When a chapter introduces a new term, add it there once and link to it.
@@ -44,11 +45,12 @@ Branches and remotes are covered in [00-repo-workflow.md](00-repo-workflow.md). 
 
 ## Adding chapter notes
 
-Create one file per chapter under `book/`, named for the chapter:
+All thirteen chapter files already exist under `book/`, one per chapter of the xv6 book; writing a note means filling a stub in, not creating a file.
 
-```
-docs/book/ch01-operating-system-interfaces.md
-docs/book/ch03-page-tables.md
-```
+Read [book/00-ostep-concordance.md](book/00-ostep-concordance.md) first. It lists every concept the two note sets cover, and for each one it names the OSTEP note, the xv6 chapter, the source symbols, and the exercise — so you can see what is already explained before explaining it again.
 
-Keep them linked to the source they describe — `kernel/vm.c:57` style references are clickable in most editors — and add any new vocabulary to the glossary rather than defining it inline.
+The rule the concordance encodes: **`../operating-system/` owns concepts; `docs/book/` owns xv6's realization of them.** A concept whose OSTEP note is not written yet sits on loan in the xv6 note until it is, which is why each concordance row carries a status.
+
+[book/README.md](book/README.md) has the full procedure — the three-case table, the note shape, and the blockquote variant that goes with each case. Do not restate any of it here; that file is the single authority.
+
+Keep notes linked to the source they describe — `kernel/vm.c:57` style references are clickable in most editors — and add any new vocabulary to the glossary rather than defining it inline.

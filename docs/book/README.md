@@ -69,7 +69,17 @@ A loan is a debt, not a home. `grep -rn '^## Concept on loan' docs/book/` lists 
 [ostep-x]: ../../../operating-system/<Note>.md#<anchor>
 ```
 
-`What xv6 actually does` is the only mandatory section. For an `xv6-only` chapter, the blockquote instead states that no OSTEP counterpart exists, so the note stands alone by design.
+`What xv6 actually does` is the only mandatory section.
+
+The opening blockquote has one variant per case, and picking the wrong one sends the reader somewhere useless — a `linked` blockquote on a `loan` chapter points at a file that says only `Placeholder — not yet written`:
+
+| Case | Opening blockquote |
+| ---- | ------------------ |
+| **linked** | `> **Theory:** [OSTEP — …][ostep]. Read that first; this note does not re-explain it.` |
+| **loan** | `> **Theory on loan.** [OSTEP — …][ostep] is not written yet, so this note holds the concept itself for now. When that note is written, move the material there and replace this with a theory link — see [00-ostep-concordance.md](00-ostep-concordance.md).` |
+| **xv6-only** | `> **No OSTEP counterpart.** This chapter is xv6-only, so this note stands alone by design and owns its material permanently.` |
+
+A `loan` chapter still carries its `[ostep]:` definition at the bottom, because the destination is known even though the note behind it is empty. That definition is what makes repaying the debt a two-line edit rather than a search. For a `mixed` chapter — some concepts linked, some on loan or xv6-only — use the variant that fits the chapter's dominant concept and let the per-concept rows in the concordance carry the detail.
 
 `Divergences` covers three kinds, each of which would otherwise look like somebody's mistake:
 
@@ -85,6 +95,8 @@ Links into the OSTEP notes are **relative and editor-only**: `../../../operating
 
 > [!IMPORTANT]
 > These links 404 on GitHub, by design. The two repositories live on different hosts, so no relative path can render on both. Do not "fix" them into absolute URLs. They assume both repositories sit side by side under `~/personal/`.
+
+Every OSTEP note that has an xv6 counterpart carries a backlink to it, so the pairing is navigable from either side. One is still missing: `../../../operating-system/Paging.md` has no backlink to [ch03](ch03-page-tables.md), because it was left alone while it held uncommitted in-progress edits. Add the single backlink line once those edits are committed; that is the only outstanding gap in the reverse direction, and `check_backlinks` in [check-notes.sh](check-notes.sh) guards the ones that do exist.
 
 Run [check-notes.sh](check-notes.sh) after editing to confirm every link still resolves.
 

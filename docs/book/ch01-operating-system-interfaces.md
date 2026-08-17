@@ -29,7 +29,7 @@ The book chapter is a tour of the interface. This note is a tour of the code sit
 Three details are specific to this tree:
 
 - The stack is `USERSTACK + 1` pages allocated above the program image, and `uvmclear()` strips `PTE_U` from the lowest of them to make a guard page. `USERSTACK` is 1 normally and **2** under `LAB_UTIL` (`kernel/param.h`), so the active lab silently changes the shape of every process's stack.
-- Argument strings are `copyout()` onto the new stack with `sp` re-aligned to 16 bytes after each one, because the RISC-V ABI requires it; the `ustack[]` array of pointers to them is pushed afterwards and its address left in `a1`.
+- Argument strings are `copyout()` onto the new stack one at a time, and alignment precedes each copy rather than following it: `kexec()` (`kernel/exec.c:102-106`) does `sp -= strlen(argv[argc]) + 1` then `sp -= sp % 16` to round the new bottom down to a 16-byte boundary, checks it against `stackbase`, and only then `copyout()`s the string — so every string lands already aligned, as the RISC-V ABI requires. The `ustack[]` array of pointers to them is pushed afterwards and its address left in `a1`.
 - `kexec()` returns `argc`, not 0. `sys_exec()` passes that straight through, and the trap return puts it in `a0` — which is the first argument to the new program's `main`. The kernel function genuinely returns; what makes `exec` "not return" is that the code it returns into is a different program.
 
 What `kexec()` deliberately does **not** touch is `p->ofile` and `p->cwd`. That omission is a feature, and the next section is what it buys.
@@ -114,7 +114,7 @@ The parser (`parsecmd()` and its helpers) is the larger half of the file and is 
 
 - `USERSTACK` becomes 2 pages under `-DLAB_UTIL`, so `kexec()`'s stack arithmetic is already running in its lab configuration.
 - `grade-lab-util`'s `sleep` tests break on the `sys_pause` breakpoint, not `sys_sleep`: the clock-tick call is named `pause` in this tree, and `sleep` is the user program you write on top of it.
-- The three `find ... -exec` tests are a `fork`/`exec`/`wait` exercise in user space — `find` has to do per-match what `runcmd()`'s `EXEC` arm does per command.
+- The two `find ... -exec` tests are a `fork`/`exec`/`wait` exercise in user space — `find` has to do per-match what `runcmd()`'s `EXEC` arm does per command.
 - `sh < findtest.sh` is the descriptor argument above, graded: the shell reads its commands from fd 0 without a single line of code that knows it is not the console.
 
 [ostep]: ../../../operating-system/The_Process_Abstraction.md
