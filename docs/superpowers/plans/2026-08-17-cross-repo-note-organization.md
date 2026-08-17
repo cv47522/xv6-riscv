@@ -106,6 +106,10 @@ check_chapters() {
 }
 
 # 3. Every file and symbol cited in the concordance actually exists.
+#    Only this tree's own source is checked — tokens under kernel/ and
+#    user/. The Exercise column cites ../operating-system/codes and
+#    ../ostep-homework, which do not resolve against this repo and are
+#    informational.
 check_symbols() {
   echo "== concordance code references exist =="
   [ -f "$CONC" ] || { bad "missing $CONC"; return; }
@@ -113,6 +117,12 @@ check_symbols() {
   while IFS= read -r row; do
     file=""
     for tok in $(printf '%s\n' "$row" | grep -oE '`[^` ]+`' | tr -d '`'); do
+      # Path tokens are checked only under kernel/ and user/; a bare
+      # sym() token is checked against the last such path on the row.
+      case "$tok" in
+        kernel/*|user/*|*'()') ;;
+        *) file=""; continue ;;
+      esac
       case "$tok" in
         *.c|*.h|*.S|*.c:[0-9]*|*.h:[0-9]*|*.S:[0-9]*|*.ld)
           file="${tok%%:*}"
@@ -339,7 +349,16 @@ ch13-summary.md
 docs/book/check-notes.sh
 ```
 
-Expected: exit 1, with only the missing-concordance failure remaining. No link failures — the README now links to `00-ostep-concordance.md` and `check-notes.sh`, and the latter exists. If `00-ostep-concordance.md` is reported as an unresolved link, that is expected and clears in Task 3.
+Expected: exit 1 with **exactly 2 problems**, both of which clear in Task 3:
+
+```
+  FAIL: docs/book/README.md -> 00-ostep-concordance.md
+  FAIL: missing /home/wahsieh/personal/xv6-riscv/docs/book/00-ostep-concordance.md
+
+FAILED — 2 problem(s).
+```
+
+The README now links to a concordance that Task 3 has not created yet, so the link check reports it — that is correct behaviour, not a defect to work around. Do not create a stub concordance to silence it. The chapter check must be silent; if any `FAIL: chapter` line remains, Step 2 was applied incompletely.
 
 - [ ] **Step 7: Commit**
 
@@ -471,9 +490,11 @@ The user-facing names in `user/user.h` are unprefixed, so a program calls `fork(
 docs/book/check-notes.sh
 ```
 
-Expected: `All checks passed.` and exit 0. Every file and symbol in the table is verified to exist, no `linked` row points at a placeholder, and every relative link resolves.
+Expected: `All checks passed.` and exit 0. Both Task 2 failures clear: the concordance now exists and the README link resolves. Every `kernel/` and `user/` file and symbol in the table is verified present, and no `linked` row points at a placeholder.
 
-If `check_symbols` reports a missing symbol, fix the concordance rather than the check — the symbols were confirmed present at planning time and a failure means a typo in the table.
+If `check_symbols` reports a missing symbol, fix the concordance rather than the check — every symbol in the table above was confirmed present by grep at planning time, so a failure means a typo was introduced in transcription.
+
+Note that the `Exercise` column is deliberately unchecked: it cites `../operating-system/codes/` and `../ostep-homework/`, which do not resolve against this repository.
 
 - [ ] **Step 3: Commit**
 
