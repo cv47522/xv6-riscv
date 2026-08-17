@@ -6,7 +6,7 @@
 
 ---
 
-From `make qemu` to a shell prompt, what every line of output means, and how to debug the kernel with gdb. All output below is real, captured from this repository.
+From `make qemu` to a shell prompt, what every line of output means, and how to debug the kernel — gdb, disassembly, backtraces, and the QEMU monitor. All output below is real, captured from this repository.
 
 ## Building and booting
 
@@ -135,7 +135,22 @@ It does **not** support quoting, globbing, environment variables, `cd` with no a
 > [!WARNING]
 > `make qemu` depends on `newfs.img`, which rotates the existing `fs.img` aside and builds a fresh one. Any file you create inside xv6 is gone on the next `make qemu`. Use `make qemu-fs` to boot the existing image and keep guest files across reboots.
 
-## Debugging with gdb
+## Debugging
+
+Kernel bugs rarely announce themselves clearly, so it is worth building the habit of reaching for the right tool instead of staring at the code. MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) says learning these is well worth the time, and that matches experience — the tools below turn most "it just hangs" sessions into a five-minute answer.
+
+### Print statements, and keeping the output
+
+If a test fails, do not guess why. Insert `printf` calls until you can see what is actually happening. When that produces more output than fits in a scrollback buffer, run the whole session under `script`, which logs the console to a file you can search:
+
+```bash
+script -c "make qemu" xv6.log     # or: script xv6.log, then make qemu, then exit
+grep -n 'panic' xv6.log
+```
+
+Remember to leave `script` (`exit`, or `Ctrl-d`) — until you do, the log is still being written and may be incomplete.
+
+### Debugging with gdb
 
 Two terminals. In the first:
 
@@ -148,6 +163,8 @@ QEMU starts with the CPU halted and a gdb stub listening, printing the port to c
 ```bash
 gdb-multiarch kernel/kernel
 ```
+
+If that binary is not installed, `riscv64-linux-gnu-gdb` or `riscv64-unknown-elf-gdb` works identically — any of the three can debug a RISC-V target.
 
 The Makefile generates a `.gdbinit` with your personal port already filled in (derived from your uid so multiple users on one machine do not collide), so gdb connects automatically.
 
@@ -172,6 +189,81 @@ Useful starting points:
 
 For per-lab debugging, `make CPUS=1 qemu-gdb` makes scheduling deterministic and single-steps far more predictably.
 
+### Finding where the kernel crashed
+
+When the kernel takes an unexpected fault — an invalid memory address, most often — it prints an error containing `sepc`, the program counter at the point of the crash. Two ways to turn that number into a location:
+
+```bash
+grep -n '80001f2a' kernel/kernel.asm     # the disassembly the Makefile already built
+addr2line -e kernel/kernel 0x80001f2a    # file and line directly
+```
+
+`kernel/kernel.asm` is produced on every kernel build, and the Makefile emits a `.asm` next to every user program too. It is also the answer to "what assembly did the compiler actually generate for this", which matters more than usual in the traps and pgtbl labs.
+
+### Backtraces: panics and hangs
+
+For a panic, break on `panic` and let the kernel run into it:
+
+```bash
+make qemu-gdb                # terminal 1
+gdb-multiarch kernel/kernel  # terminal 2
+```
+
+```gdb
+(gdb) b panic
+(gdb) c
+(gdb) bt
+```
+
+For a **hang** — a deadlock, or a loop that never exits — there is nothing to break on. Continue, wait for it to wedge, then interrupt it and look at where it stopped:
+
+```gdb
+(gdb) c
+^C
+(gdb) bt
+```
+
+> [!TIP]
+> A backtrace that stops at a lock acquisition is usually a deadlock; one that sits in the same function across several `Ctrl-C` interrupts is usually a live loop. `bt` on every hart (`info threads`, then `thread N`) tells you which core holds what.
+
+### The QEMU monitor
+
+`Ctrl-a` then `c` switches from the xv6 console to QEMU's monitor, which queries the state of the emulated machine directly. `Ctrl-a c` again switches back.
+
+| Command              | What it shows                                            |
+| -------------------- | -------------------------------------------------------- |
+| **`info mem`**       | The active page table — the pgtbl lab's single best tool |
+| **`info registers`** | Every RISC-V register, including the CSRs                |
+| **`cpu N`**          | Select which core the other commands report on           |
+
+`info mem` reports on one core, so on a multi-core boot you either pick the core with `cpu` first or sidestep the question entirely:
+
+```bash
+make CPUS=1 qemu
+```
+
+### Pointer arithmetic
+
+Half of the confusing bugs in these labs are C pointer arithmetic rather than kernel logic. Operating systems cast between pointers and integers constantly, which ordinary C programs almost never do, and the two kinds of addition are not the same:
+
+```c
+int *p = (int*)100;
+(int)p + 1;      // 101 — integer addition
+(int)(p + 1);    // 104 — pointer addition, scaled by sizeof(int)
+```
+
+Adding an integer to a pointer implicitly multiplies it by the size of the pointed-to object. Two identities follow from that rule:
+
+| Expression  | Equivalent to | Meaning                                     |
+| ----------- | ------------- | ------------------------------------------- |
+| **`p[i]`**  | `*(p + i)`    | The i'th object in the memory `p` points to |
+| **`&p[i]`** | `p + i`       | The _address_ of that i'th object           |
+
+> [!IMPORTANT]
+> Whenever you see an addition involving a memory address, stop and ask whether it is integer addition or pointer addition, and whether the value being added should be scaled. `PGSIZE` added to a `uint64` and `PGSIZE` added to a `pte_t*` are very different offsets.
+
+Kernighan and Ritchie's _The C Programming Language_ (second edition) is the succinct reference if any of this is unfamiliar.
+
 ## Running the test suite
 
 Inside xv6:
@@ -195,3 +287,5 @@ For grading a lab specifically, see [03-lab-workflow.md](03-lab-workflow.md).
 | **Terminal is wrecked after a crash**                 | QEMU left the terminal in raw mode. Run `reset` — it will work even though you cannot see what you are typing.                       |
 | **`make clean` fails**                                | Another xv6 instance is still running and holding files. Find it with `ps` and kill it.                                              |
 | **Hangs forever with no output**                      | Usually a kernel panic before the console is up, or an infinite loop in early boot. Attach with `make qemu-gdb` and break on `main`. |
+| **Hangs after booting normally**                      | Likely a deadlock. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](#backtraces-panics-and-hangs).       |
+| **A fault message with an `sepc` value**              | Turn the address into a line with `addr2line -e kernel/kernel <sepc>`, or search for it in `kernel/kernel.asm`.                     |

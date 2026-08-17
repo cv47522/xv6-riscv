@@ -16,8 +16,8 @@ If you are setting this up for the first time, read these in order. Each one ass
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **[00-repo-workflow.md](00-repo-workflow.md)**               | How this repository is wired: remotes, branches, tags, and the exact commands to sync, push, and recover. Read this first — it explains _where_ everything lives. |
 | **[01-environment-setup.md](01-environment-setup.md)**       | Installing the toolchain, and what each `apt` package actually does.                                                                                              |
-| **[02-build-boot-and-usage.md](02-build-boot-and-usage.md)** | `make qemu`, reading the boot output, using the xv6 shell, and debugging with gdb.                                                                                |
-| **[03-lab-workflow.md](03-lab-workflow.md)**                 | Running the 6.1810 labs from this repo: `conf/lab.mk`, `make grade`, and merging each lab branch.                                                                 |
+| **[02-build-boot-and-usage.md](02-build-boot-and-usage.md)** | `make qemu`, reading the boot output, using the xv6 shell, and the debugging toolkit: gdb, `kernel.asm`, `addr2line`, and the QEMU monitor.                       |
+| **[03-lab-workflow.md](03-lab-workflow.md)**                 | Running the 6.1810 labs from this repo: `conf/lab.mk`, `make grade`, merging each lab branch, and how to approach a lab.                                          |
 | **[04-terminology.md](04-terminology.md)**                   | Glossary. Every acronym expanded — xv6, RISC-V, QEMU, hart, PLIC, and the rest.                                                                                   |
 | **[book/](book/)**                                           | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                               |
 

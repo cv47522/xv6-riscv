@@ -60,6 +60,31 @@ Other conflicts should be rare after the first merge, because `rerere` replays y
 git config rerere.enabled true
 ```
 
+## How to approach a lab
+
+Every exercise in the 6.1810 handouts carries a difficulty rating. It estimates time, not volume of code — most solutions are tens to a few hundred lines, but the code is conceptually complicated and the details matter a lot.
+
+| Rating       | Expected time     | What it usually means                                   |
+| ------------ | ----------------- | ------------------------------------------------------- |
+| **Easy**     | Under an hour     | A warm-up that sets up the exercise following it        |
+| **Moderate** | 1–2 hours         | The bulk of a typical lab                               |
+| **Hard**     | More than 2 hours | Rarely much code — the code is just tricky to get right |
+
+MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) reduces to four habits, and they are worth taking literally:
+
+1. **Read before you write.** Do the assigned reading, read the relevant kernel files through, and keep the RISC-V manuals from the course [reference page](https://pdos.csail.mit.edu/6.1810/2026/reference.html) to hand. This is not overhead: a page-table exercise stays unwritable until you can picture the three-level walk.
+2. **Implement in small steps.** The handouts usually suggest how to break the problem down. Take that decomposition and verify each step works before starting the next one, rather than writing the whole thing and debugging it as a unit.
+3. **Checkpoint with Git.** Commit the moment a piece works, so a later change that breaks everything costs you one `git reset` rather than an evening:
+
+    ```bash
+    git commit -am "wip(util): find walks one directory level"
+    ```
+
+4. **Spread the work over multiple days.** Do not start a lab the night before a deadline. A bug in an operating system kernel can manifest in bewildering ways, and understanding one often needs more thinking time than typing time.
+
+> [!TIP]
+> Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder. Enrolled students are told to ask on Piazza or come to office hours; the self-study equivalent is to go back to the book chapter or step through the code in gdb — see [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debugging).
+
 ## Grading
 
 ```bash
