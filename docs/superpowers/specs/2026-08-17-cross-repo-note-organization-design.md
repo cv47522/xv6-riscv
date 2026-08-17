@@ -162,7 +162,7 @@ The two glossaries stay separate but stop competing. `04-terminology.md` holds x
 
 ### Link mechanics
 
-Cross-repo links use relative paths: `../../operating-system/…` from `docs/book/`, and `../xv6-riscv/…` from the OSTEP repository root. They are clickable in the editor, survive renames, and 404 on both web UIs by design. `docs/book/README.md` states this explicitly, along with the assumption that the repositories sit side by side under `~/personal/`, so the dead web links are not later "fixed" into absolute URLs.
+Cross-repo links use relative paths: `../../../operating-system/…` from `docs/book/`, which is two levels below the repository root, and `../xv6-riscv/…` from the OSTEP repository root, which is one. They are clickable in the editor, survive renames, and 404 on both web UIs by design. `docs/book/README.md` states this explicitly, along with the assumption that the repositories sit side by side under `~/personal/`, so the dead web links are not later "fixed" into absolute URLs.
 
 ## Chapter map
 
