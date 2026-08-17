@@ -25,7 +25,9 @@ The repositories live on different hosts (`operating-system` on GitLab, `xv6-ris
 
 Both repositories already carry hub conventions built independently: the OSTEP notes have `Prerequisites` / `Related Notes` / `Terminology` sections defined by `templates/NOTE_TEMPLATE.md`, while `docs/README.md` nominates `04-terminology.md` as its glossary hub. Nothing bridges them.
 
-**`ostep-projects` and the OSTEP notes target a different xv6.** `INSTALL-xv6.md` clones `mit-pdos/xv6-public`, the older x86 tree, and `The_Process_Abstraction.md` links to that same repository in its Useful Links. This tree is `xv6-riscv`. The two differ in architecture, in file layout, and in naming — this revision calls the kernel-side system call implementations `kfork`, `kexec`, `kwait`, and `kexit` (`kernel/proc.c:259`, `kernel/exec.c:28`) where both the book prose and OSTEP say `fork`, `exec`, and `wait`. Every cross-reference must therefore say *which* xv6 it means.
+**`ostep-projects` and the OSTEP notes target an older xv6.** `INSTALL-xv6.md` clones `mit-pdos/xv6-public`, the x86 tree, and `The_Process_Abstraction.md` links to that same repository in its Useful Links. This tree is `xv6-riscv`. They are not rival projects but one lineage: this repository's history begins at the same `import` commit of 2006-06-12, and the RISC-V port lands in 2019. OSTEP's xv6 figures simply predate that port.
+
+The practical consequence is covered in "Divergence between the trees" below, and it is narrower than it first appears.
 
 ## Approach
 
@@ -50,6 +52,26 @@ The rule as stated assumes the concept note exists. For Chapter 1 it does. For m
 **On loan** is the case that makes the design survive contact with the reading order. Concepts are borrowed, not annexed: the block is capped at a few paragraphs, marked with a fixed heading so it is greppable, and carries the name of the OSTEP note it is destined for. When that note is written, the block moves there and a link replaces it. The concordance status flips from `loan` to `linked`, which is what makes the debt visible rather than forgotten.
 
 **xv6-only** is not a failure of the mapping — it is most of what makes xv6 worth reading. RISC-V machine mode and the boot path in `entry.S`, the trampoline page, `swtch.S`, the `fence` instructions in `spinlock.c:70` and `virtio_disk.c:277`, and the whole of Chapter 13 have no OSTEP counterpart and are never on loan. They are the xv6 notes' own material.
+
+### Divergence between the trees
+
+Because OSTEP's xv6 material predates the RISC-V port, some of it contradicts this tree. A survey of the notes bounds the problem tightly:
+
+| Note | xv6 references | Verdict |
+| ---- | -------------- | ------- |
+| `Address_Spaces_And_Translation.md`, `Paging.md`, `CPU_Scheduling.md` | none | Clean. Their x86 content is OSTEP's own teaching architecture, unrelated to xv6. |
+| `Memory_Management.md` | one | Already correct; it names `sp` for RISC-V alongside `%esp`. |
+| `The_Process_Abstraction.md` | twenty-four | The only affected note. |
+
+`The_Process_Abstraction.md` reproduces OSTEP's Figure 4.5 (`struct context`, `struct proc`) and Figure 6.4 (`swtch`) as x86 listings — `eip`, `esp`, `ebx`, `ebp` — and states outright that xv6 targets 32-bit x86. This tree's `struct context` in `kernel/proc.h` is `ra`, `sp`, and `s0`–`s11`. The structures are not cosmetically different; they have different fields for different reasons.
+
+**That note is not wrong and is not to be corrected.** It faithfully reproduces the figures of the book it takes notes on. Rewriting them to RISC-V would desync the note from its source, break the "distil the source" rule by inventing material the book does not contain, and violate the constraint against editing prose in that repository. Under the ownership rule the translation is xv6's job, not OSTEP's, so it is handled entirely on this side:
+
+- The chapter notes for 1, 4, and 8 carry the correspondence in their `## Divergences` section.
+- The concordance gains a **Tree divergence** appendix — one table mapping the x86 structures and register names OSTEP shows to their RISC-V equivalents here, written once rather than in each of the three chapters.
+- The backlink into `The_Process_Abstraction.md` names the mismatch, so the note warns a reader before they compare a figure against this tree and conclude one of them is broken.
+
+The naming divergence belongs to the same appendix: this revision calls the kernel-side system call implementations `kfork`, `kexec`, `kwait`, and `kexit` (`kernel/proc.c:259`, `kernel/exec.c:28`) where the book prose and OSTEP both say `fork`, `exec`, and `wait`.
 
 ### The concordance
 
@@ -94,7 +116,7 @@ The "Suggested shape" block in `docs/book/README.md` is replaced by one that enf
 
 ## What xv6 actually does
 ## Concept on loan: <topic>        <- only while the OSTEP note is a placeholder
-## Naming and framing differences
+## Divergences
 ## Code walked through
 ## Questions I had
 ## Lab connection
@@ -104,14 +126,20 @@ The "Suggested shape" block in `docs/book/README.md` is replaced by one that enf
 
 `Concept on loan:` is a fixed, greppable heading. Its presence is a debt, and `grep -rn '^## Concept on loan' docs/book/` lists every one outstanding.
 
-`Naming and framing differences` carries the `kfork`/`kexec`/`kwait` divergence in Chapter 1, and in later chapters the equivalent gaps between the book's vocabulary, OSTEP's, and this tree's. Divergences of that kind belong in the bridge and nowhere else.
+`Divergences` covers three kinds, and exists because all three would otherwise be mistaken for errors:
+
+- **Naming** — `kfork`/`kexec`/`kwait` here against `fork`/`exec`/`wait` in both the book prose and OSTEP.
+- **Architecture** — RISC-V `ra`/`sp`/`s0`–`s11` against the x86 `eip`/`esp`/`ebx`/`ebp` in OSTEP's figures.
+- **Vintage** — where OSTEP's xv6 material predates the 2019 RISC-V port and describes the older tree.
+
+Only chapters that actually diverge carry the section. Where the divergence is the architectural one, the section links the concordance appendix rather than restating the correspondence table.
 
 ### Backlinks
 
 Each OSTEP note with an xv6 counterpart gains a single line in its `## Related Notes` section, naming the tree explicitly so it is not confused with the `xv6-public` links already present:
 
 ```markdown
-- [xv6 Ch 1 — Operating system interfaces](../xv6-riscv/docs/book/ch01-operating-system-interfaces.md) — the same `fork`/`exec`/`wait` in the RISC-V tree (kernel-side: `kfork`/`kexec`/`kwait`), not the `xv6-public` tree linked above.
+- [xv6 Ch 1 — Operating system interfaces](../xv6-riscv/docs/book/ch01-operating-system-interfaces.md) — the same `fork`/`exec`/`wait` in `xv6-riscv` (kernel-side: `kfork`/`kexec`/`kwait`). Note that §4.5 and §6's figures above are the older `xv6-public` x86 tree; the RISC-V equivalents are tabulated in that note.
 ```
 
 Thirteen OSTEP notes have a counterpart, in three groups:
@@ -179,7 +207,7 @@ And a second loop, run whenever an OSTEP placeholder note is finally written:
 
 In this pass:
 
-- Add `docs/book/00-ostep-concordance.md` with the nineteen seed rows above.
+- Add `docs/book/00-ostep-concordance.md` with the nineteen seed rows above, plus the tree-divergence appendix mapping OSTEP's x86 `struct context`, `struct proc`, and `swtch` to their `kernel/proc.h` and `kernel/swtch.S` equivalents, and the `kfork`/`kexec`/`kwait`/`kexit` naming table.
 - Update `docs/book/README.md`: correct the chapter table to the thirteen chapters, and add the new chapter-note shape, the link convention, the three-case rule, and a pointer to the concordance.
 - Stub all thirteen chapter notes under `docs/book/`, each carrying its title, its `> **Theory:**` line (or the `xv6-only` variant), the section headings from the shape above, and a placeholder marker in the style the OSTEP repository already uses.
 - Write `docs/book/ch01-operating-system-interfaces.md` in full, as the worked example of a `linked` chapter.
@@ -211,5 +239,7 @@ Not in this pass: any `loan` block. Those are written when their chapter is read
 - Confirm every symbol named in the concordance exists at the cited file, by grep rather than by memory.
 - Confirm each of the thirteen stubs exists, is reachable from the corrected README table, and carries a theory line whose target resolves.
 - Confirm every concordance row has a case assigned, and that no row is `linked` to a placeholder note.
+- Confirm the tree-divergence appendix matches `kernel/proc.h` and `kernel/swtch.S` field for field, read from the files rather than recalled.
+- Confirm no OSTEP figure was edited toward RISC-V; the only change in that repository remains the backlink and its heading.
 - Confirm `ch01-operating-system-interfaces.md` defines no concept the ownership rule assigns to the OSTEP repository.
 - Inspect the diff for accidental prose reflow and newly introduced hard wraps.
