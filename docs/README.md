@@ -22,6 +22,7 @@ If you are setting this up for the first time, read these in order. Each one ass
 | **[05-syscall-reference.md](05-syscall-reference.md)**           | All 22 system calls by group — signature, return value, failure mode, and implementing file. xv6 has no man pages; this is the lookup. Not read in order; consulted.                                                                                                                                                                                                       |
 | **[06-build-artifacts.md](06-build-artifacts.md)**               | What `.o`, `.d`, `.asm`, `.sym`, `.S`, `.pl`, and `.ld` files are, which are generated, and why a kernel needs file types an ordinary C project does not. Also every instruction and register used in the `.S` files, what ELF is, why the kernel lands at `0x80000000`, how `ULIB` differs from glibc, and where `fs.img`, `mkfs`, `kernel/`, and `user/` map onto Linux. |
 | **[07-exercises.md](07-exercises.md)**                           | The lecture exercises under `user/`, one section each: behaviour, the idea each one carries, and its regression tests. Grows as exercises are added.                                                                                                                                                                                                                       |
+| **[08-makefile-tour.md](08-makefile-tour.md)**                   | How the [Makefile](../Makefile) works: the default goal, the goal graph, a cold build phase by phase, the three link steps, and every construct the file uses. Ends with a side-by-side comparison against the simpler `operating-system/codes/Makefile`, whose syntax is explained in [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md).             |
 | **[book/](book/)**                                               | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                                                                                                                                                                                                                                        |
 | **[book/00-ostep-concordance.md](book/00-ostep-concordance.md)** | One concept per row, mapped across the xv6 book, the OSTEP notes in `../operating-system/`, this tree's source, and the exercises. Read it before writing any chapter note.                                                                                                                                                                                                |
 
@@ -42,6 +43,7 @@ xv6-riscv/
   gradelib.py      the grading harness they run on
   docs/            these notes
   Makefile         the build, heavily commented as a teaching aid
+                   (walked through in docs/08-makefile-tour.md)
 ```
 
 Branches and remotes are covered in [00-repo-workflow.md](00-repo-workflow.md). The short version: `riscv` is an untouched mirror of upstream, and `study` is where all work happens.

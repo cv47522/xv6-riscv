@@ -670,6 +670,8 @@ user/ex1copy.o: user/ex1copy.c kernel/types.h kernel/stat.h user/user.h
 
 The leading `-` means "silently skip if absent", so a freshly cleaned tree with no `.d` files still builds.
 
+`-include` is one of six Make features this build uses that a simple project never needs; the rest are catalogued in [08-makefile-tour.md](08-makefile-tour.md#make-features-this-file-uses-that-a-simple-one-does-not).
+
 > [!CAUTION]
 > Without dependency tracking, editing `kernel/param.h` — where `NPROC`, `NOFILE`, and `USERSTACK` live — would rebuild nothing. `make` would report everything up to date, and you would boot a kernel still compiled with the old constants. That is the worst failure a build system can produce, because it looks exactly like your change having no effect.
 
@@ -827,3 +829,5 @@ The direct answer to "why not just the plain workflow": every row below is a pla
 | **Final output**    | One executable                       | A kernel ELF, one user ELF per `UPROGS` entry, and a filesystem image holding them |
 
 Everything else is the same four stages that document already describes. The extra file types are not xv6 being unusual for its own sake; each one exists because some job in that table has no C-language expression.
+
+That table names the _differences_; [08-makefile-tour.md](08-makefile-tour.md) shows how the [Makefile](../Makefile) resolves each one — which rule builds what, in what order, and how the same constructs are spelled in an ordinary hosted project's Makefile.

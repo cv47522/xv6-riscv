@@ -409,7 +409,7 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 # ---------------------------------------------------------------------------
 #  The User programs that go into the filesystem image
 # ---------------------------------------------------------------------------
-#  Anything listed here gets built by the `_%` rule above and copied into
+#  TODO: Anything listed here gets built by the `_%` rule above and copied into
 #  fs.img, which is how it becomes runnable inside xv6.  Adding a new user
 #  program in a lab means adding it to this list -- otherwise it compiles but
 #  never appears in the guest, and the shell reports "exec ... failed".
@@ -435,6 +435,7 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_sync\
 	$U/_ex1copy\
+	$U/_ex2createfile\
 
 
 

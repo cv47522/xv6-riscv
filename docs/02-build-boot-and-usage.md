@@ -14,7 +14,7 @@ From `make qemu` to a shell prompt, what every line of output means, and how to 
 make qemu
 ```
 
-That single command compiles the kernel, compiles every user program, builds the filesystem image, and launches QEMU. The [Makefile](../Makefile) is heavily commented if you want the details of any step; the summary is:
+That single command compiles the kernel, compiles every user program, builds the filesystem image, and launches QEMU. The [Makefile](../Makefile) is heavily commented if you want the details of any step, and [08-makefile-tour.md](08-makefile-tour.md) walks through it — the goal graph, the cold-build order, and why `make` on its own builds only the kernel. The summary is:
 
 ```mermaid
 flowchart LR
@@ -181,7 +181,7 @@ Use this checklist for a standalone exercise:
     $U/_ex2\
     ```
 
-    **Every entry ends with a backslash, including the last one** — the blank line that follows is what terminates the variable. Adding an exercise is therefore a one-line append, with no edit to the line above it.
+    **Every entry ends with a backslash, including the last one** — the blank line that follows is what terminates the variable. Adding an exercise is therefore a one-line append, with no edit to the line above it. No compile or link rule needs touching: `user/*.c` is handled by Make's built-in `.c` → `.o` rule and the Makefile's `_%` link rule, as [08-makefile-tour.md](08-makefile-tour.md#user-objects-there-is-no-rule-at-all) explains.
 
 6. Build a fresh image and start QEMU:
 
