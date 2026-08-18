@@ -15,11 +15,25 @@
 //    $ echo hi | ex1copy    the pipe supplies EOF when echo exits
 //    $ ex1copy < README     the file supplies EOF at end of file
 //
+//  Type each of those out.  user/sh.c has no line editing and no command
+//  history, so the arrow keys never arrive as keys: the terminal sends the
+//  raw bytes of an ANSI escape sequence (Up is ESC [ A), and sh folds them
+//  into the word being typed.  Recalling `echo hi` with Up and appending
+//  ` | ex1copy` therefore asks sh to exec "\033[Aecho", which fails -- and
+//  because the terminal *acts* on the escape rather than printing it, the
+//  diagnostic renders as `exec echo failed`, naming a program that `ls`
+//  shows is plainly there.  Ctrl-u erases the line and does work; it is
+//  handled by consoleintr() in kernel/console.c, alongside Ctrl-h.
+//
+//  One more console edge: Ctrl-d at the `$` prompt is EOF for sh itself, so
+//  an extra one after this program exits ends the shell, and init starts a
+//  fresh one -- the reason a stray `init: starting sh` appears mid-session.
+//
 // ---------------------------------------------------------------------------
 //  THE DATA PATH
 // ---------------------------------------------------------------------------
 //
-//    fd 0  <-- keyboard, pipe, or file
+//    fd 0  <-- keyboard, pipe, or file (similar to stdin in Linux)
 //      |
 //      |   read(0, buf, sizeof(buf))        ---- ecall ---> kernel
 //      |   returns n: >0 bytes, 0 at EOF, -1 on error
@@ -29,7 +43,7 @@
 //      |   write(1, buf, n)                 ---- ecall ---> kernel
 //      |   returns n, or -1 on error
 //      v
-//    fd 1  --> console, pipe, or file
+//    fd 1  --> console, pipe, or file (similar to stdout in Linux)
 //
 // ---------------------------------------------------------------------------
 //  read(fd, addr, n)  AND  write(fd, addr, n)
@@ -46,7 +60,8 @@
 //   --------  --------------------------  ----------------------------------
 //    > 0      bytes actually transferred  copy exactly that many, not 64
 //      0      EOF: no more will arrive    leave the loop and return 0
-//     -1      the call failed             report on fd 2 and return 1
+//     -1      the call failed             report on fd 2 (similar to stderr in Linux)
+//                                         and return 1
 //
 // ---------------------------------------------------------------------------
 //  FILE DESCRIPTORS
