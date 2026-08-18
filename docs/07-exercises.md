@@ -71,6 +71,46 @@ Twenty lines of C carry most of the Unix I/O model. The commentary block at the 
 
 The lecture ends on an open question — how do you make a _new_ file descriptor? — and the answer is `open()`, `pipe()`, and `dup()` in `user/user.h`. `user/sh.c` builds every redirection and pipeline out of those three plus `close()`, resting entirely on `fdalloc()`'s lowest-unused-descriptor rule; see [book/ch01](book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection).
 
+### Questions the source raises
+
+Five things in `user/ex1copy.c` look arbitrary until you follow them into the kernel. The source carries the same answers inline, next to the code each one explains.
+
+#### Why `fstat(0, …)` rather than `fstat(1, …)`?
+
+The hint answers exactly one question — _is a human about to type at me?_ — and that is a property of the input side alone. The two sides come apart in both directions: `ex1copy > out` leaves descriptor 1 on a file while somebody still waits at the keyboard, and `echo hi | ex1copy` leaves descriptor 1 on the console with nobody typing. `fstat()` takes a descriptor rather than a path, so it reports on whatever `sh` wired to 0 before `exec`, which is precisely the thing in doubt.
+
+#### What counts as `T_DEVICE` besides the console? Is the display separate?
+
+In this tree, nothing else, and no. `T_DEVICE` is the inode type that `mknod()` stamps in `sys_mknod()` (`kernel/sysfile.c`), and the only `mknod()` call in the entire source tree is `mknod("console", CONSOLE, 0)` in `user/init.c` — so `console` is the only device file that exists. Keyboard and display are not two devices either: one inode with major number `CONSOLE` covers both directions, because `consoleinit()` registers `devsw[CONSOLE].read = consoleread` and `devsw[CONSOLE].write = consolewrite` over the same UART.
+
+| Symbol         | Defined in       | What it actually bounds                                                         |
+| -------------- | ---------------- | ------------------------------------------------------------------------------- |
+| **`T_DEVICE`** | `kernel/stat.h`  | inode type `3`, written only by `mknod()`, never by `create()` for a plain file |
+| **`CONSOLE`**  | `kernel/file.h`  | major number `1`, the only major number anything claims                         |
+| **`NDEV`**     | `kernel/param.h` | size of `devsw[]` — room for ten majors, nine of which stay empty               |
+
+> [!NOTE]
+> On Linux the same test would pass for every character device — `/dev/null`, a disk, any tty — which is why portable filters call `isatty()` instead of inspecting the file type. xv6 has no `isatty()`, and with a single device file it does not need one.
+
+#### Why write the hint to descriptor 2 when it is not an error?
+
+Descriptor 2 is better read as the _out-of-band_ descriptor than as the error one: it is what stays pointed at the terminal when `>` moves descriptor 1 somewhere else. Anything _about_ the run rather than _part_ of it belongs there — errors, progress, prompts, and this hint. The filter rule is what forces the choice: `ex1copy > out` and `ex1copy | wc` must see the input bytes and nothing more, and `sh` redirects only the descriptor you name.
+
+#### Why `fprintf(2, …)` rather than `printf(…)`?
+
+`printf()` in `user/printf.c` is `vprintf(1, …)` with descriptor 1 hardwired; `fprintf()` takes the descriptor as its first argument. xv6 has no `FILE`, no `stderr` stream, and no `fdopen()` — `user/user.h` declares exactly these two functions — so `fprintf(2, …)` is the only way to reach descriptor 2 at all.
+
+#### Where is Ctrl-d implemented?
+
+Nowhere in `ex1copy.c`, which never names it: `read()` returns 0 and the `> 0` loop test does the rest. Two functions in `kernel/console.c` produce that zero.
+
+| Function            | What it does with `C('D')`                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`consoleintr()`** | Accepts byte `0x04` — `C(x)` is `((x) - '@')` — as a line terminator alongside `'\n'`, advancing `cons.w` and waking a sleeping reader even though no newline arrived.         |
+| **`consoleread()`** | Pulls that byte back out, `break`s without copying it, and returns `target - n`. At an empty position nothing has been copied yet, `n` is still `target`, and the result is 0. |
+
+That is also the whole content of "on an empty line". Type `abc` and then Ctrl-d, and `consoleread()` takes its `if (n < target) cons.r--` branch, pushing the Ctrl-d back into the buffer so that `read()` returns three bytes and only the _next_ call returns 0 — a partial line needs two presses.
+
 ### Regression tests
 
 [`grade-ex1copy`](../grade-ex1copy) holds three tests, each pinning one of the behaviours above:

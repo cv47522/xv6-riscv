@@ -96,7 +96,7 @@ ISO C anticipates being used without an operating system, and defines two kinds 
 
 The proof is short enough to run. Exactly three files in the operating system include a standard header, and all three include the same one:
 
-```console
+```bash
 $ grep -rn '#include <' kernel/ user/
 kernel/console.c:12:#include <stdarg.h>
 kernel/printk.c:5:#include <stdarg.h>
@@ -105,7 +105,7 @@ user/printf.c:5:#include <stdarg.h>
 
 And that header is not glibc's. Asking GCC to report what it opened:
 
-```console
+```bash
 $ riscv64-linux-gnu-gcc -ffreestanding -nostdlib -H -fsyntax-only t.c
 . /usr/lib/gcc-cross/riscv64-linux-gnu/13/include/stdarg.h
 ```
@@ -167,11 +167,88 @@ Nothing, on purpose. It is worth being blunt about this, because "Unix-like" inv
 | **`gradelib.py`**      | MIT's grading harness — boots QEMU, drives the shell, matches output.                                                                                        |
 | **hart 0 / boot hart** | The first CPU to reach `main()`; it initialises everything while the others wait.                                                                            |
 
+## Why these particular words
+
+Two terms in these guides are precise technical choices rather than casual description, and both are easier to trust once you know where they come from.
+
+### "Freestanding", not "independent"
+
+`freestanding` is not an adjective someone reached for. It is the term **ISO C uses itself**: the standard defines a _freestanding implementation_ in contrast to a _hosted_ one, and GCC's flag is named after the standard's word — `-ffreestanding`. Picking a synonym would cut the connection to both.
+
+It is also the more precise word. "Independent" would raise the question "independent of what?" and answer nothing; xv6's kernel is emphatically not independent — it depends on the compiler, on RV64GC, on QEMU's `virt` board, and on the linker script placing it correctly. What it stands free of is exactly one thing: a **host environment**, meaning an operating system underneath it providing a C library and calling `main` for it. That is a narrow, checkable claim, and it comes with a specification saying which headers you still get and where your program may start. See [Hosted versus freestanding](#hosted-versus-freestanding-the-part-of-iso-c-that-xv6-does-obey).
+
+### "Stub", not "snippet", "function", or "module"
+
+Three different words get offered as substitutes, and each fails for its own reason. "Snippet" gets the axis wrong. "Function" and "module" get the axis right but describe a different one.
+
+**The analogy: a stub is a forwarding address.**
+
+Post arrives there under the right name, and nothing whatsoever happens to it except being sent on. Everything the word has to carry is already in that image:
+
+| In the analogy                                                | What it stands for                                                                                                                                 |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **It is a genuine, deliverable address**                      | The stub compiles, links, and occupies a real symbol at a real address. `ld` resolves calls to `fork` because `fork` is really there               |
+| **Nothing is kept there. It all goes onward**                 | Four instructions, no decisions, no work. `li a7`, `ecall`, `ret`                                                                                  |
+| **A scrap of paper with half an address on it**               | A **snippet**. It looks like the same kind of thing and is not deliverable — the post office cannot resolve it, and `ld` cannot resolve a fragment |
+| **"It's an address"**                                         | **Function** or **module**. True, and it tells you nothing: the warehouse has an address too                                                       |
+| **A depot that opens the parcel and attaches a customs form** | A **wrapper**. `sbrk` adding `SBRK_EAGER` is exactly that form                                                                                     |
+| **The warehouse where the goods actually are**                | An **implementation**. `strlen`                                                                                                                    |
+
+The deliverability line is the one that separates a stub from a snippet, and it is not a matter of degree: a forwarding address either resolves or it does not. That is the same test `ld` applies.
+
+Size stays a separate question throughout, which is the whole point about "function" and "module". A forwarding address can be a PO box (one function — `sys_sbrk`), a mail-handling office (a module — QEMU's gdb stub), or an empty building registered as a company's office (a file — `docs/book/ch13-summary.md`). None of those sizes makes it more or less a forwarding address.
+
+> [!NOTE]
+> The analogy earns exactly one thing: it separates _what a thing does_ from _how big it is_. Push it further and it misleads — nothing in the post is privileged, and `ecall` is not a delivery van but a change of CPU privilege level. For what actually happens on the other side of that call, see [Why the system call number goes in `a7`](06-build-artifacts.md#why-the-system-call-number-goes-in-a7).
+
+**Against "snippet"** — the two classify along different axes, and only one of them says anything useful here:
+
+|                                              | **Snippet**                                    | **Stub**                                         |
+| -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
+| **Defined by**                               | Its form — a short fragment of code            | Its role — standing in for a full implementation |
+| **Is it complete?**                          | Not necessarily; it may not compile on its own | Yes. It compiles, links, and is callable         |
+| **Does it have a name others link against?** | No                                             | **Yes.** That is the entire point                |
+
+`fork` in `user/usys.S` is a real function at a real address that `ld` resolves references to; calling it a snippet would describe its length and miss its job. It occupies the name `fork` so that C code can call `fork()` — and then does none of the work itself, handing straight over to the kernel.
+
+**Against "function" and "module"** — these name a _granularity_, while "stub" names a _role_. A stub **is** a function, or a module, or a file. The two axes are orthogonal, and this repository demonstrates it by using the word at all three levels at once:
+
+| Thing                                     | Granularity | Role           |
+| ----------------------------------------- | ----------- | -------------- |
+| `sys_sbrk` in `user/usys.S`               | function    | **stub**       |
+| `sbrk` in `user/ulib.c:153`               | function    | wrapper        |
+| `strlen` in `user/ulib.c:40`              | function    | implementation |
+| QEMU's gdb stub                           | module      | **stub**       |
+| `docs/book/ch13-summary.md`, all 21 lines | file        | **stub**       |
+
+A word that qualifies a function, a module, _and_ a file cannot be a replacement for any of them. It is the role-shaped word that says what a thing does; they are the structural words that say what size of thing it is.
+
+The `sbrk` chain is the sharpest case, because all three roles sit in one call path:
+
+```c
+sys_sbrk:  li a7, SYS_sbrk; ecall; ret          // usys.S      — stub: names the call, does nothing
+sbrk(n)    { return sys_sbrk(n, SBRK_EAGER); }  // ulib.c:153  — wrapper: supplies an argument
+strlen(s)  { ... }                              // ulib.c:40   — implementation: does the work
+```
+
+All three are functions, so calling them that is true and says nothing. Calling the middle one a stub is simply wrong: it makes a decision — which eager/lazy mode to request — and deciding anything is exactly what a stub does not do. That distinction is why `user/usys.pl` special-cases this one entry, emitting the stub as `sys_sbrk` so the plain name stays free for the wrapper.
+
+Substitution fails in both directions, which is the test worth applying to any such word:
+
+| Sentence         | With "stub"                                                                              | With "function"                                                     |
+| ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| **On behaviour** | "The stub never touches `a0`–`a5`" — worth saying, because pass-through is what stubs do | "The function never touches `a0`–`a5`" — reads as an arbitrary fact |
+| **On counting**  | "22 stubs" — identifies a set                                                            | "22 functions" — identifies nothing; `ulib.c` contributes 14 more   |
+
+"Module" fails on granularity in the opposite direction: `user/usys.S` as a whole file could fairly be called a module, but the four lines named `fork` inside it could not.
+
+The word is standard across several fields with the same sense: **RPC** has client and server stubs marshalling calls across a network, **gdb** talks to a _remote stub_ inside the target, and **testing** distinguishes stubs from mocks. The etymology fits precisely — a stub is the short part left behind when the rest is torn away, like a ticket stub or a tree stump. That is the shape of `usys.S`: the name and the entry point survive, the body does not.
+
 ## Naming oddities worth knowing
 
 Small things that cause confusion the first time:
 
 - **`printk` vs `printf`** — the kernel's is `printk` (`kernel/printk.c`), user space has its own `printf` (`user/printf.c`). Upstream renamed the kernel one from `printf.c` recently, which is why the 2025 lab branches still refer to the old name.
-- **The `_` prefix** — `user/_ls` is the linked executable, `user/ls.o` the object file. The underscore keeps the Makefile's pattern rules unambiguous; inside xv6 the program is just `ls`.
+- **The `_` prefix** — `user/_ls` is the linked executable, `user/ls.o` the object file, and `mkfs` strips the underscore so that inside xv6 the program is just `ls`. The reason is written in `mkfs/mkfs.c:147`: the binaries are named `_rm`, `_cat`, and so on "to keep the build operating system from trying to execute them in place of system binaries like `rm` and `cat`". The prefix protects **your host**, not xv6.
 - **`v6` in "xv6"** — refers to Unix Version 6, the 1975 system it re-implements, not a version of xv6 itself.
 - **"virt"** — QEMU's generic board name, not related to virtio, though the virt board is where the virtio devices live.

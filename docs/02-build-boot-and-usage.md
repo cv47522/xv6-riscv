@@ -216,6 +216,15 @@ Adding a tenth or a fiftieth exercise does not justify `user/exercises/`, and th
 | **`clean`'s `*/*.o */*.d */*.asm */*.sym`** | The same single level.                                                             | `make clean` leaves the nested objects behind, and the next build silently links them. |
 | **The `_%: %.o` rule and its `$*` stem**    | The stem is the source path, which is how `.asm` and `.sym` land next to the `.c`. | Disassembly appears somewhere other than where you look for it.                        |
 
+The `mkfs` row is worth seeing fail, because it is the one that saves you. `mkfs/mkfs.c:137` strips a single leading `user/`, and `mkfs/mkfs.c:142` then asserts that nothing else in the name is a slash:
+
+```bash
+$ mkfs/mkfs test.img user/exercises/_ex1copy
+mkfs: mkfs/mkfs.c:142: main: Assertion `index(shortname, '/') == 0' failed.
+```
+
+The build stops there with a `SIGABRT`, before a broken image is ever handed to QEMU.
+
 The artifacts are already invisible where it counts. `.gitignore` covers `_*`, `*.o`, `*.d`, `*.asm`, `*.sym`, `*.img`, and `*.img.bk`, and `git ls-files` returns nothing generated — so the clutter is a file-listing annoyance, never a diff or a commit. Moving it into a `build/` tree would buy a tidier `ls` and cost the four mechanisms above.
 
 > [!IMPORTANT]

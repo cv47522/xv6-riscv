@@ -60,8 +60,9 @@
 //   --------  --------------------------  ----------------------------------
 //    > 0      bytes actually transferred  copy exactly that many, not 64
 //      0      EOF: no more will arrive    leave the loop and return 0
-//     -1      the call failed             report on fd 2 (similar to stderr in Linux)
-//                                         and return 1
+//     -1      the call failed             report on fd 2
+//                                         (similar to stderr in Linux) and
+//                                         return 1
 //
 // ---------------------------------------------------------------------------
 //  FILE DESCRIPTORS
@@ -144,7 +145,39 @@ main(void)
   //
   // The pipe case falls out of kernel/file.c: filestat() serves FD_INODE and
   // FD_DEVICE and rejects FD_PIPE outright.
+  //
+  // Why descriptor 0 and not 1?  The hint answers one question -- is a human
+  // about to type at me? -- and that is a property of the input side alone.
+  // The two sides come apart in both directions: `ex1copy > out` leaves fd 1
+  // on a file while somebody still waits at the keyboard, and
+  // `echo hi | ex1copy` leaves fd 1 on the console with nobody typing.
+  // fstat() takes a descriptor rather than a path, so it reports on whatever
+  // sh wired to 0 before exec'ing us, which is exactly the thing in doubt.
+  //
+  // Why T_DEVICE means "the console" here, with no display case to add:
+  // T_DEVICE is the inode type mknod() stamps (sys_mknod() in
+  // kernel/sysfile.c), and the only mknod() call in this whole tree is
+  // `mknod("console", CONSOLE, 0)` in user/init.c -- so `console` is the only
+  // device file that exists.  Keyboard and display are not two devices
+  // either: one inode with major number CONSOLE (1) covers both directions,
+  // because consoleinit() registers devsw[CONSOLE].read = consoleread and
+  // devsw[CONSOLE].write = consolewrite over the same UART.  NDEV (10) is
+  // only the size of devsw[]; nothing else ever claims a major number.  On
+  // Linux this same test would pass for every character device -- /dev/null,
+  // a disk, any tty -- which is why portable filters ask isatty() instead.
   if (fstat(0, &st) == 0 && st.type == T_DEVICE) {
+    // fd 2 is better read as the out-of-band descriptor than the error one:
+    // it is what stays pointed at the terminal when `>` moves fd 1 elsewhere.
+    // Anything *about* the run rather than *part* of it belongs there --
+    // errors, progress, prompts, and this hint.  The filter rule forces it:
+    // `ex1copy > out` and `ex1copy | wc` must see the input bytes and nothing
+    // else, and sh redirects only the descriptor you name.
+    //
+    // fprintf() rather than printf() because printf() in user/printf.c is
+    // vprintf(1, ...) with fd 1 hardwired, while fprintf() takes the
+    // descriptor.  xv6 has no FILE, no stderr stream, and no fdopen() --
+    // user/user.h declares exactly these two functions -- so fprintf(2, ...)
+    // is the only way to reach fd 2.
     fprintf(2, "ex1copy: copying standard input to standard output.\n");
     fprintf(2, "ex1copy: type a line and press Enter. Ctrl-d on an empty "
                "line finishes.\n");
@@ -154,6 +187,22 @@ main(void)
   // until Enter, and then one read() returns the whole line.  Once the
   // buffered input is consumed the next read() waits for more, and Ctrl-d at
   // an empty input position returns zero for EOF, which ends this loop.
+  //
+  // Nothing below implements Ctrl-d, and this program never names it: read()
+  // returns 0 and the `> 0` test does the rest.  Two functions in
+  // kernel/console.c produce that zero.
+  //
+  //   consoleintr()  accepts C('D') -- the macro is ((x) - '@'), so byte 0x04
+  //                  -- as a line terminator alongside '\n', advancing cons.w
+  //                  and waking a sleeping reader though no newline arrived.
+  //   consoleread()  pulls that byte back out, breaks without copying it, and
+  //                  returns target - n.  At an empty position nothing has
+  //                  been copied yet, n is still target, and the result is 0.
+  //
+  // That is also the whole content of "on an empty line": type `abc` and then
+  // Ctrl-d, and consoleread() takes its `if (n < target) cons.r--` branch,
+  // pushing the Ctrl-d back into the buffer so this read returns three bytes
+  // and only the *next* one returns 0.  A partial line needs two presses.
   while ((n = read(0, buf, sizeof(buf))) > 0) {
     if (write(1, buf, n) != n) {
       fprintf(2, "ex1copy: write error\n");

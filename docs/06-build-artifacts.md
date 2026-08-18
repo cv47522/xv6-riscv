@@ -353,7 +353,7 @@ panic(char *s)
 
 There are 62 `panic()` call sites across 13 files in `kernel/`, and the string is always a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
 
-```console
+```bash
 $ grep -rn 'panic("bget: no buffers")' kernel/
 kernel/bio.c:87:  panic("bget: no buffers");
 ```
@@ -390,7 +390,7 @@ The three values in that first line are CSRs, read at the moment of the trap:
 
 `.sym` is a coarse index and `.asm` is the detail, so the two are used in that order. Taking the `sepc=0x0000000080001a70` from the two-line panic above, sort the symbol table and find the last symbol at or below it:
 
-```console
+```bash
 $ sort kernel/kernel.sym | awk '$1 <= "0000000080001a70"' | tail -1
 0000000080001a5c usertrap
 ```
@@ -490,7 +490,7 @@ sudo apt-get install git build-essential gdb-multiarch qemu-system-misc \
 
 `dpkg` will name the culprit for any header you are suspicious of:
 
-```console
+```bash
 $ dpkg -S /usr/riscv64-linux-gnu/include/unistd.h
 libc6-dev-riscv64-cross: /usr/riscv64-linux-gnu/include/unistd.h
 ```
@@ -684,6 +684,131 @@ The leading `-` means "silently skip if absent", so a freshly cleaned tree with 
 | `.o`, `.d`, `.asm`, `.sym`, `user/_name`, `fs.img` | **No**  | All outputs. Every one is regenerated and none is tracked.             |
 
 The two you will _read_ constantly without ever editing are `.asm` and `.sym`, both regenerated on every link. Turning a fault address into a line of C is what they are for, and the procedure is in [`.asm` versus `.sym`](#asm-versus-sym) above; the debugging loop around it is in [Finding where the kernel crashed](02-build-boot-and-usage.md#finding-where-the-kernel-crashed).
+
+## Where each piece would live on Linux
+
+The repository looks like a small Unix, and the resemblance is real — but the mapping is not one-to-one, and two of the correspondences are actively misleading because the names collide. `kernel/` here is **not** Linux's `kernel/`, and `user/` is **not** `/usr`.
+
+| In this tree    | What it is                           | Nearest Linux counterpart                                   | The catch                                                                                       |
+| --------------- | ------------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **`kernel/`**   | Every line of the operating system   | The **entire** Linux source tree                            | Linux's own `kernel/` subdirectory is only the core — scheduler, fork, signals                  |
+| **`user/`**     | C source for the userland programs   | The source repos of coreutils, util-linux, and bash         | It is source, not a runtime directory. Nothing here corresponds to `/usr`                       |
+| **`user/_ls`**  | A linked binary staged for the image | `/bin/ls`                                                   | It lands in xv6's **root** directory, not a `bin` directory, and the `_` is stripped on the way |
+| **`mkfs/mkfs`** | Builds the filesystem and fills it   | `mkfs.ext4` — which does exist, under a per-filesystem name | Linux's makes an _empty_ filesystem; xv6's also populates it                                    |
+| **`fs.img`**    | The entire root filesystem, 2 MB     | WSL 2's `ext4.vhdx`; a VM's `.qcow2`; an installer `.iso`   | It is disposable. Yours is regenerated on every `make qemu`                                     |
+
+### `fs.img`, and what the other systems use
+
+`fs.img` is a raw disk image — 2,048,000 bytes, which is exactly `FSSIZE` (2000, in `kernel/param.h`) × `BSIZE` (1024, in `kernel/fs.h`). The Makefile hands it to QEMU as a virtio block device:
+
+```makefile
+QEMUOPTS += -drive file=fs.img,if=none,format=raw,id=x0
+QEMUOPTS += -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+```
+
+so from inside xv6 it is simply the hard disk. Where the equivalent lives on the systems you are likely to be reading this on:
+
+| System                        | Where the root filesystem actually is                                                                                  | Filesystem                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **WSL 2**                     | One file on the Windows side — `%LOCALAPPDATA%\wsl\{GUID}\ext4.vhdx`, a Hyper-V virtual disk handed to a real Linux VM | ext4                                                                                                |
+| **Ubuntu on hardware**        | A partition on the physical disk, with no file wrapping it at all                                                      | ext4 by default                                                                                     |
+| **Rocky Linux**               | Likewise a partition, conventionally inside an LVM logical volume                                                      | **XFS** by default — the RHEL family's choice, and the most common surprise when moving from Ubuntu |
+| **Installer and cloud media** | `.iso` (ISO 9660; live images carry a squashfs inside it), or `.qcow2`/raw `.img` for cloud                            | varies                                                                                              |
+| **xv6**                       | `fs.img`, one file in the repo root, rebuilt every boot                                                                | xv6's own                                                                                           |
+
+WSL 2 is the closest structural match, and this machine is the demonstration:
+
+```bash
+$ df -hT /
+Filesystem     Type  Size  Used Avail Use% Mounted on
+/dev/sdc       ext4 1007G  303G  653G  32% /
+```
+
+That `/dev/sdc` is the `ext4.vhdx` file, presented to the WSL 2 virtual machine as a block device — precisely the trick QEMU plays on xv6 with `fs.img`, one layer of virtualization further up. The scale is the only dramatic difference: **391 GB against 2 MB**, a factor of about 200,000.
+
+> [!IMPORTANT]
+> The difference that matters is not size, it is disposability. `fs.img` is a **build artifact**: git-ignored, rebuilt by `make qemu`, and rotated aside as `fs.img.bk` on every run. Anything you create inside xv6 is gone at the next build unless you arranged for it to be in `UPROGS` or `UEXTRA`. Your Ubuntu root filesystem is the opposite kind of object — the one thing on the machine you are trying not to lose.
+
+### `mkfs`: it does exist on Linux, spelled per filesystem
+
+This is the one where the component is genuinely there and just does not have the name you searched for:
+
+```bash
+$ ls -la /sbin/mkfs*
+-rwxr-xr-x 1 root root 14720 Mar  6 18:00 /sbin/mkfs
+-rwxr-xr-x 1 root root 22912 Mar  6 18:00 /sbin/mkfs.bfs
+-rwxr-xr-x 1 root root 35144 Mar  6 18:00 /sbin/mkfs.cramfs
+lrwxrwxrwx 1 root root     6 Apr 29  2024 /sbin/mkfs.ext2 -> mke2fs
+lrwxrwxrwx 1 root root     6 Apr 29  2024 /sbin/mkfs.ext3 -> mke2fs
+lrwxrwxrwx 1 root root     6 Apr 29  2024 /sbin/mkfs.ext4 -> mke2fs
+-rwxr-xr-x 1 root root 43408 Mar  6 18:00 /sbin/mkfs.minix
+```
+
+`/sbin/mkfs` is a thin dispatcher from util-linux — `mkfs -t ext4 …` just execs `mkfs.ext4`. The real programs ship per filesystem: `e2fsprogs` provides `mkfs.ext4`, `xfsprogs` provides `mkfs.xfs`, `dosfstools` provides `mkfs.vfat`. xv6's is plain `mkfs/mkfs` because xv6 has exactly one filesystem type and never needed the suffix.
+
+The analogy holds for half of what the tool does, and the half that fails is the interesting one:
+
+|                      | Linux `mkfs.ext4`                       | xv6 `mkfs/mkfs`                                             |
+| -------------------- | --------------------------------------- | ----------------------------------------------------------- |
+| **Arguments**        | A device or file, and optionally a size | An output filename, then every file to place inside         |
+| **Produces**         | An **empty** filesystem                 | A filesystem **with the files already in it**               |
+| **Getting files in** | A second step — `mount`, then `cp`      | The same step. Nothing is ever mounted                      |
+| **Runs on**          | The target system, at install time      | **Your host**, at build time, as an ordinary x86-64 program |
+| **Invocation here**  | —                                       | `mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)`               |
+
+That fourth row is the one to keep. `mkfs/mkfs` is compiled by the **host** compiler rather than the cross compiler, because it has to run on your machine: nothing can run inside xv6 to fill the image before the image exists. It is the one program in this repository that is not RISC-V.
+
+The combined make-and-populate behaviour does exist on Linux, just off the default path — `mkfs.ext4 -d <directory>` (e2fsprogs 1.43 and later, and present in this machine's help output), plus `genext2fs`, `mksquashfs`, and `virt-make-fs`. They exist for exactly xv6's reason: building a filesystem for a system that is not running yet. Embedded firmware, container images, and cloud images are all built this way. xv6 is that same problem in miniature.
+
+### `_name`: they are `/bin`, but xv6 has no `/bin`
+
+The underscore is stripped on the way into the image, and the reason is written in `mkfs/mkfs.c:147`:
+
+```c
+// Skip leading _ in name when writing to file system.
+// The binaries are named _rm, _cat, etc. to keep the
+// build operating system from trying to execute them
+// in place of system binaries like rm and cat.
+```
+
+So the prefix protects **your host**, not xv6. Without it, `user/rm` and `user/cat` would be RISC-V binaries carrying the names of real commands, sitting in a directory you are about to run shell commands in.
+
+Where they end up is the part that does not match Linux at all:
+
+|                             | Linux                                                               | xv6                                                                                    |
+| --------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Where binaries live**     | `/bin`, `/usr/bin`, `/sbin` — nowadays all symlinks into `/usr/bin` | The root directory, `/`. There is no `bin` directory                                   |
+| **How the shell finds one** | `$PATH` lookup                                                      | No `$PATH` exists. `user/sh.c:79` passes the typed word straight to `exec()` as a path |
+| **Configuration**           | `/etc`                                                              | **Nothing.** xv6 has no configuration file of any kind                                 |
+| **Device nodes**            | `/dev`, populated by devtmpfs and udev                              | One node, `/console`, created by `user/init.c` calling `mknod("console", CONSOLE, 0)`  |
+| **Home directories**        | `/home/you`                                                         | None. There are no users, no login, and no uid                                         |
+| **Kernel interfaces**       | `/proc`, `/sys`                                                     | None                                                                                   |
+| **Scratch space**           | `/tmp`                                                              | None                                                                                   |
+| **Shape**                   | The FHS — dozens of standard directories                            | One flat directory: `.`, `..`, and then every program and data file side by side       |
+
+> [!NOTE]
+> The `/etc` and `/usr` question is worth splitting in two, because it mixes build time with run time.
+>
+> - **`user/` is source code.** Its counterpart is not a runtime directory at all — it is the upstream source of GNU coreutils (`ls`, `cat`, `echo`, `wc`), util-linux (`kill`, `mkdir`), and bash (`sh`).
+> - **`/usr` and `/etc` are runtime directories on an installed system.** Their counterpart is the root of `fs.img` — and for `/etc` specifically, the counterpart is nothing at all.
+
+### `kernel/`: the whole Linux tree, not Linux's `kernel/`
+
+The name collision here is the sharpest trap of the five. Linux's source tree has its own `kernel/` subdirectory, and it holds only core process management — `fork.c`, `exit.c`, `signal.c`, `sched/`, `locking/`, `printk/`. Everything else lives in sibling directories. xv6's `kernel/` is all of it, in 6,602 lines:
+
+| xv6 file(s)                                    | Job                                   | Where Linux keeps the same job                 |
+| ---------------------------------------------- | ------------------------------------- | ---------------------------------------------- |
+| `proc.c`, `swtch.S`                            | Processes, scheduling, context switch | `kernel/sched/`, `kernel/fork.c`               |
+| `vm.c`, `kalloc.c`                             | Page tables, physical page allocator  | `mm/`                                          |
+| `fs.c`, `file.c`, `bio.c`, `log.c`             | Filesystem, buffer cache, journal     | `fs/`                                          |
+| `pipe.c`                                       | Pipes                                 | `fs/pipe.c`                                    |
+| `uart.c`, `virtio_disk.c`, `console.c`         | Device drivers                        | `drivers/tty/serial/`, `drivers/block/`        |
+| `entry.S`, `start.c`, `trampoline.S`, `trap.c` | Boot, traps, RISC-V specifics         | `arch/riscv/`                                  |
+| `syscall.c`, `sysproc.c`, `sysfile.c`          | System call dispatch and handlers     | `kernel/sys.c`, `fs/`, and the arch entry code |
+| `spinlock.c`, `sleeplock.c`                    | Locking primitives                    | `kernel/locking/`                              |
+| `printk.c`                                     | Kernel logging                        | `kernel/printk/`                               |
+
+Linux's tree runs to tens of millions of lines across those directories. The point of xv6 is that the same nine jobs are all still there, each recognisable, and all of them together fit in a long afternoon's reading.
 
 ## The same build, side by side
 
