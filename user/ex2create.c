@@ -177,15 +177,27 @@ main(void)
   int fd = open("ex2.out", O_WRONLY | O_CREATE | O_TRUNC);
   if (fd < 0) {
     // fd 2 rather than 1: a diagnostic is about the run, not part of its
-    // output, and it must survive `ex2create > log`.  fprintf() rather than
-    // printf() because printf() in user/printf.c hardwires fd 1.
+    // output, and it must survive `ex2create > log`.  printf() cannot go
+    // there -- it is vprintf(1, ...) in user/printf.c, with the descriptor
+    // hardwired -- so reaching fd 2 at all requires fprintf().
     fprintf(2, "ex2create: cannot create ex2.out\n");
-    return 1;
+    return 1; // Failure
   }
 
   // The number below is the whole observable point of the exercise: it is 3
   // on a normal run, because fdalloc() returned the lowest free slot and
   // 0, 1, and 2 were taken before main() started.
+  //
+  // printf() here, fprintf(2, ...) above, and the difference is the POINT
+  // rather than an inconsistency.  printf()'s hardwired fd 1 is a limitation
+  // only when you need fd 2; this line is the program's actual output, which
+  // belongs on fd 1, so the hardwiring is exactly what is wanted.  The rule
+  // is about WHERE each line goes, not about which function is better:
+  //
+  //   fd 1, printf()      the result the program exists to produce
+  //   fd 2, fprintf(2,)   anything ABOUT the run -- errors, progress, hints
+  //
+  // ex1copy.c draws the same line for the same reason.
   printf("ex2create: open() returned fd %d\n", fd);
 
   // Six bytes, not seven: strlen("Hello\n") is 6 and the trailing NUL that

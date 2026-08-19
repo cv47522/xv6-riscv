@@ -141,5 +141,5 @@ def test_test_find_sh():
 @test(1, "time")
 def test_time():
     check_time()
-    
+
 run_tests()
