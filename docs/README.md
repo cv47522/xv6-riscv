@@ -25,6 +25,7 @@ If you are setting this up for the first time, read these in order. Each one ass
 | **[08-makefile-tour.md](08-makefile-tour.md)**                   | How the [Makefile](../Makefile) works: the default goal, the goal graph, a cold build phase by phase, the three link steps, and every construct the file uses. Ends with a side-by-side comparison against the simpler `operating-system/codes/Makefile`, whose syntax is explained in [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md).             |
 | **[book/](book/)**                                               | Chapter-by-chapter notes from the xv6 book, added as they are read.                                                                                                                                                                                                                                                                                                        |
 | **[book/00-ostep-concordance.md](book/00-ostep-concordance.md)** | One concept per row, mapped across the xv6 book, the OSTEP notes in `../operating-system/`, this tree's source, and the exercises. Read it before writing any chapter note.                                                                                                                                                                                                |
+| **[prompts/](prompts/)**                                         | Reusable, agent-neutral task prompts — copy one into any coding agent to do a repeated job the house way. Currently: adding a lecture exercise. Not read in order; invoked.                                                                                                                                                 |
 
 > [!TIP]
 > The glossary is the hub. Rather than re-explaining a term in each guide, the other documents link into [04-terminology.md](04-terminology.md). When a chapter introduces a new term, add it there once and link to it.
@@ -42,6 +43,7 @@ xv6-riscv/
   grade-lab-*      MIT grading scripts
   gradelib.py      the grading harness they run on
   docs/            these notes
+  docs/prompts/    reusable task prompts for coding agents
   Makefile         the build, heavily commented as a teaching aid
                    (walked through in docs/08-makefile-tour.md)
 ```

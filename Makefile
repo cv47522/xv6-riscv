@@ -435,7 +435,14 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_sync\
 	$U/_ex1copy\
-	$U/_ex2createfile\
+	$U/_ex2create\
+	$U/_ex3fork\
+	$U/_ex4exec\
+	$U/_ex5forkexec\
+	$U/_ex6redirect\
+	$U/_ex7pipe\
+	$U/_ex8pipefork\
+	$U/_ex9ls\
 
 
 

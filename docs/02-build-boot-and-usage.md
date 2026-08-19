@@ -147,7 +147,7 @@ kill PID
 
 ## Available commands
 
-The full set is what `ls` showed: `cat`, `echo`, `ex1copy`, `grep`, `kill`, `ln`, `ls`, `mkdir`, `rm`, `sh`, `wc`, plus test programs (`usertests`, `forktest`, `stressfs`, `grind`, `zombie`).
+The full set is what `ls` showed: `cat`, `echo`, `grep`, `kill`, `ln`, `ls`, `mkdir`, `rm`, `sh`, `wc`, the nine lecture exercises `ex1copy` through `ex9ls` (see [07-exercises.md](07-exercises.md)), plus test programs (`usertests`, `forktest`, `stressfs`, `grind`, `zombie`).
 
 The shell supports pipes, redirection, and background jobs:
 
@@ -174,11 +174,12 @@ Use this checklist for a standalone exercise:
 2. **Keep the guest command name at most 14 bytes**. `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts that every imported basename fits. The host binary has a leading underscore, but `mkfs` removes it: `user/_ex1copy` becomes the xv6 command `ex1copy`.
 3. Include xv6's headers, usually `kernel/types.h` followed by `user/user.h`. **Do not include the host `<stdio.h>`**: xv6 is freestanding and links against `ULIB`, not the host C library.
 4. Use integer file descriptors with xv6 system calls. **By Unix convention, 0 is standard input, 1 is standard output, and 2 is standard error**; they are not C `FILE *` streams such as `stdin` and `stdout`.
-5. Append the linked target to the base `UPROGS` list in the Makefile, indented with a tab like the entries around it. `$U/_ex1copy` is currently the last one, so a new `ex2` goes straight after it:
+5. Append the linked target to the base `UPROGS` list in the Makefile, indented with a tab like the entries around it. The lecture exercises sit at the end of the list, so a new one goes straight after `$U/_ex9ls`:
 
     ```makefile
-    $U/_ex1copy\
-    $U/_ex2\
+    $U/_ex8pipefork\
+    $U/_ex9ls\
+    $U/_ex10newthing\
     ```
 
     **Every entry ends with a backslash, including the last one** — the blank line that follows is what terminates the variable. Adding an exercise is therefore a one-line append, with no edit to the line above it. No compile or link rule needs touching: `user/*.c` is handled by Make's built-in `.c` → `.o` rule and the Makefile's `_%` link rule, as [08-makefile-tour.md](08-makefile-tour.md#user-objects-there-is-no-rule-at-all) explains.

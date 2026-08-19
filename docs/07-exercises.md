@@ -9,11 +9,54 @@
 The small programs the 6.1810 lectures hand out, one section each: what the exercise does, what its observable behaviour is, and where every idea it introduces lives in this tree.
 
 > [!NOTE]
-> This file owns the exercises themselves. The mechanics they all share — how a `.c` file under `user/` becomes an xv6 command, why the tree stays flat, and the house style a new program has to match — belong to [02-build-boot-and-usage.md](02-build-boot-and-usage.md#adding-and-running-a-user-exercise), and are not repeated here.
+> This file owns the exercises themselves. The mechanics they all share — how a `.c` file under `user/` becomes an xv6 command, why the tree stays flat, and the house style a new program has to match — belong to [02-build-boot-and-usage.md](02-build-boot-and-usage.md#adding-and-running-a-user-exercise), and are not repeated here. To write the next one, use [`prompts/add-lecture-exercise.md`](prompts/add-lecture-exercise.md), which encodes the whole procedure; in Claude Code it is wired up as `/exercise`.
 
-| Exercise                                              | Source           | From                                                                              | What it introduces                                                 |
-| ----------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| **[`ex1copy`](#ex1copy--the-lecture-1-input-filter)** | `user/ex1copy.c` | [Lecture 1, `ex1.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c) | `read`, `write`, descriptors 0/1/2, EOF, and what a Unix filter is |
+## The set
+
+Lecture 1 ([`l-overview.txt`](lectures/l-overview.txt)) walks through nine example programs. Each is named `ex<N><verb>`, where `N` is the lecture's own numbering and the verb is the lecture's own wording — so `ex5forkexec` is lecture 1's `ex5.c`, described there as "fork() a new process, exec() a program".
+
+| Exercise                                                      | Source               | Lecture                                                                | What it introduces                                                            |
+| ------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **[`ex1copy`](#ex1copy--the-lecture-1-input-filter)**         | `user/ex1copy.c`     | [`ex1.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c) | `read`, `write`, descriptors 0/1/2, EOF, and what a Unix filter is            |
+| **[`ex2create`](#ex2create--making-a-descriptor)**            | `user/ex2create.c`   | [`ex2.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex2.c) | `open`, the lowest-unused-descriptor rule, per-process descriptor name-spaces |
+| **[`ex3fork`](#ex3fork--one-call-two-returns)**               | `user/ex3fork.c`     | [`ex3.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex3.c) | `fork`, parent/child, separate memory, and unordered output                   |
+| **[`ex4exec`](#ex4exec--becoming-another-program)**           | `user/ex4exec.c`     | [`ex4.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex4.c) | `exec`, the argument array, and what survives an image replacement            |
+| **[`ex5forkexec`](#ex5forkexec--the-shells-execution-model)** | `user/ex5forkexec.c` | [`ex5.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex5.c) | `wait`, exit status, and why `fork` and `exec` are two calls                  |
+| **[`ex6redirect`](#ex6redirect--how--is-implemented)**        | `user/ex6redirect.c` | [`ex6.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex6.c) | `close` + `open` in the fork/exec window; redirection lives only in `sh`      |
+| **[`ex7pipe`](#ex7pipe--a-buffer-with-two-descriptors)**      | `user/ex7pipe.c`     | [`ex7.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex7.c) | `pipe`, the kernel buffer, and why one process alone is a trap                |
+| **[`ex8pipefork`](#ex8pipefork--two-processes-one-buffer)**   | `user/ex8pipefork.c` | [`ex8.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex8.c) | `pipe` + `fork`, and why EOF depends on closing unused ends                   |
+| **[`ex9ls`](#ex9ls--a-directory-is-a-file)**                  | `user/ex9ls.c`       | [`ex9.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex9.c) | `struct dirent`, reading a directory with plain `read`                        |
+
+They are not nine independent programs. Each one answers a question the previous one leaves open, and the last three are the shell's implementation taken apart:
+
+```mermaid
+flowchart TD
+    ex1["ex1copy<br/>read/write, fd 0 and 1"] --> ex2["ex2create<br/>open makes a new fd"]
+    ex2 --> ex6
+    ex1 --> ex3["ex3fork<br/>a second process"]
+    ex3 --> ex5["ex5forkexec<br/>fork + exec + wait"]
+    ex4["ex4exec<br/>a different program"] --> ex5
+    ex5 --> ex6["ex6redirect<br/>close + open, then exec"]
+    ex5 --> ex8
+    ex7["ex7pipe<br/>a kernel buffer"] --> ex8["ex8pipefork<br/>two processes, one pipe"]
+    ex6 --> sh["user/sh.c<br/>redirection and pipelines"]
+    ex8 --> sh
+    ex2 --> ex9["ex9ls<br/>directories are files"]
+
+    classDef io fill:#f0fff0,stroke:#4a4
+    classDef proc fill:#fff0f0,stroke:#a44
+    classDef combine fill:#f0f0ff,stroke:#44a
+    classDef target fill:#ffffd0,stroke:#aa4
+    class ex1,ex2,ex9 io
+    class ex3,ex4,ex7 proc
+    class ex5,ex6,ex8 combine
+    class sh target
+```
+
+Green is I/O, red is process and buffer creation, blue is the combinations that need both, and yellow is where the whole thing was going. Reading `user/sh.c` after `ex8pipefork` is the intended payoff — every construct in it has appeared by then.
+
+> [!TIP]
+> Run them in order in one session. Several depend on files an earlier one wrote: `ex9ls` shows the `ex2.out` and `ex6.out` that `ex2create` and `ex6redirect` leave behind, which is a cheap way to see that they really did touch the file system. `make qemu` rebuilds `fs.img` and discards them; `make qemu-fs` keeps them.
 
 ## `ex1copy` — the lecture 1 input filter
 
@@ -127,3 +170,362 @@ That is also the whole content of "on an empty line". Type `abc` and then Ctrl-d
 ```
 
 The harness itself — how it boots QEMU, drives the shell, and pattern-matches the transcript — is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
+
+## `ex2create` — making a descriptor
+
+`ex1copy` ends on the lecture's open question: how do you make a _new_ file descriptor? `open()` is the first of the three answers, and the exercise exists to show the number it hands back.
+
+```text
+$ ex2create
+ex2create: open() returned fd 3
+$ cat ex2.out
+Hello
+```
+
+### Why the answer is always 3
+
+Nothing in the program chooses 3. `fdalloc()` in `kernel/sysfile.c` scans `p->ofile[]` from index 0 and returns the first empty slot, and slots 0, 1, and 2 were filled before `main()` started — `user/init.c` opens the console and `dup()`s it twice, and `sh` inherits all three through `fork()`.
+
+| Slot  | Holds                    | Put there by                     |
+| ----- | ------------------------ | -------------------------------- |
+| **0** | the console, for reading | `user/init.c`, inherited by `sh` |
+| **1** | the console, for writing | `dup(0)` in `user/init.c`        |
+| **2** | the console, for writing | `dup(0)` in `user/init.c`        |
+| **3** | _empty_                  | ← `fdalloc()` picks it           |
+
+That rule is not a curiosity. It is load-bearing: `close(1)` frees slot 1, so the next `open()` is _guaranteed_ to land there, which is the entire mechanism behind [`ex6redirect`](#ex6redirect--how--is-implemented).
+
+### Two levels of indirection
+
+`open()` builds a chain, and later exercises depend on knowing where it can be cut:
+
+```text
+p->ofile[3]  ──►  struct file  ──►  inode
+ (per process)     (holds the        (holds the
+                    offset)           data)
+```
+
+`fork()` copies the first level and _shares_ the second, which is why a parent and child writing the same descriptor append in turn rather than overwriting each other. `dup()` does the same. Two descriptors share an offset if and only if they came from the same original by `fork()` or `dup()` — never merely by opening the same file twice.
+
+### What xv6 leaves out
+
+| Compared with Linux           | In xv6                                                                                                                                 |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **`open(path, flags, mode)`** | Two arguments only. There are no users, groups, or permission bits, so there is no `mode` to pass.                                     |
+| **`O_CREAT`**                 | Spelled `O_CREATE`, in `kernel/fcntl.h`. Five flags exist in total: `O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREATE`, `O_TRUNC`.           |
+| **`lseek`**                   | Absent. The book names it as one of the basic calls that make xv6 non-POSIX; an offset only ever moves forward, by reading or writing. |
+
+### Errors, deliberately not ignored
+
+The lecture slide says of its own examples: "these examples ignore errors — don't be this sloppy!" The official `ex2.c` does ignore them; this version does not, because neither failure announces itself where it happens.
+
+| Ignored                 | What you actually see                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **`open()` returns -1** | `write(-1, …)` fails silently, the program reports success, and `cat ex2.out` says it cannot open the file — three steps away. |
+| **`write()` short**     | A truncated or empty file, and no message at all.                                                                              |
+
+## `ex3fork` — one call, two returns
+
+```text
+$ ex3fork
+ex3fork: fork() returned 6  (I am pid 5)
+ex3fork: fork() returned 0  (I am pid 6)
+ex3fork: parent, my child is pid 6
+ex3fork: child, my own pid is 6
+```
+
+One `printf()` in the source; two lines on the console. That is the exercise. After `fork()` there are two processes executing the same instructions, and the only thing distinguishing them is the value the call returned.
+
+| Return  | In which process | Means                                                                           |
+| ------- | ---------------- | ------------------------------------------------------------------------------- |
+| **> 0** | the parent       | the child's pid — the parent is told who its child is, so it can `wait()` later |
+| **0**   | the child        | "you are the new one"; 0 is a pid no process can have                           |
+| **-1**  | the parent       | no child was created: `NPROC` reached, or out of memory                         |
+
+`fork()` copies instructions, data, stack, the descriptor table, and the current directory. From that moment the two memories are separate — the program sets `x` to different values in each half to make that concrete — while the file _offsets_ behind the copied descriptors stay shared.
+
+### The output is not just reordered, it is interleaved mid-word
+
+A real run looks like this:
+
+```text
+ex3fork: forke(x3for)k returned : fork() retu6r n e(dI  0  (I ama mp
+```
+
+> [!IMPORTANT]
+> `printf()` in `user/printf.c` is **not atomic**. It formats into a small buffer and calls `write()` as it goes, and the scheduler can switch processes between those writes. With the default `CPUS=3` the two processes are genuinely running at the same instant on different harts, and `uartputc()` takes a lock per _character_ rather than per line — so the granularity of the mixing is a byte.
+
+This is the first appearance of the problem the locking and scheduling chapters exist to solve. `make qemu CPUS=1` usually produces whole lines, which is not a fix — it only makes the race harder to hit.
+
+A third process joins in: `sh` forked this program and is sitting in `wait()`, which returns as soon as _its_ child exits. The child here may still be running then, so the `$` prompt can land in the middle. The prompt is not a promise that everything finished.
+
+This program deliberately omits `wait()` so the raw behaviour is visible. A parent that exits first leaves an **orphan**, which `kexit()` reparents to `init` (pid 1); `init` waits in a loop forever so no exited process stays a zombie.
+
+## `ex4exec` — becoming another program
+
+```text
+$ ex4exec
+this is echo
+```
+
+The program you typed printed nothing. `this is echo` came from `user/echo.c`, running in the very process that started as `ex4exec`. No new process was created — two programs took turns inside one pid.
+
+| Replaced by `exec()` | Preserved across `exec()` |
+| -------------------- | ------------------------- |
+| instructions         | pid                       |
+| data and stack       | the file descriptor table |
+| heap                 | the current directory     |
+|                      | the parent relationship   |
+
+The preserved column is the one that matters. Because `exec()` keeps the descriptor table, a caller can rearrange descriptors _first_ and then `exec()` a program that knows nothing about the rearrangement — which is exactly how `>` and `|` are implemented.
+
+`kexec()` in `kernel/exec.c` swaps the new page table in as its **last** step, so a failure at any earlier point leaves the original program intact and lets `exec()` return -1 into it.
+
+### Why the argument array ends in `0`
+
+Because nothing else says how long it is. `exec()` takes no count, so the kernel walks the array until it finds a null pointer. From `sys_exec()` in `kernel/sysfile.c`:
+
+```c
+for (i = 0;; i++) {
+  if (i >= NELEM(argv)) goto bad;                        // MAXARG (32) reached
+  if (fetchaddr(uargv + sizeof(uint64) * i, &uarg) < 0) goto bad;
+  if (uarg == 0) { argv[i] = 0; break; }                 // the terminator
+  ...
+}
+```
+
+Omit the `0` and the loop keeps fetching whatever follows the array on the stack. It does not run away forever — `MAXARG` stops it after 32 entries — but it either copies garbage as arguments or hits `bad` and returns -1. A missing terminator is therefore an `exec` that mysteriously fails, or a program receiving arguments nobody typed. Same rule as a C string's trailing NUL, one level up: an array of `char` needs a sentinel byte, an array of `char *` needs a sentinel pointer.
+
+`argv[0]` is conventionally the program's own name. Nothing enforces it, and `user/echo.c` ignores it entirely — its loop starts at `argv[1]`, which is why the output above begins at `this`.
+
+> [!NOTE]
+> `exec()` does not return on success, so the statement _after_ it is the error path. No `if` is needed there, and adding one would misrepresent the control flow.
+
+### Why this program is useless on its own
+
+`exec()` consumed the caller. A shell cannot work this way: if `sh` called `exec()` directly it would _become_ `echo`, print, exit, and never read a second command. The fix is to `exec()` in a process you can afford to lose — which is the next exercise.
+
+## `ex5forkexec` — the shell's execution model
+
+```text
+$ ex5forkexec
+ex5forkexec: parent waiting for child 9
+THIS IS ECHO
+ex5forkexec: child 9 exited with status 0
+```
+
+Unlike `ex3fork`, the order is fixed after the first line: `wait()` does not return until the child is gone, so the exit message can never precede the child's output. This is the complete shape of what `user/sh.c` does for **every** command you type.
+
+```mermaid
+sequenceDiagram
+    participant P as parent
+    participant C as child
+
+    Note over P,C: fork — two processes from one call
+    rect rgb(255, 240, 240)
+        P->>C: fork() returns 0 here, the child's pid there
+    end
+
+    Note over C: exec — the child becomes a different program
+    rect rgb(240, 240, 255)
+        C->>C: exec("echo", argv) — never returns
+        C->>C: echo writes to fd 1
+    end
+
+    Note over P,C: wait — the parent blocks until the child exits
+    rect rgb(240, 255, 255)
+        C-->>P: exit(0) — 32 bits of status
+        P->>P: wait(&status) returns the child's pid
+    end
+```
+
+### `wait()` returns a pid and delivers status through a pointer
+
+One integer cannot carry both the identity of the child and the value it exited with, so the status leaves through an out-parameter.
+
+| Return  | Means                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **> 0** | the pid of a child that exited. With several children this is how you learn _which_ — `wait()` reaps any, and xv6 has no `waitpid()` |
+| **-1**  | the caller has no children at all                                                                                                    |
+
+`wait()` blocks only if no child has exited _yet_. One that finished earlier is already a **zombie** — exited but retained so its status can still be collected — and `wait()` returns from it immediately. `kexit()` sets `p->state = ZOMBIE` and wakes the parent; `kwait()` copies `p->xstate` out and calls `freeproc()`. A parent that never waits is what `user/zombie.c` demonstrates.
+
+Passing `0` instead of an address tells the kernel to skip the store — `kwait()` guards it with `if (addr != 0 && copyout(...) < 0)`. That is the documented way to say "I don't want the status", and it is what [`ex6redirect`](#ex6redirect--how--is-implemented) does.
+
+The exit status is convention, not enforcement: `0` for success, non-zero for failure. It is how a child reports an outcome to a parent that cannot see its memory, and 32 bits is the entire channel.
+
+### Why `fork` and `exec` are not one call
+
+The gap between them is where redirection and pipelines are built. Code running in the child after the `fork` but before the `exec` can change the child's world — and only the child's — without the parent or the exec'd program knowing.
+
+> [!NOTE]
+> The xv6 book makes the counterfactual explicit: a combined `forkexec()` would force the shell to modify its own I/O and undo it afterwards, or take redirection instructions as arguments, or (least attractively) teach every program like `cat` to do its own redirection.
+
+`fork()` copies the whole address space and `exec()` discards it instructions later. Real kernels avoid the waste with copy-on-write, which is the `cow` lab.
+
+## `ex6redirect` — how `>` is implemented
+
+```text
+$ ex6redirect
+ex6redirect: parent waiting for child 11
+ex6redirect: child 11 finished; try `cat ex6.out`
+$ cat ex6.out
+ex6redirect's redirected echo
+```
+
+`echo`'s output never reaches the console, and nothing about `echo` changed. The child rewired descriptor 1 before exec'ing it.
+
+```text
+child's FD table       close(1)              open("ex6.out", ...)
++--------------+       +--------------+      +--------------------+
+| 0 -> console |       | 0 -> console |      | 0 -> console       |
+| 1 -> console |  ==>  | 1 <empty>    |  ==> | 1 -> ex6.out       |
+| 2 -> console |       | 2 -> console |      | 2 -> console       |
++--------------+       +--------------+      +--------------------+
+                              ^                       ^
+                slot 1 is now the lowest    fdalloc() must pick it
+                free slot in the table      — there is no choice
+```
+
+Three properties combine, and removing any one breaks it:
+
+| Step               | What it provides                                           |
+| ------------------ | ---------------------------------------------------------- |
+| **`fork()`**       | a process whose descriptors can safely be damaged          |
+| **`close`+`open`** | puts the file where the program will look for descriptor 1 |
+| **`exec()`**       | keeps the table while replacing the program                |
+
+Descriptor 2 is untouched, which is why an error from `echo` would still reach the terminal — `>` redirects only the descriptor you name. That is the same reason `ex1copy` puts its hint on 2.
+
+### Why the parent is unaffected
+
+`close(1)` runs in the child, whose descriptor table is a _copy_ made by `fork()`. Closing a slot marks `p->ofile[1] = 0` in one `struct proc` only. This is precisely why the shell must fork before redirecting: a shell that closed its own descriptor 1 would lose the terminal permanently, and every later prompt would land in whatever file the last command mentioned.
+
+> [!TIP]
+> The `(int *)` cast in `wait((int *)0)` is style, not necessity — a bare `0` is a valid null pointer constant and compiles identically. The xv6 book writes the cast to make the argument's type visible; `user/sh.c` writes plain `wait(0)`. Both appear in this tree. The cast is worth keeping where a lone `0` would read like a status _value_.
+
+## `ex7pipe` — a buffer with two descriptors
+
+```text
+$ ex7pipe
+ex7pipe: pipe() gave read fd 3, write fd 4
+xyz
+```
+
+One `pipe()` call, two descriptors, one kernel object:
+
+| `fds[]`      | End   | Direction       | Blocks when                                   |
+| ------------ | ----- | --------------- | --------------------------------------------- |
+| **`fds[0]`** | read  | out of the pipe | the buffer is empty and a writer still exists |
+| **`fds[1]`** | write | into the pipe   | the buffer is full and a reader still exists  |
+
+The buffer is `char data[PIPESIZE]` — 512 bytes — in `kernel/pipe.c`. It is not a file, nothing touches the disk, and it has **no name in the file system**, which is why a pipe can only be handed to another process by `fork()`.
+
+Nothing here uses a pipe-specific call. `read()` and `write()` are the same ones from `ex1copy`; `fileread()` and `filewrite()` branch on `f->type` and forward to `piperead()`/`pipewrite()`. That uniformity is the whole abstraction: `ls | grep x` works because `grep` reads descriptor 0 with no idea a pipe is behind it.
+
+> [!WARNING]
+> **This one-process version works only by staying under the buffer size.** Write more than `PIPESIZE` with nobody draining the other end and the program hangs on itself — `pipewrite()` sleeps at `pi->nwrite == pi->nread + PIPESIZE` waiting for a reader that is this same, now-sleeping, process. A pipe is a rendezvous between two schedulable things. `Ctrl-p` dumps the process table and shows it stuck in state `sleep`.
+
+A pipe has no EOF marker in the data. `read()` returns 0 only when the buffer is empty **and** every write-end descriptor has been closed. Until then, an empty pipe means "wait", not "finished" — which is the subject of the next exercise.
+
+## `ex8pipefork` — two processes, one buffer
+
+```text
+$ ex8pipefork
+ex8pipefork: parent read 17 bytes: hello from child
+```
+
+The bytes crossed a process boundary. Neither process can see the other's variables, so the pipe is the only channel between them.
+
+### `pipe()` must come before `fork()`
+
+A pipe has no name, so no process can `open()` one somebody else created. The only route is inheritance: make the pipe first, then fork, and the child's copied descriptor table already points at the same kernel buffer. Reversing the order gives each process a private, unconnected pipe.
+
+After the fork there are **four** descriptors on one pipe — two read ends and two write ends. That is one more of each than the design needs, and the extras are not harmless.
+
+### Closing unused ends is protocol, not hygiene
+
+`piperead()` sleeps while `pi->nread == pi->nwrite && pi->writeopen`, and `pipeclose()` clears `writeopen` only when the _last_ writer goes away. So a parent holding its own copy of the write end keeps the pipe open forever, even after the child exits:
+
+```text
+parent forgets close(fds[1])
+  → child exits, its write end closes
+  → writeopen is still 1, because the parent still holds one
+  → parent's read() sees an empty buffer and sleeps
+  → nothing will ever write, and nothing will ever close
+```
+
+The mirror-image rule holds on the other side: if every read end closes while a writer is still writing, `pipewrite()` sets the writer's `p->killed` and `write()` returns -1 — xv6's stand-in for `SIGPIPE`, and what `grade-ex1copy`'s third test exercises.
+
+> [!NOTE]
+> This program reads a fixed byte count and would survive the mistake. The closes are there anyway, because in a real pipeline the reader always waits for EOF.
+
+### How the shell goes one step further
+
+`ls | grep x` needs something this file does not show. Here the parent reads descriptor 3 knowingly; `grep` must read descriptor 0, because that is all any program knows. The shell bridges the gap with `dup()`:
+
+```c
+close(0);          // give up the console
+dup(p[0]);         // the pipe's read end lands in slot 0
+close(p[0]);       // drop the now-redundant original
+close(p[1]);       // and the write end, so EOF can happen
+exec("grep", argv);
+```
+
+Same lowest-free-descriptor rule as `ex6redirect`, with `dup()` in place of `open()` because the target is an existing descriptor rather than a file. A pipe is one-directional — writing to `fds[0]` fails — so two-way conversation needs two pipes, which is exactly the chapter 1 exercise in the xv6 book.
+
+## `ex9ls` — a directory is a file
+
+```text
+$ ex9ls
+.
+..
+README
+cat
+echo
+...
+```
+
+There is no `opendir()`, no `readdir()`, and no directory-listing system call. A directory is a file whose contents are a plain array of fixed-size records, and you list it with the same `open()` and `read()` as everything else. From `kernel/fs.h`:
+
+```c
+#define DIRSIZ 14
+
+struct dirent {
+  ushort inum;                 // which inode, or 0 for a free slot
+  char name[DIRSIZ] __attribute__((nonstring));
+};
+```
+
+Sixteen bytes per entry, so a directory of _n_ entries is exactly 16*n* bytes. The read loop therefore contains no parsing at all: each `read()` of `sizeof(de)` bytes lands one whole record, and the file's length says when to stop.
+
+### Three details the loop must get right
+
+| Detail                                     | Why, and what happens otherwise                                                                                                                                                                                                        |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Skip entries with `inum == 0`**          | Those are free slots. `unlink()` blanks a `dirent` by zeroing it rather than compacting the directory, so the array is sparse. Printing them yields blank lines and stale names.                                                       |
+| **Do not assume `name` is NUL-terminated** | It is marked `__attribute__((nonstring))`: a 14-character name fills the field with no room for a terminator, so `printf("%s")` would run off the end into the next record. Copy into a `DIRSIZ + 1` buffer and terminate it yourself. |
+| **Read whole records**                     | `== sizeof(de)` is both the loop condition and the guard — a short read means the directory ended, and a partial record is never processed.                                                                                            |
+
+`ex9ls` also calls `fstat()` first and rejects anything that is not `T_DIR`. Without that check a plain file would be read 16 bytes at a time and its contents printed as names, with the first two bytes of every chunk silently taken for an inode number.
+
+### `.` and `..` are real entries
+
+Not shell syntax, and not special-cased by the program: they are written into every directory when `create()` makes it. `.` links to the directory itself and `..` to its parent, which is how relative path resolution works at all — `namei()` just walks entries by name.
+
+So `open(".", O_RDONLY)` opens the process's current directory, tracked as `p->cwd` and changed with `chdir()`.
+
+> [!IMPORTANT]
+> This is why `cd` had to be built **into** the shell rather than shipped as a program. `sh` forks a child for each command, so a `cd` running as its own process would change that child's `p->cwd` and exit, leaving the shell exactly where it was.
+
+### Why the program cannot write the directory back
+
+Reading a directory is allowed; writing one is not. `sys_open()` refuses a directory opened with anything but `O_RDONLY`. Only the kernel edits directory contents, through `create()`, `sys_link()`, and `sys_unlink()`.
+
+The reason is integrity: a directory entry references an inode, and the inode's `nlink` count must stay in step with it. A user program writing raw bytes could produce an entry pointing at a free inode, or a link count nothing agrees on — a corrupt file system with no way back. Early Unix did allow this, and it is one of the places where later designs tightened the interface.
+
+## Adding the next one
+
+The naming rule is `ex<N><verb>`: `N` from the lecture's own numbering, verb from the lecture's own wording, and the whole guest command name at most **14 bytes** because `DIRSIZ` in `kernel/fs.h` bounds every filename in `fs.img`.
+
+The full procedure — the checklist, the comment-block shape, the verification loop — is [`prompts/add-lecture-exercise.md`](prompts/add-lecture-exercise.md), runnable as `/exercise` in Claude Code and copy-pasteable into any other agent. The build-side mechanics it depends on are in [02-build-boot-and-usage.md](02-build-boot-and-usage.md#adding-and-running-a-user-exercise).
