@@ -92,6 +92,8 @@ flowchart LR
 
 > **Theory:** [OSTEP — …][ostep-x]. Read that first; this note does not re-explain it.
 
+## Figures <- only for chapters the book gives figures
+
 ## What xv6 actually does
 
 ## Concept on loan: <topic> <- only while the OSTEP note is a placeholder
@@ -129,6 +131,18 @@ A `loan` chapter still carries its `[ostep]:` definition at the bottom because t
 - **Vintage** — OSTEP's xv6 material predates the 2019 RISC-V port and describes `xv6-public`, the older x86 tree.
 
 Only chapters that actually diverge carry the section, and it links the concordance appendix rather than restating the correspondence table.
+
+## Figures
+
+`## Figures` comes first in a note because it is useful before the note is written: a chapter stub that shows the book's diagram is already worth opening. Ten of the book's figures are copied into [fig/](fig/README.md); seven more are TikZ or PDF-only and are redrawn in the notes as Mermaid, tables, or annotated code. [fig/README.md](fig/README.md) is the inventory, the licence notice, and the reproduction command.
+
+Two conventions keep them honest:
+
+- **Cite by source and label, never by number** — `` `lock.tex`, `fig:race` ``. LaTeX assigns figure numbers at build time, so any number written here would be a guess that silently rots.
+- **Nothing load-bearing lives in alt text.** Alt text is invisible to everyone reading the page normally, so a field name, a bit width, or an address that appears only there is hidden from almost every reader. Alt text gets one short line describing the shape of the image, for a reader who cannot see it at all; everything worth knowing goes in the caption below, where both audiences get it.
+- **Caption every figure in three moves:** the book's own caption in quotes, then what is actually drawn — the labels, the bit widths, the addresses — then why a reader of _this_ note is looking at it: which symbol to open, which lab touches it, or which detail this tree does differently.
+
+That second half is where a figure earns its place. [ch09](ch09-sleep-and-wakeup.md#figures) is the model: the book's figure is shown, then immediately contradicted, because this tree closes the lost-wakeup race by a different mechanism than the published book does.
 
 ## Cross-repo links
 

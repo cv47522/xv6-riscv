@@ -8,6 +8,12 @@
 
 > **Theory:** [OSTEP — The Process Abstraction][ostep]. Read that first; this note does not re-explain it.
 
+## Figures
+
+![Two ellipses in user space above a red dividing line, with one arrow crossing it into the kernel box below](fig/os.svg)
+
+_“A kernel and two user processes.” — [book figure](fig/README.md), `unix.tex` `fig:os`. Two user processes, `shell` and `cat`, drawn as ellipses above a red line; below it, a single box holding the whole kernel. One arrow leaves the shell, crosses the line, and is labelled **system call**. That arrow is the chapter: everything the shell can ask for arrives through it, and the twenty entries in the book's system-call table are the complete set of things it can say._
+
 ## What xv6 actually does
 
 The book chapter is a tour of the interface. This note is a tour of the code sitting behind it, in roughly the order the shell exercises it: make a process, replace its image, rewire its descriptors, wire two of them together. Every claim below is anchored to a symbol you can jump to.
@@ -83,8 +89,8 @@ What `kexec()` deliberately does **not** touch is `p->ofile` and `p->cwd`. That 
 
 There are two tables, not one, and the split is where all the interesting behaviour lives.
 
-| Level       | Where                                                                          | Contents                                                                                  |
-| ----------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| Level           | Where                                                                          | Contents                                                                                  |
+| --------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | **Per-process** | `struct file *ofile[NOFILE]` in `struct proc` (`kernel/proc.h`), `NOFILE` = 16 | pointers, indexed by the descriptor number itself                                         |
 | **System-wide** | `ftable.file[NFILE]` in `kernel/file.c`, `NFILE` = 100                         | the `struct file` objects, each with `ref`, `readable`, `writable`, a type tag, and `off` |
 
