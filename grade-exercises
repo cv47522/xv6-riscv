@@ -1,0 +1,327 @@
+#!/usr/bin/env python3
+
+# Regression tests for the lecture exercises under user/.
+#
+# One test per documented claim, not per line of code: each assertion here
+# corresponds to something docs/07-exercises.md or the source comment block
+# states as fact.  The point is that the prose cannot drift away from the
+# programs without something going red.
+#
+# Several of these pin *kernel* invariants rather than program output --
+# fdalloc()'s lowest-free rule (ex2create, ex6redirect), exec() preserving the
+# descriptor table (ex6redirect), wait() ordering (ex5forkexec).  A lab that
+# changes kernel/proc.c or kernel/exec.c should run this suite.
+#
+# Filtering is by substring against the test title, so the exercise name is
+# the prefix of every title:
+#
+#     ./grade-exercises              all of them
+#     ./grade-exercises ex6          just ex6redirect
+#     ./grade-exercises "closed output pipe"
+#
+# NOTE ON THE FILE SYSTEM: reset_fs() in gradelib.py is a no-op in this repo
+# (it needs obj/fs/clean-fs.img, which this tree does not build), and
+# `make qemu-gdb` only regenerates fs.img when it is out of date.  So guest
+# files can survive from an earlier run.  Every test that inspects a file it
+# created deletes it first -- otherwise a stale ex6.out would let a broken
+# ex6redirect pass.  `rm` on a missing file is harmless.
+
+import re
+
+from gradelib import *
+
+
+r = Runner(save("xv6.out"))
+
+
+def subsequence_end(text, needle, limit=None):
+    """Index just past the last character of `needle` matched as an in-order
+    SUBSEQUENCE of text[:limit], or -1 if it never completes.
+
+    Console output from two live processes interleaves at byte granularity:
+    uartputc() locks per character, and printf() in user/printf.c calls
+    write() several times per line, so `THIS IS ECHO` really can arrive as
+    `THISp ISa rECHOe`.  Interleaving inserts foreign characters but never
+    reorders a single process's own stream, so a subsequence test is the
+    only assertion about concurrent output that is not inherently flaky.
+    """
+    i = 0
+    for pos, ch in enumerate(text[:limit]):
+        if ch == needle[i]:
+            i += 1
+            if i == len(needle):
+                return pos + 1
+    return -1
+
+
+def assert_emitted(text, needle, limit=None, msg=""):
+    end = subsequence_end(text, needle, limit)
+    assert end >= 0, (msg or "%r was never fully emitted" % needle)
+    return end
+
+
+##############################################################################
+#  ex1copy -- read/write, descriptors 0/1/2, EOF
+##############################################################################
+
+@test(1, "ex1copy: copies finite piped input")
+def test_piped_input():
+    payload = "xv6-ex1copy-payload-0123456789-abcdefghijklmnopqrstuvwxyz-ABCDEFGHIJKL"
+    r.run_qemu(shell_script([
+        "echo %s | ex1copy" % payload,
+        "echo DONE",
+    ]))
+    r.match("^%s$" % payload, "^DONE$",
+            no=["exec .* failed", "ex1copy: .* error"])
+
+
+@test(1, "ex1copy: interactive input ends with Ctrl-d")
+def test_interactive_eof():
+    input_lines = ("first", "second")
+    line_counts = {line: 0 for line in input_lines}
+
+    def drive_input(runner):
+        def send_first(_line):
+            runner.qemu.write("%s\n" % input_lines[0])
+
+        def send_next(line):
+            line = line.rstrip("\r")
+            line_counts[line] += 1
+            if line == input_lines[0] and line_counts[line] == 2:
+                runner.qemu.write("%s\n" % input_lines[1])
+            elif line == input_lines[1] and line_counts[line] == 2:
+                runner.qemu.write(b"\x04")
+
+        call_on_line(r"^\$ ex1copy\r?$", send_first)(runner)
+        call_on_line(r"^(first|second)\r?$", send_next)(runner)
+
+    r.run_qemu(shell_script(["ex1copy", "echo DONE"]), drive_input, timeout=10)
+    copied = re.findall(r"(?m)^(first|second)$", r.qemu.output)
+    assert_equal(copied.count("first"), 2, "console echo plus copied first line")
+    assert_equal(copied.count("second"), 2, "console echo plus copied second line")
+    r.match("^DONE$", no=["ex1copy: .* error"])
+
+
+@test(1, "ex1copy: reports a closed output pipe")
+def test_closed_output_pipe():
+    r.run_qemu(
+        # README is larger than xv6 PIPESIZE (512), so ex1copy keeps writing
+        # until it observes the closed reader.
+        shell_script(["ex1copy < README | echo done < README"]),
+        make_args=["CPUS=1"],
+        timeout=10,
+    )
+    prompts = re.findall(r"(?m)^\$ ", r.qemu.output)
+    assert_equal(len(prompts), 2, "initial and returned shell prompts")
+    r.match("^done$", "^ex1copy: write error$")
+
+
+##############################################################################
+#  ex2create -- open() and the lowest-free-descriptor rule
+##############################################################################
+
+@test(1, "ex2create: open returns descriptor 3 and the bytes reach the disk")
+def test_ex2create():
+    # `rm` first: a stale ex2.out would make `cat` succeed regardless.
+    r.run_qemu(shell_script([
+        "rm ex2.out",
+        "ex2create",
+        "cat ex2.out",
+        "echo DONE",
+    ]), timeout=30)
+    # fd 3 is a kernel invariant, not a program choice: 0, 1, and 2 are the
+    # console, so fdalloc() has no other slot to return.
+    r.match(r"^ex2create: open\(\) returned fd 3$",
+            "^Hello$",
+            "^DONE$",
+            no=["exec .* failed",
+                "ex2create: cannot",
+                "ex2create: short write",
+                "cat: cannot open"])
+
+
+##############################################################################
+#  ex3fork -- one call, two returns
+##############################################################################
+
+@test(1, "ex3fork: both processes run and each has its own memory")
+def test_ex3fork():
+    # CPUS=1 so the two processes are less likely to interleave mid-line.
+    # Even so, every assertion below is a SUBSTRING count over the whole
+    # transcript rather than a line match: printf() is not atomic, so any
+    # line-anchored assertion here would be flaky by construction.
+    r.run_qemu(shell_script(["ex3fork", "echo DONE"]),
+               make_args=["CPUS=1"], timeout=30)
+    out = r.qemu.output.split("$ ex3fork", 1)[1].split("$ echo DONE", 1)[0]
+
+    # The child branch ran: fork() handed it 0.
+    assert_emitted(out, "fork() returned 0",
+                   msg="no process saw fork() return 0 -- no child was created")
+    # Both branches ran, and each wrote its OWN x: the address spaces are
+    # separate copies, not shared memory.
+    assert_emitted(out, "parent, x is 11", msg="the parent branch did not run")
+    assert_emitted(out, "child, x is 22", msg="the child branch did not run")
+
+    r.match("^DONE$")
+
+
+##############################################################################
+#  ex4exec -- replacing the process image
+##############################################################################
+
+@test(1, "ex4exec: the process becomes echo and never returns")
+def test_ex4exec():
+    r.run_qemu(shell_script(["ex4exec", "echo DONE"]), timeout=30)
+    # echo's output is present, and ex4exec itself printed nothing at all:
+    # a successful exec() means the statement after it never runs.
+    r.match("^this is echo$", "^DONE$",
+            no=["exec .* failed", "ex4exec: exec echo failed"])
+
+
+##############################################################################
+#  ex5forkexec -- fork + exec + wait, and the ordering wait() guarantees
+##############################################################################
+
+@test(1, "ex5forkexec: wait orders the child's output before the status")
+def test_ex5forkexec():
+    # CPUS=1 makes the scheduling decisive.  On one hart the parent runs on
+    # to wait() and sleeps there, so the child's echo can only be reached
+    # BECAUSE wait() yielded -- delete the wait() and the parent prints its
+    # status and exits before the child is ever scheduled.  With three harts
+    # the child often wins the race anyway and the regression hides.
+    r.run_qemu(shell_script(["ex5forkexec", "echo DONE"]),
+               make_args=["CPUS=1"], timeout=30)
+    out = r.qemu.output
+
+    status = re.search(r"child \d+ exited with status 0", out)
+    assert status is not None, "the parent never reported an exit status"
+
+    # The whole point of wait(): the parent cannot report the status until the
+    # child has exited, so every byte the child wrote must already be out.
+    # Checked as a subsequence because the parent's own "parent waiting" line
+    # races with echo's output and really does split it mid-word.
+    assert_emitted(
+        out, "THIS IS ECHO", limit=status.start(),
+        msg="the child's output was incomplete before the status line -- "
+            "wait() returned without blocking")
+
+    r.match("^DONE$", no=["ex5forkexec: fork failed",
+                          "ex5forkexec: exec echo failed",
+                          "ex5forkexec: wait failed"])
+
+
+##############################################################################
+#  ex6redirect -- close(1) + open(), and exec() preserving the FD table
+##############################################################################
+
+@test(1, "ex6redirect: output goes to the file and not to the console")
+def test_ex6redirect():
+    redirected = "ex6redirect's redirected echo"
+    # MARKER separates the program's own run from the later `cat`, so the
+    # test can prove WHERE the text came from rather than just that it exists.
+    r.run_qemu(shell_script([
+        "rm ex6.out",
+        "ex6redirect",
+        "echo MARKER",
+        "cat ex6.out",
+        "echo DONE",
+    ]), timeout=30)
+    out = r.qemu.output
+
+    # It must appear exactly once -- from `cat`, never from the program.
+    assert_equal(out.count(redirected), 1,
+                 "the redirected text should reach the console only via cat")
+
+    marker = out.find("MARKER")
+    text = out.find(redirected)
+    assert marker >= 0, "MARKER missing; the script did not run to completion"
+    assert text > marker, (
+        "the redirected text reached the console while ex6redirect ran -- "
+        "descriptor 1 was not redirected")
+
+    r.match("^DONE$", no=["ex6redirect: fork failed",
+                          "ex6redirect: cannot redirect",
+                          "ex6redirect: exec echo failed",
+                          "cat: cannot open"])
+
+
+##############################################################################
+#  ex7pipe -- a kernel buffer behind two descriptors
+##############################################################################
+
+@test(1, "ex7pipe: pipe allocates the next two descriptors and carries bytes")
+def test_ex7pipe():
+    r.run_qemu(shell_script(["ex7pipe", "echo DONE"]), timeout=30)
+    # 3 and 4 for the same reason ex2create saw 3: fdalloc() hands out the
+    # lowest free slots, and 0, 1, 2 are the console.
+    r.match(r"^ex7pipe: pipe\(\) gave read fd 3, write fd 4$",
+            "^xyz$",
+            "^DONE$",
+            no=["ex7pipe: .* failed"])
+
+
+##############################################################################
+#  ex8pipefork -- the bytes cross a process boundary
+##############################################################################
+
+@test(1, "ex8pipefork: the child's bytes reach the parent through the pipe")
+def test_ex8pipefork():
+    r.run_qemu(shell_script(["ex8pipefork", "echo DONE"]), timeout=30)
+    # 17 bytes is strlen("hello from child\n"); asserting the count catches a
+    # partial read as well as a lost one.
+    r.match("^ex8pipefork: parent read 17 bytes: hello from child$",
+            "^DONE$",
+            no=["ex8pipefork: .* failed"])
+
+
+##############################################################################
+#  ex9ls -- a directory is a file with a known record layout
+##############################################################################
+
+@test(1, "ex9ls: lists the current directory including . and ..")
+def test_ex9ls_listing():
+    # Create and delete a file FIRST, so the directory genuinely contains a
+    # free slot.  sys_unlink() zeroes the dirent in place rather than
+    # compacting, so this leaves a hole for the inum == 0 branch to skip.
+    # Without it the assertion below is vacuous: a freshly built fs.img has
+    # no holes, and a reader that ignores inum entirely would still pass.
+    r.run_qemu(shell_script([
+        "echo x > ex9hole",
+        "rm ex9hole",
+        "ex9ls",
+        "echo DONE",
+    ]), timeout=30)
+    # "." and ".." are real entries written by create(), not shell syntax,
+    # so a correct reader emits them like any other name.
+    r.match(r"^\.$", r"^\.\.$", "^README$", "^ex9ls$", "^DONE$",
+            no=["ex9ls: cannot", "ex9ls: .* is not a directory"])
+    # Free slots (inum == 0) must be skipped rather than printed as blank
+    # lines.  strip() first: slicing on the prompt leaves a leading newline
+    # that would otherwise count as an empty entry.
+    body = r.qemu.output.split("$ ex9ls", 1)[1].split("$ echo DONE", 1)[0]
+    # [1:] drops the tail of the prompt line itself.  Do NOT strip() here:
+    # the root directory's free slots sit at the END of the file, so stripping
+    # trailing whitespace would delete the very evidence this checks for.
+    listed = body.splitlines()[1:]
+    blanks = [l for l in listed if l.strip() == ""]
+    assert_equal(len(blanks), 0, "free directory slots leaked into the output")
+    assert "ex9hole" not in body, "an unlinked name was still listed"
+
+
+@test(1, "ex9ls: lists a named directory and rejects bad arguments")
+def test_ex9ls_arguments():
+    r.run_qemu(shell_script([
+        "mkdir ex9dir",
+        "echo hi > ex9dir/f",
+        "ex9ls ex9dir",
+        "ex9ls README",
+        "ex9ls nosuchdir",
+        "echo DONE",
+    ]), timeout=30)
+    r.match("^f$",                                  # the named directory
+            "^ex9ls: README is not a directory$",   # fstat() guard, not a crash
+            "^ex9ls: cannot open nosuchdir$",       # open() failure reported
+            "^DONE$")
+
+
+run_tests()

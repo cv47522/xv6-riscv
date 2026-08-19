@@ -156,7 +156,7 @@ That is also the whole content of "on an empty line". Type `abc` and then Ctrl-d
 
 ### Regression tests
 
-[`grade-ex1copy`](../grade-ex1copy) holds three tests, each pinning one of the behaviours above:
+[`grade-exercises`](../grade-exercises) holds three tests for `ex1copy`, each pinning one of the behaviours above:
 
 | Test                                     | What it asserts                                                                                                                                                        |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -165,11 +165,12 @@ That is also the whole content of "on an empty line". Type `abc` and then Ctrl-d
 | **`reports a closed output pipe`**       | With a reader that exits first, `write()` returns -1 and the program prints `ex1copy: write error` and exits, instead of looping back into `read()` and waiting there. |
 
 ```bash
-./grade-ex1copy                          # all three
-./grade-ex1copy "closed output pipe"     # one, by name
+./grade-exercises                          # every exercise, 12 tests
+./grade-exercises ex1copy                  # just this one
+./grade-exercises "closed output pipe"     # one test, by name
 ```
 
-The harness itself — how it boots QEMU, drives the shell, and pattern-matches the transcript — is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
+Filtering is a substring match against the test title, and every title is prefixed with its exercise name — see [the suite](#regression-suite) below. The harness itself — how it boots QEMU, drives the shell, and pattern-matches the transcript — is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
 
 ## `ex2create` — making a descriptor
 
@@ -455,7 +456,7 @@ parent forgets close(fds[1])
   → nothing will ever write, and nothing will ever close
 ```
 
-The mirror-image rule holds on the other side: if every read end closes while a writer is still writing, `pipewrite()` sets the writer's `p->killed` and `write()` returns -1 — xv6's stand-in for `SIGPIPE`, and what `grade-ex1copy`'s third test exercises.
+The mirror-image rule holds on the other side: if every read end closes while a writer is still writing, `pipewrite()` sets the writer's `p->killed` and `write()` returns -1 — xv6's stand-in for `SIGPIPE`, and what the `reports a closed output pipe` test exercises.
 
 > [!NOTE]
 > This program reads a fixed byte count and would survive the mistake. The closes are there anyway, because in a real pipeline the reader always waits for EOF.
@@ -523,6 +524,27 @@ So `open(".", O_RDONLY)` opens the process's current directory, tracked as `p->c
 Reading a directory is allowed; writing one is not. `sys_open()` refuses a directory opened with anything but `O_RDONLY`. Only the kernel edits directory contents, through `create()`, `sys_link()`, and `sys_unlink()`.
 
 The reason is integrity: a directory entry references an inode, and the inode's `nlink` count must stay in step with it. A user program writing raw bytes could produce an entry pointing at a free inode, or a link count nothing agrees on — a corrupt file system with no way back. Early Unix did allow this, and it is one of the places where later designs tightened the interface.
+
+## Regression suite
+
+[`grade-exercises`](../grade-exercises) covers all nine, twelve tests in about twelve seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose cannot drift away from the programs without something going red.
+
+| Test | The claim it pins |
+| --- | --- |
+| **`ex1copy`** ×3 | Filter semantics: a finite pipe is copied byte for byte, `Ctrl-d` at an empty position ends an interactive run, and a closed reader produces `write error` rather than a hang. |
+| **`ex2create`** | `open()` returns **3**, and `Hello` reaches the disk. |
+| **`ex3fork`** | Both branches run, and each writes its **own** `x` — the address spaces are copies, not shared. |
+| **`ex4exec`** | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` never runs. |
+| **`ex5forkexec`** | Every byte the child wrote is out **before** the parent's status line. |
+| **`ex6redirect`** | The redirected text reaches the console **only** via `cat`, never while the program runs. |
+| **`ex7pipe`** | `pipe()` returns descriptors 3 and 4, and the bytes come back. |
+| **`ex8pipefork`** | All 17 bytes cross the process boundary. |
+| **`ex9ls`** ×2 | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage. |
+
+Several of these pin *kernel* invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
+
+> [!IMPORTANT]
+> Two of these assertions were **vacuous when first written**, and only mutation testing found it. Deleting `ex9ls`'s `inum == 0` skip did not fail the test, because a freshly built `fs.img` has no free slots to leak and a `.strip()` was deleting the trailing blank lines that would have proved it. Deleting `ex5forkexec`'s `wait()` did not fail it either, because with three harts the child usually wins the race anyway. The suite now creates a hole on purpose and pins that test to `CPUS=1`. **If you add a test here, break the code deliberately and confirm it goes red** — a green test that cannot fail is worse than no test, because it is trusted.
 
 ## Adding the next one
 

@@ -199,7 +199,7 @@ Use this checklist for a standalone exercise:
 
 If the shell prints `exec ex1copy failed`, that `grep` printed nothing: check the spelling in `UPROGS`. If the build reaches `mkfs` and aborts, check for a nested path or a basename longer than 14 bytes. Run `make clean` only when changing `conf/lab.mk` or diagnosing a genuinely stale build; ordinary source and `UPROGS` dependencies rebuild automatically.
 
-To pin the behaviour down rather than re-checking it by hand after every edit, write a focused grader beside the lab ones. [`grade-ex1copy`](../grade-ex1copy) is the pattern: three tests, driving QEMU through `gradelib.py` and asserting on the console transcript. The harness is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
+To pin the behaviour down rather than re-checking it by hand after every edit, write a focused grader beside the lab ones. [`grade-exercises`](../grade-exercises) is the pattern: one test per documented claim, driving QEMU through `gradelib.py` and asserting on the console transcript. Add tests to it rather than creating a new `grade-*` file — it filters by test title, so `./grade-exercises ex6` already scopes to one exercise. The harness is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
 
 For the signature, return value, and failure mode of any call you reach for, see [05-syscall-reference.md](05-syscall-reference.md) — xv6 has no man pages, so that file is the lookup. For the generic model behind system calls and descriptors, see [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#file-descriptors-open-file-descriptions-and-pipes).
 

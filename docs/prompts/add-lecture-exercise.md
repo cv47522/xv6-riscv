@@ -122,7 +122,9 @@ Then fix the comments to match reality. Real behaviour is frequently _more_ inte
 - **`docs/05-syscall-reference.md`** — if this is the first exercise to use a call, check the entry is accurate.
 - Markdown rules: **never hard-wrap prose** (one continuous line per paragraph), bold the first column in comparison tables, use GitHub callouts (`> [!NOTE]`, `> [!WARNING]`) where they earn the emphasis, and follow the documented Mermaid band colors.
 
-Optionally add a `grade-<name>` script beside `grade-ex1copy` if the behaviour is worth pinning — one test per claim, driving QEMU through `gradelib.py`.
+Add tests to [`grade-exercises`](../../grade-exercises) — one per claim the comments or docs make. Do not create a new `grade-*` file; the suite filters by test title, so prefix every title with the exercise name (`ex9ls: lists a named directory`).
+
+**Then break the code deliberately and confirm the test goes red.** Two assertions in this suite were vacuous when first written and passed against deliberately broken programs. A green test that cannot fail is worse than no test, because it is trusted.
 
 ## Step 8 — Verify before claiming done
 
@@ -130,7 +132,7 @@ Run these and report the actual output. Do not assert success without them.
 
 ```bash
 make fs.img 2>&1 | grep -E "error:|Error|Assertion"   # expect no output
-./grade-ex1copy                                    # existing suite must still pass
+./grade-exercises                                  # existing suite must still pass
 awk 'length > 79 {print FILENAME" "FNR}' user/ex*.c   # expect no output
 grep -rn '<old-name>' --include='*.md' --include='Makefile' --include='grade-*' .
 git status --short
