@@ -11,6 +11,7 @@ Task prompts for repeated work in this repository, written to be **agent-neutral
 | Prompt                                                 | Use it when                                                                                               |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | **[add-lecture-exercise.md](add-lecture-exercise.md)** | Adding a new `user/ex*.c` from a lecture example, or bringing an existing one up to the teaching standard |
+| **[derive-lab-exercise.md](derive-lab-exercise.md)**   | Writing the `docs/labs/` note for a 6.1810 lab exercise: what to read, what to link, and where to stop     |
 
 ## Why one file per prompt
 
@@ -18,13 +19,33 @@ Select-all and paste is the whole interaction. A single combined `Prompts.md` wo
 
 ## Using them
 
-**Claude Code** — already wired up. `.claude/commands/exercise.md` is a thin stub that points here, so `/exercise ex5forkexec` runs the prompt with its arguments. Adding a prompt means adding a matching stub if you want a slash command for it.
+Every prompt is a plain Markdown file that assumes only a shell and file access, so **copy the whole file into any agent's chat** and it works. The per-agent wiring below only saves you that copy-paste; it never changes what the prompt says.
 
-**Codex** — reads `AGENTS.md` at the repository root automatically, which is where the C style and comment-formatting rules live. Paste the prompt body on top of that.
+[setup-agent-commands.sh](setup-agent-commands.sh) generates all of it from the files in this directory:
 
-**Cursor** — paste into the chat, or save a copy under `.cursor/rules/` if you want it always loaded. Cursor does not read `AGENTS.md` on its own, and every prompt here opens by telling the agent to read it, so keep that line.
+```bash
+docs/prompts/setup-agent-commands.sh            # repo-local mirrors
+docs/prompts/setup-agent-commands.sh --codex    # plus the user-level Codex prompts
+docs/prompts/setup-agent-commands.sh --check    # verify nothing has drifted, write nothing
+docs/prompts/setup-agent-commands.sh --check --codex  # include installed Codex prompts
+```
 
-**Anything else** — the prompts assume only a shell and file access. Nothing depends on a particular tool's API.
+| Agent | How the rules load | Command location | Committed? |
+| ----- | ------------------ | ---------------- | ---------- |
+| **Claude Code** | Each generated command points to `AGENTS.md` through its canonical prompt | `.claude/commands/` | Yes |
+| **Cursor** | The always-on rule below points to `AGENTS.md` | `.cursor/commands/` | Yes |
+| **Codex** | Loads `AGENTS.md` automatically | `$CODEX_HOME/prompts/`, user-level | No; run `--codex` |
+| **Anything else** | Read `AGENTS.md`, then paste the prompt | None | No |
+
+So `/exercise ex5forkexec` and `/lab util: find` work in Claude Code and Cursor after a clone. Codex custom prompts use `/prompts:exercise ex5forkexec` and `/prompts:lab util: find`; after running `--codex`, restart the CLI session or open a new chat so Codex reloads them.
+
+> [!NOTE]
+> Codex custom prompts are deprecated in favor of skills, but the user-level mirrors remain useful for matching the repository's Claude and Cursor commands while Codex still supports them.
+
+**Cursor needs one extra thing.** It does not read `AGENTS.md` on its own, so [`.cursor/rules/xv6-house-rules.mdc`](../../.cursor/rules/xv6-house-rules.mdc) is a hand-written always-on rule that points at it and repeats only the constraints that get violated most often. It is the one file here that is **not** generated — edit it directly when the house rules change.
+
+> [!IMPORTANT]
+> The generated stubs are pointers, never copies. The alias table in `setup-agent-commands.sh` maps command names to canonical prompt files. Update that table when adding or renaming a command, then rerun the script; it updates current mirrors and removes obsolete generated mirrors. `--check` reports missing, stale, and orphaned mirrors without writing.
 
 ## Writing a new one
 

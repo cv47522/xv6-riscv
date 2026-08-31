@@ -71,3 +71,25 @@ The documentation visual-readability rules above apply inside `.c` and `.h` comm
 - Use one or two purposeful visuals per substantive chapter by default. Add more only when the chapter contains additional relationships that cannot be scanned effectively in prose.
 - Preserve detailed source-symbol explanations near their visual overview. A chapter diagram is an entry point into the explanation, not a replacement for implementation evidence.
 - Leave placeholder chapters structurally minimal until substantive content exists; do not decorate empty scaffolding.
+
+## Lab Notes
+
+`docs/labs/<lab>-<exercise>.md` holds one note per 6.1810 lab exercise that needs deriving rather than transcribing. `docs/prompts/derive-lab-exercise.md` is the procedure; the rules below are what a note has to satisfy however it was produced.
+
+- **Never write the solution, in any form, including after the exercise is graded.** Every fenced `c` block in a lab note must be a contiguous, verbatim quotation from an existing non-target source and must cite that source. The exercise's target file gets a contract table, a decision checklist, and a trap table instead. The check below catches unmatched lines, but it cannot prove contiguity or exclude a completed solution, so inspect every block manually too:
+
+    ````bash
+    awk '/^```c$/{f=1;next} /^```/{f=0} f && NF' docs/labs/<note>.md |
+      sed 's/^[[:space:]]*//' | sort -u |
+      while IFS= read -r line; do
+        grep -rqF --include='*.c' --include='*.h' -e "$line" kernel user mkfs ||
+          echo "NOT IN TREE: $line"
+      done
+    ````
+
+- Treat `grade-lab-<lab>` as the exercise's executable specification. Read each relevant test body and record its positive assertions, negative assertions, and breakpoints without overstating what they prove.
+- **Link instead of restating.** `docs/02` owns program mechanics and C style, `docs/03` owns lab and grading mechanics, `docs/05` owns system-call semantics, `docs/06` owns `ecall`, `a7`, and the stub, and `docs/book/ch*.md` owns kernel mechanisms. A lab note owns only the one exercise it is named after. Where the owning document is still a placeholder, hold the material on loan and say so, the way `docs/book/` does.
+- Keep the section order: what the exercise asks, the code to read first, a walkthrough of the function it turns on, the concept underneath, the derivation, verification, then questions. Add an analogy only when it materially helps, and name where it breaks down.
+- Two diagrams is the working budget — one for which file contributes what, one for the control flow being explained — and both use the repository Mermaid palette with the legend stated once beneath the first.
+- Verify names against this tree before citing them. The clock-tick system call is `pause`, not `sleep`, and `kernel/printf.c` is `kernel/printk.c`; a note that sends the reader grepping for an upstream symbol has failed at its one job.
+- Register every new note in `docs/labs/README.md`, and run `docs/book/check-notes.sh` before claiming it is done.
