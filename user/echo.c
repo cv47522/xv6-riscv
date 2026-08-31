@@ -7,7 +7,7 @@ main(int argc, char *argv[])
 {
   int i;
 
-  for (i = 1; i < argc; i++) {
+  for (i = 1; i < argc; i++) { // Q: I don't recall echo can take any int as its argc?
     write(1, argv[i], strlen(argv[i]));
     if (i + 1 < argc) {
       write(1, " ", 1);

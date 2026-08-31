@@ -8,7 +8,7 @@ Make the official MIT 6.1810 `ex1.c` example easy to build, run, understand, and
 
 The exercise is based on MIT 6.1810's 2026 Lecture 1 source at <https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c>. Its intended behavior is to copy bytes from standard input to standard output until `read()` reports EOF; it must not become a one-line command or print an application prompt.
 
-Generic operating-system concepts remain owned by the sibling `~/personal/operating-system/` repository. `Introduction_to_Operating_Systems.md` already owns OS purpose, resource management, isolation, abstraction, and design tradeoffs. `The_Process_Abstraction.md` already owns generic system-call, process, and file-descriptor theory. This repository will link to those notes and document only xv6-specific implementation and usage details.
+Generic operating-system concepts remain owned by the sibling `../../../../operating-system/` repository. `Introduction_to_Operating_Systems.md` already owns OS purpose, resource management, isolation, abstraction, and design tradeoffs. `The_Process_Abstraction.md` already owns generic system-call, process, and file-descriptor theory. This repository will link to those notes and document only xv6-specific implementation and usage details.
 
 ## Documentation Changes
 
@@ -46,4 +46,4 @@ The loop will continue until EOF. A negative `read()` result will be reported to
 
 Verification will build the registered program and filesystem image, then boot xv6 and exercise both usage modes. A pipeline will prove that finite input is copied and the command returns. An interactive run will prove that one entered line is copied, the process intentionally remains blocked for more input, and `Ctrl-d` returns to the shell. The build and existing relevant tests must remain clean.
 
-Documentation verification will run the repository's note checker where applicable, check links and headings, scan renamed terms and commands, and confirm that no edited prose paragraph was hard-wrapped. A final diff review will ensure the changes do not reintroduce generic theory already owned by `~/personal/operating-system/` and do not include transient course logistics.
+Documentation verification will run the repository's note checker where applicable, check links and headings, scan renamed terms and commands, and confirm that no edited prose paragraph was hard-wrapped. A final diff review will ensure the changes do not reintroduce generic theory already owned by `../../../../operating-system/` and do not include transient course logistics.

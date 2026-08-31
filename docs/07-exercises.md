@@ -229,10 +229,10 @@ The lecture slide says of its own examples: "these examples ignore errors — do
 
 ```text
 $ ex3fork
-ex3fork: fork() returned 6  (I am pid 5)
-ex3fork: fork() returned 0  (I am pid 6)
-ex3fork: parent, my child is pid 6
-ex3fork: child, my own pid is 6
+(ex3fork) fork() returned 6  (I am pid 5)
+(ex3fork) fork() returned 0  (I am pid 6)
+(ex3fork) parent: my child is pid 6
+(ex3fork) child: my own pid is 6
 ```
 
 One `printf()` in the source; two lines on the console. That is the exercise. After `fork()` there are two processes executing the same instructions, and the only thing distinguishing them is the value the call returned.
@@ -250,7 +250,7 @@ One `printf()` in the source; two lines on the console. That is the exercise. Af
 A real run looks like this:
 
 ```text
-ex3fork: forke(x3for)k returned : fork() retu6r n e(dI  0  (I ama mp
+(ex3fork) forke(x3for)k returned : fork() retu6r n e(dI  0  (I ama mp
 ```
 
 > [!IMPORTANT]
@@ -306,6 +306,20 @@ Omit the `0` and the loop keeps fetching whatever follows the array on the stack
 
 `exec()` consumed the caller. A shell cannot work this way: if `sh` called `exec()` directly it would _become_ `echo`, print, exit, and never read a second command. The fix is to `exec()` in a process you can afford to lose — which is the next exercise.
 
+### Why there is no `fork()` here
+
+Because the exercise is about what `exec()` does, and forking first would hide it. `exec()` replaces the program inside _this_ process — same pid, same descriptors, same parent — and the proof is that `this is echo` appears while `ex4exec`'s own error line never runs. Add a `fork()` and you are watching two processes instead of one program becoming another, which is [`ex5forkexec`](#ex5forkexec--the-shells-execution-model).
+
+| Shape                                    | The caller afterwards                                 | Good for                                 |
+| ---------------------------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| **`exec()` alone**                       | gone — its instructions no longer exist               | the _last_ thing a process ever does     |
+| **`fork()`, then `exec()` in the child** | untouched, and holding the child's pid to `wait()` on | a shell, which must print another prompt |
+
+> [!TIP]
+> `exec()` is a career change, not a hire. The person keeps their badge, keys, and desk — pid, descriptors, current directory, parent — and forgets every trade they knew. A shopkeeper who does that stops being a shopkeeper, and nobody is left to serve the next customer. `fork()` then `exec()` is hiring instead: a copy of you walks off and becomes the new thing while you stay behind the counter.
+
+`ex4exec` can afford the career change because it has nothing left to do.
+
 ## `ex5forkexec` — the shell's execution model
 
 ```text
@@ -339,6 +353,22 @@ sequenceDiagram
         P->>P: wait(&status) returns the child's pid
     end
 ```
+
+### `wait()` does not order what comes _before_ it
+
+The first line still races, and a real run shows it:
+
+```text
+$ ex5forkexec
+ex5forkexec: parenTHIS t ISw aECHO
+iting for child 8
+ex5forkexec: child 8 exited with status 0
+```
+
+The `parent waiting` message is printed in the gap between `fork()` and `wait()`, so it competes with the child's `THIS IS ECHO` exactly as the two halves of [`ex3fork`](#ex3fork--one-call-two-returns) compete — same non-atomic `printf()`, same per-character `uartputc()` lock. `wait()` orders everything after the call and nothing before it. Move the message above the `fork()`, or below the `wait()`, and the run comes out clean.
+
+> [!WARNING]
+> A run that prints only `exec ex5forkexec failed` is **not** this program. `ex5forkexec` says `ex5forkexec: exec echo failed`; that wording is `user/sh.c:80`, so it is the _shell_ failing to exec the name it read — the exercise never started. `consoleintr()` in `kernel/console.c` drops a character outright when the 128-byte line buffer is full (`if (c != 0 && cons.e - cons.r < INPUT_BUF_SIZE)`) and echoes nothing for it, so typed-ahead or pasted input can hand `sh` a name that is not on disk. Feeding qemu 100 command lines at once reproduces it with the damage visible: `exec ex5forkexx5fokrc failed`. Feeding 120 runs one line per prompt: 120 finished, zero failures.
 
 ### `wait()` returns a pid and delivers status through a pointer
 
@@ -529,19 +559,19 @@ The reason is integrity: a directory entry references an inode, and the inode's 
 
 [`grade-exercises`](../grade-exercises) covers all nine, twelve tests in about twelve seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose cannot drift away from the programs without something going red.
 
-| Test | The claim it pins |
-| --- | --- |
-| **`ex1copy`** ×3 | Filter semantics: a finite pipe is copied byte for byte, `Ctrl-d` at an empty position ends an interactive run, and a closed reader produces `write error` rather than a hang. |
-| **`ex2create`** | `open()` returns **3**, and `Hello` reaches the disk. |
-| **`ex3fork`** | Both branches run, and each writes its **own** `x` — the address spaces are copies, not shared. |
-| **`ex4exec`** | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` never runs. |
-| **`ex5forkexec`** | Every byte the child wrote is out **before** the parent's status line. |
-| **`ex6redirect`** | The redirected text reaches the console **only** via `cat`, never while the program runs. |
-| **`ex7pipe`** | `pipe()` returns descriptors 3 and 4, and the bytes come back. |
-| **`ex8pipefork`** | All 17 bytes cross the process boundary. |
-| **`ex9ls`** ×2 | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage. |
+| Test              | The claim it pins                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`ex1copy`** ×3  | Filter semantics: a finite pipe is copied byte for byte, `Ctrl-d` at an empty position ends an interactive run, and a closed reader produces `write error` rather than a hang. |
+| **`ex2create`**   | `open()` returns **3**, and `Hello` reaches the disk.                                                                                                                          |
+| **`ex3fork`**     | Both branches run, and each writes its **own** `x` — the address spaces are copies, not shared.                                                                                |
+| **`ex4exec`**     | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` never runs.                                                 |
+| **`ex5forkexec`** | Every byte the child wrote is out **before** the parent's status line.                                                                                                         |
+| **`ex6redirect`** | The redirected text reaches the console **only** via `cat`, never while the program runs.                                                                                      |
+| **`ex7pipe`**     | `pipe()` returns descriptors 3 and 4, and the bytes come back.                                                                                                                 |
+| **`ex8pipefork`** | All 17 bytes cross the process boundary.                                                                                                                                       |
+| **`ex9ls`** ×2    | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage.                                     |
 
-Several of these pin *kernel* invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
+Several of these pin _kernel_ invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
 
 > [!IMPORTANT]
 > Two of these assertions were **vacuous when first written**, and only mutation testing found it. Deleting `ex9ls`'s `inum == 0` skip did not fail the test, because a freshly built `fs.img` has no free slots to leak and a `.strip()` was deleting the trailing blank lines that would have proved it. Deleting `ex5forkexec`'s `wait()` did not fail it either, because with three harts the child usually wins the race anyway. The suite now creates a hole on purpose and pins that test to `CPUS=1`. **If you add a test here, break the code deliberately and confirm it goes red** — a green test that cannot fail is worse than no test, because it is trusted.

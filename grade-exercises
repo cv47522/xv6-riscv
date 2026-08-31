@@ -144,7 +144,7 @@ def test_ex2create():
 #  ex3fork -- one call, two returns
 ##############################################################################
 
-@test(1, "ex3fork: both processes run and each has its own memory")
+@test(1, "(ex3fork) both processes run and each has its own memory")
 def test_ex3fork():
     # CPUS=1 so the two processes are less likely to interleave mid-line.
     # Even so, every assertion below is a SUBSTRING count over the whole
