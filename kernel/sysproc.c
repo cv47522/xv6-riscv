@@ -64,6 +64,27 @@ sys_sbrk(void)
   return addr;
 }
 
+// ---------------------------------------------------------------------------
+//  PAUSE SYSTEM CALL: BEGINNER'S VIEW
+// ---------------------------------------------------------------------------
+//
+// user/sleep.c is a user program: it runs as a process and calls pause(n).
+// The generated stub in user/usys.S puts n in a0, the syscall number in a7,
+// and executes ecall. kernel/syscall.c dispatches here; argint(0, &n) reads
+// syscall argument zero from the saved a0. This function has no C arguments
+// because every syscall handler uses the same uint64 function(void) shape.
+//
+//   user/sleep.c -> pause(n) -> ecall -> sys_pause() -> user mode
+//
+// ticks is defined in kernel/trap.c and declared in kernel/defs.h. Hart 0
+// increments it on each timer interrupt. A hart is a hardware execution
+// context (a QEMU virtual CPU here), not a process or a software thread.
+// kernel/sysproc.c is part of one kernel image, not a separate program.
+//
+// Conceptually, this handler records the start tick, waits until n ticks
+// have elapsed, and returns. tickslock and the sleep/wakeup calls make that
+// wait safe without polling. docs/book/ch09-sleep-and-wakeup.md explains
+// those later concurrency details; they are not needed for user/sleep.c.
 uint64
 sys_pause(void)
 {
