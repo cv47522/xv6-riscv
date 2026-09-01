@@ -14,7 +14,7 @@ On Debian, Ubuntu, or WSL 2 running Ubuntu:
 
 ```bash
 sudo apt-get install git build-essential gdb-multiarch qemu-system-misc \
-                     gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu
+                     gcc-riscv64-linux-gnu binutils-riscv64-linux-gnu clang-format
 ```
 
 > [!IMPORTANT]

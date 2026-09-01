@@ -168,6 +168,17 @@ It does **not** support quoting, globbing, environment variables, `cd` with no a
 
 A C file on the host is not automatically visible inside xv6. `make qemu` builds a fresh `fs.img` from the files named in the Makefile, and the xv6 shell can execute only binaries installed in that image.
 
+### How command words reach `main` via `argc`/`argv`
+
+`argc` is not an arbitrary integer supplied by the C source, and the user does not type it separately. It is derived from the null-terminated argument vector assembled during process startup:
+
+1. `parseexec()` in `user/sh.c` stores each command word in `argv[]`, beginning with the command name, and terminates the array with a null pointer.
+2. `runcmd()` passes that vector to `exec()`, and `sys_exec()` in `kernel/sysfile.c` copies the pointers and strings into kernel memory.
+3. `kexec()` in `kernel/exec.c` counts entries until the null pointer, copies the strings and pointer array onto the new user stack, places `argv` in register `a1`, and returns the count in `a0` as `argc`.
+4. `start()` in `user/ulib.c` receives those two values and calls `main(argc, argv)`; when `main` returns, `start()` passes its result to `exit()`.
+
+Therefore, a normal command always counts its own name as `argv[0]`. For `echo one two`, `argc` is 3 and the array contains `"echo"`, `"one"`, `"two"`, then a null pointer. `user/echo.c` begins its loop at index 1 because the command name is metadata, not output.
+
 Use this checklist for a standalone exercise:
 
 1. Put the source directly under `user/`, for example `user/ex1copy.c`. `mkfs` imports the _linked binary_, never the source, and it strips one leading `user/` component and then asserts that no second slash remains — so a source under `user/exercises/` compiles and links cleanly, and then aborts the image step as `user/exercises/_ex1copy`.

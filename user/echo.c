@@ -7,7 +7,9 @@ main(int argc, char *argv[])
 {
   int i;
 
-  for (i = 1; i < argc; i++) { // Q: I don't recall echo can take any int as its argc?
+  // user/sh.c builds argv; kernel/exec.c passes argc and argv to main.
+  // argv[0] names echo, so output starts at argv[1].
+  for (i = 1; i < argc; i++) {
     write(1, argv[i], strlen(argv[i]));
     if (i + 1 < argc) {
       write(1, " ", 1);
