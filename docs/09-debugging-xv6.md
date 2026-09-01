@@ -49,7 +49,8 @@ The colors label request, processing, routing, data, successful resolution, and 
 
 | Layer | Native C notes | This xv6 session |
 | --- | --- | --- |
-| **Host process being controlled** | The selected compiled program. | QEMU, through its remote debugging stub. |
+| **Debug target** | The selected host process. | QEMU's emulated RISC-V machine, exposed through the remote debugging stub. |
+| **Host-side process** | The selected compiled program itself. | QEMU; GDB controls its emulated CPUs rather than debugging QEMU's host implementation. |
 | **Machine executing the C code** | The host machine. | QEMU's emulated RISC-V machine. |
 | **Initial symbol file** | The selected program's ELF. | `kernel/kernel`. |
 | **Source covered initially** | Sources linked into the selected ELF. | Sources linked into the kernel ELF. |
