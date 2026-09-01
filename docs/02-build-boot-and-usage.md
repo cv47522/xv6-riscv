@@ -280,42 +280,64 @@ Remember to leave `script` (`exit`, or `Ctrl-d`) — until you do, the log is st
 
 ### Debugging with gdb
 
-Two terminals. In the first:
+Use two terminals. In the first, start one emulated hart so scheduling and single-stepping remain predictable:
 
 ```bash
-make qemu-gdb
+make CPUS=1 qemu-gdb
 ```
 
-QEMU starts with the CPU halted and a gdb stub listening, printing the port to connect to. In the second terminal, from the repo root:
+The `qemu-gdb` recipe adds `-S`, which stops the hart at the reset vector before its first instruction, and `-gdb tcp::<port>`, which exposes QEMU's remote GDB stub. The Makefile derives the port from the host uid and generates `.gdbinit` with that value, the RISC-V architecture, `kernel/kernel` as the symbol file, and compressed-breakpoint support.
+
+In the second terminal, from the repository root, explicitly source that generated file:
 
 ```bash
-gdb-multiarch kernel/kernel
+gdb-multiarch -x .gdbinit kernel/kernel
 ```
 
 If that binary is not installed, `riscv64-linux-gnu-gdb` or `riscv64-unknown-elf-gdb` works identically — any of the three can debug a RISC-V target.
 
-The Makefile generates a `.gdbinit` with your personal port already filled in (derived from your uid so multiple users on one machine do not collide), so gdb connects automatically.
+The explicit `-x` works even when GDB declines to auto-load a repository-local `.gdbinit`. To use the shorter `gdb-multiarch kernel/kernel` command, trust this one repository by adding the exact absolute path GDB prints to the user-init file named in its diagnostic, which may be `~/.config/gdb/gdbinit` or `~/.gdbinit`:
 
 > [!NOTE]
-> gdb refuses to auto-load `.gdbinit` from a directory it does not trust. If it complains, add this to `~/.gdbinit`:
+> Add only repositories you trust. A local `.gdbinit` executes debugger commands, so globally disabling `auto-load safe-path` would also trust files in unrelated repositories.
 >
-> ```
-> add-auto-load-safe-path /home/wahsieh/personal/xv6-riscv/.gdbinit
+> ```gdb
+> add-auto-load-safe-path /absolute/path/to/xv6-riscv/.gdbinit
 > ```
 
-Useful starting points:
+Set breakpoints before continuing from the reset vector. This example stops when the util lab's `sleep` command crosses into its kernel handler:
 
 ```gdb
-(gdb) b main              # breakpoint on kernel main
-(gdb) c                   # continue
-(gdb) b syscall           # every system call
-(gdb) layout src          # source view
-(gdb) info registers      # all RISC-V registers
-(gdb) p/x $satp           # the page table base register
-(gdb) bt                  # backtrace (works thanks to -fno-omit-frame-pointer)
+(gdb) break sys_pause
+(gdb) continue
+(gdb) info breakpoints
+(gdb) next
+(gdb) print n
+(gdb) info registers a0 a7
+(gdb) backtrace
+(gdb) detach
+(gdb) quit
 ```
 
-For per-lab debugging, `make CPUS=1 qemu-gdb` makes scheduling deterministic and single-steps far more predictably.
+Enter `sleep 10` in QEMU's terminal after xv6 reaches its `$ ` prompt. The breakpoint initially stops at the handler's opening brace, before local variable `n` has a value; run `next` until the current line has moved past `argint(0, &n)`, then `print n`. In this build that takes two `next` commands and prints 10. `info registers a0 a7` shows the saved first argument and syscall number at this boundary, while `backtrace` shows `sys_pause()`, `syscall()`, and `usertrap()` because the kernel is compiled with frame pointers.
+
+When focus is in GDB, `Ctrl-C` interrupts the emulated target and returns to the GDB prompt. When focus is in QEMU's terminal, `Ctrl-a x` exits QEMU. Use `detach` before `quit` when you want QEMU to keep running; otherwise exit QEMU after leaving GDB so its per-user GDB port and `fs.img` are not left occupied.
+
+### Debugging with VS Code
+
+The checked-in `.vscode/launch.json` and `.vscode/tasks.json` automate the same two-terminal setup. They require `gdb-multiarch` and Microsoft's C/C++ extension, whose extension identifier is `ms-vscode.cpptools`:
+
+```bash
+code --install-extension ms-vscode.cpptools
+```
+
+1. Open the repository root in VS Code and select **xv6: debug sys_pause** in Run and Debug.
+2. Press F5. The pre-launch task runs `make CPUS=1 qemu-gdb` in a dedicated terminal, and `cppdbg` invokes `gdb-multiarch` with the generated `.gdbinit` explicitly sourced. This obtains the per-user port without hard-coding it in `launch.json`.
+3. The debugger connects at QEMU's reset vector with a breakpoint already set on `sys_pause`. Press Continue once and wait for xv6's `$ ` prompt in the QEMU terminal.
+4. Enter `sleep 10` in that terminal. VS Code stops in `kernel/sysproc.c`; step past `argint(0, &n)`, then inspect `n` in Variables or the Debug Console, the `a0` and `a7` registers in the Registers view, and the kernel path in Call Stack.
+5. Press Stop when finished. The post-debug task terminates the QEMU process using this user's generated GDB port, freeing both the port and disk image for the next run.
+
+The launch configuration leaves the initial target stopped instead of issuing `run`, because `kernel/kernel` is not a host executable: GDB controls an already-created remote machine. If startup fails, run the console workflow above first; it exposes GDB safe-path diagnostics, an occupied port, a missing `gdb-multiarch`, or a QEMU build failure directly.
 
 ### Finding where the kernel crashed
 

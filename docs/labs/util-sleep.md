@@ -158,7 +158,7 @@ For `n > 0`, the condition becomes false after between `n - 1` and `n` timer int
 
 ### Decisions and evidence
 
-1. **How should `main` receive arguments?** Compare an argument-taking program such as `user/echo.c`; [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#how-command-words-reach-main) traces how the shell and kernel construct `argc` and `argv`, while its [house-style section](../02-build-boot-and-usage.md#house-style-for-a-new-user-program) records the required top-level function layout.
+1. **How should `main` receive arguments?** Compare an argument-taking program such as `user/echo.c`; [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#how-command-words-reach-main-via-argcargv) traces how the shell and kernel construct `argc` and `argv`, while its [house-style section](../02-build-boot-and-usage.md#house-style-for-a-new-user-program) records the required top-level function layout.
 2. **Which `argc` value represents exactly one supplied argument?** Account for `argv[0]`, the program name.
 3. **How is text converted to an integer?** Read `atoi()` in `user/ulib.c`. It converts only the initial run of decimal digits and returns zero when the first character is not a digit, without reporting whether conversion succeeded, so decide whether the exercise requires validation beyond that helper's contract.
 4. **How is a diagnostic written to file descriptor 2?** Find the descriptor-taking formatted-output function in `user/user.h`; `user/ex2create.c` demonstrates the repository's error style.
@@ -216,9 +216,49 @@ Run the focused grader:
 ./grade-lab-util sleep
 ```
 
-Failures leave transcripts in `xv6.out.sleep` and `xv6.out.sleep_no_args`; [`03-lab-workflow.md`](../03-lab-workflow.md#grading) explains how to read them.
+Failures leave transcripts in `xv6.out.sleep` and `xv6.out.sleep_no_args`; because the first two wrappers share their Python name, two simultaneous failures can write the same `xv6.out.sleep_no_args` path. [`03-lab-workflow.md`](../03-lab-workflow.md#grading) explains how to read grader transcripts generally.
 
-For a direct boundary check, run `make CPUS=1 qemu-gdb`, connect `gdb-multiarch kernel/kernel`, break on `sys_pause`, and inspect `n` after `argint(0, &n)`. Hitting the breakpoint confirms that `sleep 10` reached the kernel handler; it does not establish the duration or prove that no other implementation path consumed CPU.
+To reproduce the syscall test interactively, use two terminals:
+
+1. Start QEMU halted with one hart in terminal 1:
+
+    ```bash
+    make CPUS=1 qemu-gdb
+    ```
+
+2. Connect in terminal 2, set the same symbolic breakpoint as the grader, and continue through boot:
+
+    ```bash
+    gdb-multiarch -x .gdbinit kernel/kernel
+    ```
+
+    ```gdb
+    (gdb) break sys_pause
+    (gdb) continue
+    ```
+
+3. When terminal 1 shows the xv6 prompt, enter the grader's command:
+
+    ```text
+    $ sleep 10
+    ```
+
+4. GDB stops at `kernel/sysproc.c:90`, the opening brace. Advance to the `argint` call, execute it, then inspect both the decoded local and the saved user registers:
+
+    ```gdb
+    (gdb) next
+    94        argint(0, &n);
+    (gdb) next
+    95        if (n < 0)
+    (gdb) print n
+    $1 = 10
+    (gdb) info registers a0 a7
+    a0             0xa        10
+    a7             0xd        13
+    (gdb) backtrace
+    ```
+
+The exact addresses in the backtrace change after a rebuild, but its named kernel frames should include `sys_pause`, `syscall`, and `usertrap`. Hitting the breakpoint confirms that `sleep 10` reached the handler, and observing `n == 10` adds the argument check missing from `grade-lab-util`; neither observation alone measures elapsed ticks or proves that no other implementation path consumed CPU. The reusable [console setup and VS Code workflow](../02-build-boot-and-usage.md#debugging-with-vs-code) explain debugger startup, controls, and cleanup.
 
 ## Questions
 
