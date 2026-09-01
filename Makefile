@@ -347,6 +347,7 @@ UPROGS=\
 	$U/_ex8pipefork\
 	$U/_ex9ls\
 	$U/_sleep\
+	$U/_sixfive\
 
 
 

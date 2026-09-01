@@ -24,6 +24,22 @@ flowchart TB
         N2 --> N3[GDB launches that ELF]
         N3 --> N4[Its source breakpoint resolves]
     end
+    classDef request fill:#fff0f0,stroke:#8a4b4b,color:#111
+    classDef routing fill:#f0f0ff,stroke:#57578a,color:#111
+    classDef data fill:#f0fff0,stroke:#4b7d4b,color:#111
+    classDef processing fill:#fffff0,stroke:#85854d,color:#111
+    classDef commit fill:#f0ffff,stroke:#4d7d7d,color:#111
+    classDef failure fill:#ffd9d9,stroke:#9a4c4c,color:#111
+    class N1,X1 request
+    class N2 processing
+    class N3,X2 routing
+    class X3,X6 data
+    class N4,X4 commit
+    class X5 failure
+```
+
+```mermaid
+flowchart TB
     subgraph Xv6[xv6 remote machine]
         X1[VS Code starts QEMU] --> X2[GDB attaches to QEMU remote stub]
         X2 --> X3[.gdbinit loads kernel/kernel symbols]
@@ -47,24 +63,24 @@ flowchart TB
 
 The colors label request, processing, routing, data, successful resolution, and unresolved state; every node also states its meaning so the diagram remains readable in monochrome.
 
-| Layer | Native C notes | This xv6 session |
-| --- | --- | --- |
-| **Debug target** | The selected host process. | QEMU's emulated RISC-V machine, exposed through the remote debugging stub. |
-| **Host-side process** | The selected compiled program itself. | QEMU; GDB controls its emulated CPUs rather than debugging QEMU's host implementation. |
-| **Machine executing the C code** | The host machine. | QEMU's emulated RISC-V machine. |
-| **Initial symbol file** | The selected program's ELF. | `kernel/kernel`. |
-| **Source covered initially** | Sources linked into the selected ELF. | Sources linked into the kernel ELF. |
-| **Other executable code** | Usually outside the exercise's process. | Separate user ELFs such as `user/_sleep`, loaded later from `fs.img`. |
+| Layer                            | Native C notes                          | This xv6 session                                                                       |
+| -------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Debug target**                 | The selected host process.              | QEMU's emulated RISC-V machine, exposed through the remote debugging stub.             |
+| **Host-side process**            | The selected compiled program itself.   | QEMU; GDB controls its emulated CPUs rather than debugging QEMU's host implementation. |
+| **Machine executing the C code** | The host machine.                       | QEMU's emulated RISC-V machine.                                                        |
+| **Initial symbol file**          | The selected program's ELF.             | `kernel/kernel`.                                                                       |
+| **Source covered initially**     | Sources linked into the selected ELF.   | Sources linked into the kernel ELF.                                                    |
+| **Other executable code**        | Usually outside the exercise's process. | Separate user ELFs such as `user/_sleep`, loaded later from `fs.img`.                  |
 
 ## What the screenshots show
 
 ![VS Code paused on the verified `sys_pause` breakpoint while the `sleep.c` breakpoint remains gray](images/vscode-kernel-breakpoint-hit.png)
 
-*The filled red breakpoint in `kernel/sysproc.c` has an address from `kernel/kernel`; the gray `user/sleep.c` entry has no address in the currently loaded symbols.*
+_VS Code paused on the verified `sys_pause` breakpoint while the `sleep.c` breakpoint remains gray. The filled red breakpoint in `kernel/sysproc.c` has an address from `kernel/kernel`; the gray `user/sleep.c` entry has no address in the currently loaded symbols._
 
 ![VS Code after stepping past the syscall argument decode, showing `n = 10` and the kernel call stack](images/vscode-sys-pause-argument-loaded.png)
 
-*After `argint(0, &n)` executes, the debugger can show `n = 10`. The stack remains `sys_pause` → `syscall` → `usertrap`, so this is kernel-side evidence about the request rather than a stop in `sleep.c:main`.*
+_After `argint(0, &n)` executes, the debugger can show `n = 10`. The stack remains `sys_pause` → `syscall` → `usertrap`, so this is kernel-side evidence about the request rather than a stop in `sleep.c:main`._
 
 ## Why one breakpoint resolves and the other does not
 
@@ -91,6 +107,8 @@ The following recipe adds `user/_sleep` to the existing kernel-debugging session
     ```gdb
     (gdb) continue
     ```
+
+    GDB prints `Continuing.` and then shows no further `(gdb)` prompt; that is expected, because the target is running and GDB only prompts again once it stops.
 
 3. Wait for the `$ ` prompt in terminal 1, then press `Ctrl-C` in terminal 2. Stopping after the shell is ready matters because every xv6 user ELF is linked at virtual address zero; installing an address-zero breakpoint during boot could stop in `init` or `sh` before `sleep` runs.
 
@@ -144,10 +162,10 @@ The hardware breakpoint is purposeful. It asks QEMU to stop when a hart executes
 
 There is no automatic host-CPU selection here. The Makefile sets `CPUS := 3` by default, passes that value to QEMU's `-smp` option, and accepts a command-line override; the `fs` lab is the one branch that forces `CPUS := 1`. In this QEMU machine, each virtual CPU is a RISC-V hart.
 
-| Setting | What becomes easier or harder | When to use it |
-| --- | --- | --- |
-| **`CPUS=1`** | Removes cross-hart execution, lock contention, and many interleavings. Timer interrupts and xv6 process scheduling still occur, so the run is simpler but not fully deterministic. | Trace one causal path, single-step, inspect one call stack, or use the QEMU monitor without first choosing a hart. |
-| **Default `CPUS=3`** | Exercises concurrent kernel paths and can expose races, deadlocks, and ordering assumptions that one hart hides. Console order and the currently stopped hart are less predictable. | Reproduce multicore failures and perform final correctness checks after the focused trace. |
+| Setting              | What becomes easier or harder                                                                                                                                                       | When to use it                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **`CPUS=1`**         | Removes cross-hart execution, lock contention, and many interleavings. Timer interrupts and xv6 process scheduling still occur, so the run is simpler but not fully deterministic.  | Trace one causal path, single-step, inspect one call stack, or use the QEMU monitor without first choosing a hart. |
+| **Default `CPUS=3`** | Exercises concurrent kernel paths and can expose races, deadlocks, and ordering assumptions that one hart hides. Console order and the currently stopped hart are less predictable. | Reproduce multicore failures and perform final correctness checks after the focused trace.                         |
 
 QEMU exposes the emulated harts to GDB as debugger threads. Those entries are execution contexts of virtual CPUs, not xv6 processes and not user-level software threads. `info threads` answers “which hart did QEMU report?”, while `myproc()` and `p->state` in xv6 answer “which process is this hart running?”
 
@@ -156,15 +174,16 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 
 ## Troubleshooting
 
-| Observation | Likely cause | Check or correction |
-| --- | --- | --- |
-| **A breakpoint is gray or hollow** | No loaded symbol file maps that source line to an address. | Run `info sources` and `info files`; load the correct ELF rather than moving the breakpoint randomly. |
-| **`sleep.c` resolves but execution stops in another user program** | Several xv6 user ELFs reuse virtual address zero, and the breakpoint was installed before `sleep` owned the user page table. | Continue to the shell first, interrupt GDB, then add the symbols and hardware breakpoint immediately before running `sleep`. |
-| **GDB cannot insert the breakpoint** | The requested breakpoint type or address is unavailable in the current target state. | Confirm the QEMU remote connection, use `hbreak`, and check `info breakpoints`; do not replace it with a software breakpoint in read-only user text. |
-| **A local is `<optimized out>` or nonsensical** | The compiler optimized it or the stop is before its initialization. | Check the highlighted source line and step past the assignment before printing the value. |
-| **The GDB port is already in use** | A previous QEMU instance still owns the per-user port. | Run `pgrep -af qemu-system-riscv64`, identify the stale instance, and terminate only that process. |
-| **`exec sleep failed` appears** | The running guest's `fs.img` does not contain the linked user program. | Quit QEMU, rebuild the image, boot again, and confirm `ls | grep sleep` before debugging source behavior. |
-| **The bug disappears with `CPUS=1`** | The failure depends on cross-hart concurrency. | Treat the single-hart trace as partial evidence and reproduce with the default three harts. |
+| Observation                                                               | Likely cause                                                                                                                 | Check or correction                                                                                                                                  |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A breakpoint is gray or hollow**                                        | No loaded symbol file maps that source line to an address.                                                                   | Run `info sources` and `info files`; load the correct ELF rather than moving the breakpoint randomly.                                                |
+| **`continue` prints `Continuing.` and no further `(gdb)` prompt appears** | The target is running; GDB does not prompt again until it stops.                                                             | Watch terminal 1 for the `$ ` prompt, then press `Ctrl-C` in terminal 2 to regain the `(gdb)` prompt, as in step 3 of the recipe above.              |
+| **`sleep.c` resolves but execution stops in another user program**        | Several xv6 user ELFs reuse virtual address zero, and the breakpoint was installed before `sleep` owned the user page table. | Continue to the shell first, interrupt GDB, then add the symbols and hardware breakpoint immediately before running `sleep`.                         |
+| **GDB cannot insert the breakpoint**                                      | The requested breakpoint type or address is unavailable in the current target state.                                         | Confirm the QEMU remote connection, use `hbreak`, and check `info breakpoints`; do not replace it with a software breakpoint in read-only user text. |
+| **A local is `<optimized out>` or nonsensical**                           | The compiler optimized it or the stop is before its initialization.                                                          | Check the highlighted source line and step past the assignment before printing the value.                                                            |
+| **The GDB port is already in use**                                        | A previous QEMU instance still owns the per-user port.                                                                       | Run `pgrep -af qemu-system-riscv64`, identify the stale instance, and terminate only that process.                                                   |
+| **`exec sleep failed` appears**                                           | The running guest's `fs.img` does not contain the linked user program.                                                       | Quit QEMU, rebuild the image, boot again, and confirm the xv6 shell's `ls` output includes `sleep` before debugging source behavior.                 |
+| **The bug disappears with `CPUS=1`**                                      | The failure depends on cross-hart concurrency.                                                                               | Treat the single-hart trace as partial evidence and reproduce with the default three harts.                                                          |
 
 ## Related references
 

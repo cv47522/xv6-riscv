@@ -85,7 +85,7 @@ main(void)
 
     if (open("ex6.out", O_WRONLY | O_CREATE | O_TRUNC) != 1) { /* 0,2 are taken, so open() takes 1 */
       fprintf(2, "ex6redirect: cannot redirect to ex6.out\n");
-      exit(1);
+      return 1;
     }
 
     char *argv[] = { "echo", "ex6redirect's", "redirected", "echo", 0 };
@@ -93,7 +93,7 @@ main(void)
 
     // fd 2 still names the console, so exec failures remain visible.
     fprintf(2, "ex6redirect: exec echo failed\n");
-    exit(1);
+    return 1;
   }
 
   printf("ex6redirect: parent waiting for child %d\n", pid);

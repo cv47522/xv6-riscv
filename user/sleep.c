@@ -10,7 +10,7 @@ main(int argc, char *argv[])
   // user/sh.c builds argv; kernel/exec.c passes argc and argv to main.
   // argv[0] names sleep; argv[1] carries the requested tick count.
   if (argc != 2) {
-    fprintf(2, "Usage: sleep ticks\n");
+    fprintf(2, "Usage: sleep TICKS\n");
     return 1;
   }
 

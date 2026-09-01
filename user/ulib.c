@@ -60,6 +60,7 @@ memset(void *dst, int c, uint n)
 char *
 strchr(const char *s, char c)
 {
+  // Doc: https://cplusplus.com/reference/cstring/strchr/?kw=strchr
   for (; *s; s++)
     if (*s == c)
       return (char *)s;
