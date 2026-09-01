@@ -23,11 +23,31 @@ The first exercise of MIT's [util lab](https://pdos.csail.mit.edu/6.1810/2026/la
 
 The three relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 20 points:
 
-| Test                       | Runs                         | Exact observation                                                                                                                                                                                  |
-| -------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`sleep, no arguments`**  | `sleep`                      | Rejects an `exec` failure and a transcript containing only the command and prompts, so the program must print something.                                                                           |
-| **`sleep, returns`**       | `sleep`, then `echo OK`      | Requires `OK` and rejects the same two failure patterns, so the no-argument invocation must finish.                                                                                                |
-| **`sleep, makes syscall`** | `sleep 10`, then `echo FAIL` | Stops at a gdb breakpoint on `sys_pause` and rejects `FAIL`, proving that the program reaches the required syscall before the next command. It does not by itself measure elapsed time or CPU use. |
+| Test                       | Runs                         | Exact observation                                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`sleep, no arguments`**  | `sleep`                      | Supplies no required regex and forbids `exec .* failed` plus `$ sleep\n$`. `no=` means “must not match,” not expected output, so `Usage: sleep ticks` is allowed. The second forbidden regex is also ineffective: `assert_lines_match()` splits the transcript into lines, and its unescaped dollar signs are regex end anchors rather than literal shell prompts.                         |
+| **`sleep, returns`**       | `sleep`, then `echo OK`      | Requires a line matching `^OK$`, proving that the no-argument invocation returned control to the shell so it could execute the next command. It also applies the same two negative regexes.                                                                                                                                                                                           |
+| **`sleep, makes syscall`** | `sleep 10`, then `echo FAIL` | Stops at a gdb breakpoint on `sys_pause`, then requires the echoed command line `$ sleep 10` and rejects `FAIL`. Reaching the breakpoint before the shell can run `echo FAIL` proves that the program made the required syscall; the test stops at handler entry, so it neither verifies the argument value nor waits for the requested interval.                                      |
+
+### Why two tests can have the same Python function name
+
+The duplicate `def test_sleep_no_args():` declarations are legal because a Python function name is only a module variable. Each `@test(...)` decorator runs as its `def` is evaluated: `test()` constructs `register_test`, `register_test(original_function)` constructs a separate `run_test` wrapper, `TESTS.append(run_test)` preserves that wrapper in registration order, and the returned wrapper is assigned to the module name `test_sleep_no_args`. The second declaration replaces that name, but it does not remove the first wrapper already stored in `TESTS`; `run_tests()` iterates the list, so both wrappers execute with the distinct titles captured from their decorators.
+
+The repeated name is still misleading. `register_test()` copies the original function's `__name__` onto each wrapper, and `save()` derives a failed test's path from that name, so both failures use `xv6.out.sleep_no_args`; if both fail in one run, the later transcript can overwrite the earlier one.
+
+### How `stop_breakpoint('sys_pause')` ends the test
+
+The breakpoint monitor is a deliberately small remote-GDB client, not a subprocess running the interactive `gdb` command:
+
+1. `Runner.run_qemu()` turns its default target base `qemu` into `qemu-gdb`, whose Makefile recipe starts QEMU halted with `-S` and exposes its GDB stub. `GDBClient` connects to the port returned by `make print-gdbport`.
+2. `shell_script()` watches QEMU output for each `$ ` prompt. It sends `sleep 10` at the first prompt; it can send `echo FAIL` only if another prompt appears.
+3. `stop_breakpoint('sys_pause')` scans `kernel/kernel.sym`, parses the address on the line whose symbol equals `sys_pause`, and passes that address to `GDBClient.breakpoint()`.
+4. `breakpoint()` sends remote-protocol packet `Z1,<address>,1`, requesting a hardware breakpoint, and `cont()` later sends `c` to continue the halted machine.
+5. When execution reaches `sys_pause`, QEMU sends a stop-reply packet beginning with `T05`, where signal 5 is the remote protocol's trap stop. `GDBClient.handle_read()` responds by raising `TerminateTest`, and `Runner.__react()` catches that private control-flow exception and ends its event loop.
+6. `Runner.run_qemu()` terminates QEMU in its `finally` block. Only then does the test call `r.match('\\$ sleep 10', no=['FAIL'])` against the captured console transcript.
+
+> [!IMPORTANT]
+> The breakpoint hit is the intended stopping event, not a grader failure. `FAIL` is absent because QEMU stops at handler entry and is then destroyed before `sys_pause()` returns, so the shell never receives the next prompt and never runs `echo FAIL`. The grader does not wait ten ticks and would accept a call that reached `sys_pause` with the wrong integer.
 
 ## Why the call is named `pause`
 
@@ -165,7 +185,7 @@ The focused grader and an interactive shell can report different results because
 
 | Observation                                 | What it means                                                                                                                                                                                                                                  |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`./grade-lab-util sleep` passes**         | The no-argument cases printed something and returned, and `sleep 10` reached `sys_pause`. The breakpoint test neither verifies that the handler received 10 nor measures elapsed ticks, so even a call with zero would satisfy this assertion. |
+| **`./grade-lab-util sleep` passes**         | The no-argument invocation returned so the second test could observe `OK`, and `sleep 10` reached `sys_pause`. The grader does not require a particular diagnostic, its attempted silent-transcript rejection is ineffective, and the breakpoint test neither verifies that the handler received 10 nor measures elapsed ticks. |
 | **`sleep 3` appears to return immediately** | The argument is three ticks, not three seconds. With the current timer interval, that is nominally about 0.3 seconds.                                                                                                                          |
 | **`exec sleep failed` appears**             | `exec()` failed before `user/sleep.c:main()` ran. The shell prints this message in `user/sh.c` when it cannot load the guest executable, commonly because the active `fs.img` does not contain `sleep`.                                        |
 
