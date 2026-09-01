@@ -260,7 +260,7 @@ To reproduce the syscall test interactively, use two terminals:
     (gdb) backtrace
     ```
 
-The exact addresses in the backtrace change after a rebuild, but its named kernel frames should include `sys_pause`, `syscall`, and `usertrap`. Hitting the breakpoint confirms that `sleep 10` reached the handler, and observing `n == 10` adds the argument check missing from `grade-lab-util`; neither observation alone measures elapsed ticks or proves that no other implementation path consumed CPU. The reusable [console setup and VS Code workflow](../02-build-boot-and-usage.md#debugging-with-vs-code) explain debugger startup, controls, and cleanup.
+The exact addresses in the backtrace change after a rebuild, but its named kernel frames should include `sys_pause`, `syscall`, and `usertrap`. Hitting the breakpoint confirms that `sleep 10` reached the handler, and observing `n == 10` adds the argument check missing from `grade-lab-util`; neither observation alone measures elapsed ticks or proves that no other implementation path consumed CPU. The reusable [console setup and VS Code workflow](../02-build-boot-and-usage.md#debugging-with-vs-code) explain debugger startup, controls, and cleanup; [manually debugging an xv6 user program](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) explains why the existing `sleep.c` breakpoint is unresolved and how to stop at `sleep.c:main` without changing `.vscode`.
 
 ## Questions
 

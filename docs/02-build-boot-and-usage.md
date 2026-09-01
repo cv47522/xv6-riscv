@@ -280,7 +280,7 @@ Remember to leave `script` (`exit`, or `Ctrl-d`) — until you do, the log is st
 
 ### Debugging with gdb
 
-Use two terminals. In the first, start one emulated hart so scheduling and single-stepping remain predictable:
+Use two terminals. In the first, start one emulated hart to remove cross-hart interleavings while you trace one path; timer interrupts and xv6 process scheduling still occur:
 
 ```bash
 make CPUS=1 qemu-gdb
@@ -338,6 +338,8 @@ code --install-extension ms-vscode.cpptools
 5. Press Stop when finished. The post-debug task terminates the QEMU process using this user's generated GDB port, freeing both the port and disk image for the next run.
 
 The launch configuration leaves the initial target stopped instead of issuing `run`, because `kernel/kernel` is not a host executable: GDB controls an already-created remote machine. If startup fails, run the console workflow above first; it exposes GDB safe-path diagnostics, an occupied port, a missing `gdb-multiarch`, or a QEMU build failure directly.
+
+For why this session resolves `kernel/sysproc.c` but not `user/sleep.c`, how to load one user ELF manually, and why `CPUS=1` is a tracing aid rather than a correctness setting, see [Debugging xv6: symbols, address spaces, and harts](09-debugging-xv6.md).
 
 ### Finding where the kernel crashed
 
