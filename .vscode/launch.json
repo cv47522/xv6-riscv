@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "xv6: debug sys_pause",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/kernel/kernel",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb-multiarch",
+            "miDebuggerArgs": "-x ${workspaceFolder}/.gdbinit",
+            "customLaunchSetupCommands": [],
+            "setupCommands": [
+                {
+                    "description": "Break when the sleep command reaches its kernel handler",
+                    "text": "break sys_pause",
+                    "ignoreFailures": false
+                }
+            ],
+            "launchCompleteCommand": "None",
+            "stopAtConnect": true,
+            "hardwareBreakpoints": { "require": true },
+            "preLaunchTask": "xv6: start QEMU for GDB",
+            "postDebugTask": "xv6: stop QEMU GDB"
+        }
+    ]
+}
