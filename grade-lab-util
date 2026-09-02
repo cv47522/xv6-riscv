@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
 
+import os
 import re
 from gradelib import *
 
 r = Runner(save("xv6.out"))
+SIXFIVE_PROGRAM = os.environ.get("SIXFIVE_PROGRAM", "sixfive")
+
+def assert_command_output(command, following_command, expected):
+    output = r.qemu.output.replace("\r", "")
+    start = "$ %s\n" % command
+    end = "$ %s\n" % following_command
+    if start not in output or end not in output:
+        raise AssertionError("command boundaries missing from QEMU output")
+    actual = output.split(start, 1)[1].split(end, 1)[0].splitlines()
+    assert_equal(actual, expected, "Output from `%s`" % command)
 
 @test(5, "sleep, no arguments")
 def test_sleep_no_args():
@@ -30,24 +41,58 @@ def test_sleep():
 
 @test(10, "sixfive_test")
 def test_sixfive_test():
-    r.run_qemu(shell_script([
-        'sixfive sixfive.txt',
-    ]))
-    r.match('^5', '^100', '^18', '^6')
+    commands = [
+        '%s sixfive.txt' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_BASE_DONE',
+        '%s sf-edge' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_EDGE_DONE',
+        '%s sf-seps' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_SEPS_DONE',
+        '%s sf-empty' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_EMPTY_DONE',
+    ]
+    r.run_qemu(shell_script(commands))
+    assert_command_output(commands[0], commands[1],
+                          ['5', '100', '18', '6', '0', '0', '30'])
+    assert_command_output(commands[2], commands[3],
+                          ['5', '6', '30', '12', '18', '20', '24'])
+    assert_command_output(commands[4], commands[5], [])
+    assert_command_output(commands[6], commands[7], [])
 
 @test(10, "sixfive_readme")
 def test_sixfive_readme():
-    r.run_qemu(shell_script([
-        'sixfive README',
-    ]))
-    r.match('^6', '^6', '^1810','^6', '^1810')
+    commands = [
+        '%s README' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_README_DONE',
+    ]
+    r.run_qemu(shell_script(commands))
+    assert_command_output(commands[0], commands[1],
+                          ['6', '6', '1810', '6', '1810'])
 
 @test(10, "sixfive_all")
 def test_sixfive_readme():
-    r.run_qemu(shell_script([
-        'sixfive sixfive.txt README',
-    ]))
-    r.match('^5', '^100', '^18', '^6', '^6', '^6', '^1810','^6', '^1810')
+    commands = [
+        '%s sixfive.txt README' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_ALL_DONE',
+        '%s sf-good-eof' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_GOOD_EOF_DONE',
+        '%s sf-bad-eof' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_BAD_EOF_DONE',
+        '%s sf-good-eof sf-empty sf-good-eof' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_MULTI_DONE',
+        '%s sf-does-not-exist' % SIXFIVE_PROGRAM,
+        'echo SIXFIVE_MISSING_DONE',
+    ]
+    r.run_qemu(shell_script(commands))
+    assert_command_output(
+        commands[0], commands[1],
+        ['5', '100', '18', '6', '0', '0', '30',
+         '6', '6', '1810', '6', '1810'])
+    assert_command_output(commands[2], commands[3], ['30'])
+    assert_command_output(commands[4], commands[5], [])
+    assert_command_output(commands[6], commands[7], ['30', '30'])
+    assert_command_output(commands[8], commands[9],
+                          ['%s: cannot open sf-does-not-exist' % SIXFIVE_PROGRAM])
 
 @test(10, "memdump, examples")
 def test_memdump_examples():

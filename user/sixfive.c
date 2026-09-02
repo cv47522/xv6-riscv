@@ -52,6 +52,10 @@ sixfive(int fd, char *name)
   // Q: Why not read a buffer as wc.c does?
   // A: A buffer can work if state survives between reads and only n bytes are
   // examined. One-byte reads follow the handout and remove buffer boundaries.
+  // Q: Why can't read() receive c instead of &c?
+  // A: read() needs the address of writable storage where it can copy bytes.
+  // c is the byte value. Passing it would misinterpret that value as an
+  // address rather than as writable storage.
   while ((n = read(fd, &c, 1)) > 0) {
     // Q: Why is no string comparison needed after strchr()?
     // A: strchr() returns a pointer to the matching character or zero, not a

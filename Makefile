@@ -425,11 +425,16 @@ UPROGS += \
 endif
 
 # UEXTRA holds non-executable files that still need to be inside fs.img.
-# The util lab ships a shell script and a text file that its tests read.
+# The util lab ships the shell script and text fixtures that its tests read.
 UEXTRA=
 ifeq ($(LAB),util)
 	UEXTRA += user/findtest.sh
 	UEXTRA += user/sixfive.txt
+	UEXTRA += user/sf-empty
+	UEXTRA += user/sf-seps
+	UEXTRA += user/sf-edge
+	UEXTRA += user/sf-good-eof
+	UEXTRA += user/sf-bad-eof
 	UPROGS += $U/_memdump
 endif
 

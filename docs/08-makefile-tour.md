@@ -188,7 +188,7 @@ Phases 2 and 4 are where `make` earns its keep on rebuilds: everything is keyed 
 | **`LDFLAGS`**    | `-z max-page-size=4096`                | Stops the linker aligning segments to its default, much larger page size                                              |
 | **`ULIB`**       | Four objects                           | xv6's entire C library. Linked into every user program                                                                |
 | **`UPROGS`**     | Explicit list + per-lab additions      | Which programs get built _and_ copied into `fs.img`                                                                   |
-| **`UEXTRA`**     | Per-lab only                           | Non-executable files that still belong in the image (`findtest.sh`, `sixfive.txt`)                                    |
+| **`UEXTRA`**     | Per-lab only                           | Non-executable files that still belong in the image (`findtest.sh` and the `sixfive` fixtures)                        |
 | **`CPUS`**       | `3`, or `1` under `LAB=fs`             | Emulated harts. `make CPUS=1 qemu` makes scheduling deterministic while debugging                                     |
 | **`GDBPORT`**    | `id -u % 5000 + 25000`                 | A per-user gdb stub port, so shared machines do not collide                                                           |
 | **`QEMUOPTS`**   | Accumulated with `+=`                  | The machine definition: RAM at `0x80000000`, no firmware, `fs.img` as a virtio disk                                   |

@@ -36,7 +36,7 @@ Supporting files that are not part of the compile at all:
 | -------------------------------------------------- | ------------------------------------------------------------------- |
 | `gradelib.py`, `test-xv6.py`                       | MIT's grading harness and this repo's CI driver; run on the host    |
 | `grade-lab-*`, `grade-exercises`                   | Python test scripts, extensionless because they are run as commands |
-| `user/findtest.sh`, `sixfive.txt`                  | Lab fixtures copied into `fs.img` as data, never compiled           |
+| `user/findtest.sh`, `sixfive.txt`, `sf-*`          | Lab fixtures copied into `fs.img` as data, never compiled           |
 | `.github/workflows/test.yml`                       | CI definition                                                       |
 | `.clang-format`, `.editorconfig`, `.dir-locals.el` | Editor and formatter configuration                                  |
 
