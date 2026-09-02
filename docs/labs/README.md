@@ -8,9 +8,10 @@
 
 One note per lab exercise that needed more thinking than typing: what the exercise actually asks for, which existing code you have to understand before writing anything, and the decisions the implementation comes down to.
 
-| Note                               | Lab    | Exercise                                                                |
-| ---------------------------------- | ------ | ----------------------------------------------------------------------- |
-| **[util-sleep.md](util-sleep.md)** | `util` | `sleep` (easy) — the first system call a program of your own ever makes |
+| Note                                   | Lab    | Exercise                                                                     |
+| -------------------------------------- | ------ | ---------------------------------------------------------------------------- |
+| **[util-sleep.md](util-sleep.md)**     | `util` | `sleep` (easy) — the first system call a program of your own ever makes      |
+| **[util-sixfive.md](util-sixfive.md)** | `util` | `sixfive` (moderate) — streaming decimal tokens across exact file boundaries |
 
 ## What belongs here, and what does not
 
