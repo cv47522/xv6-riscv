@@ -52,6 +52,8 @@ Match `user/ex1copy.c`'s shape. Sections are `// ---` banner rules with an ALL-C
 
 Inline comments carry the rest. Put the explanation **next to the line it explains**; the top block is for what the whole program is about.
 
+Layer long explanations for scanning before reading: lead with the smallest structure that matches the information, such as an ASCII table for repeated cases, a numbered list for an ordered path, or a compact diagram for relationships and branches, then retain the causal detail immediately below it. Do not flatten exceptions, failure behavior, or source evidence into oversized cells, and do not add a visual merely because a prose section is long.
+
 ### Constraints that are not style preferences
 
 - **79 columns maximum**, including the `//`. Verify mechanically, never by eye:
@@ -118,6 +120,7 @@ Then fix the comments to match reality. Real behaviour is frequently _more_ inte
 ## Step 7 — Update the docs
 
 - **`docs/07-exercises.md`** — add a row to the overview table, a node to the Mermaid dependency graph, and a section. Section shape: transcript, then what the lecture uses it to teach, then the questions the source raises. The source comments carry the long form, so the doc must be tighter and must not duplicate them.
+- **Prerequisite map** — when the exercise depends on earlier material, distinguish what to read first from references to consult only when needed. Link the owning local note before individual examples, and label hosted or sibling-repository examples when their APIs are not available in xv6.
 - **`docs/02-build-boot-and-usage.md`** — only if the shared mechanics changed. Ordinary exercises need nothing here.
 - **`docs/05-syscall-reference.md`** — if this is the first exercise to use a call, check the entry is accurate.
 - Markdown rules: **never hard-wrap prose** (one continuous line per paragraph), bold the first column in comparison tables, use GitHub callouts (`> [!NOTE]`, `> [!WARNING]`) where they earn the emphasis, and follow the documented Mermaid band colors.
@@ -139,6 +142,8 @@ git status --short
 ```
 
 After a rename, delete the stale build products (`user/_<oldname>`, `user/<oldname>.o|.d|.asm|.sym`). They are gitignored but survive `make` and confuse the next `ls`.
+
+Perform a final scan audit on the source header and documentation: headings, emphasized terms, tables, lists, diagrams, callouts, and code blocks should let a reader locate prerequisites, ownership, interfaces, branches, invariants, failure modes, and verification commands without reading every prose sentence. Fix retrieval gaps while preserving the detailed explanation; do not add decorative structure where the answer is already obvious at a glance.
 
 ## Scope note
 

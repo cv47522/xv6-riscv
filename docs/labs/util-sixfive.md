@@ -53,6 +53,16 @@ The checked fixture [`user/sixfive.txt`](../../user/sixfive.txt) makes several b
 
 The five intended README results are `6`, `6`, `1810`, `6`, and `1810`: the standalone 6 in “Version 6,” the `/6.1810/` URL components, and the final “MIT's 6.1810.” Text such as `xv6`, `v6`, `6th`, and `x653` remains part of nondecimal tokens because the adjacent letters are not separators.
 
+## Prerequisites
+
+| When                               | Read                                                                                                      | Why it matters here                                                                                                    |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **Read first**                     | [`C_String.md`](../../../c-programming/C_String.md#string-search-and-tokenization-stringh)                | Distinguishes one byte, a NUL-terminated string, `strchr()` membership, and decimal text conversion.                   |
+| **Read first**                     | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                             | Defines the positive, zero, and negative results from `open()`, `read()`, and `close()` that drive the file lifecycle. |
+| **Use when mapping arguments**     | [`C_Command_Line_Arguments.md`](../../../c-programming/C_Command_Line_Arguments.md#reading-the-arguments) | Reviews why paths start at `argv[1]` and why every access must remain below `argc`.                                    |
+| **Use when checking divisibility** | [`C_Operators.md`](../../../c-programming/C_Operators.md#arithmetic-operators)                            | Reviews remainder and inclusive logical OR without prescribing the scanner around them.                                |
+| **Worked comparison**              | [`count_words.c`](../../../c-programming/notes/src/main/io_streams/file_streams/text_mode/count_words.c)  | Shows persistent token state and an explicit EOF commit in hosted C; its streams and library helpers are not xv6 APIs. |
+
 ## Setup in this tree
 
 The Makefile already lists `$U/_sixfive` in `UPROGS`, so the linked program is installed in `fs.img` as the guest command `sixfive`. Under `LAB=util`, `UEXTRA` copies [`user/sixfive.txt`](../../user/sixfive.txt) plus the `sf-empty`, `sf-seps`, `sf-edge`, `sf-good-eof`, and `sf-bad-eof` grader fixtures into the image. [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns those build and program-layout mechanics.
@@ -153,6 +163,9 @@ wc(int fd, char *name)
 
 ## The concept underneath
 
+> [!IMPORTANT]
+> Keep three independent facts: **only the listed separators end tokens**, **invalid-token state survives later digits**, and **EOF can complete one pending decimal candidate**. Losing any one of them produces plausible output for simple inputs while failing the exercise's boundary cases.
+
 ### Separators define tokens; nondigits do not
 
 There are three character classes, not two:
@@ -213,7 +226,14 @@ The important persistence rule is that only an allowed separator resets invalid-
 
 ### Text representation versus numeric value
 
-`atoi()` in [`user/ulib.c`](../../user/ulib.c) accepts a pointer to a NUL-terminated character sequence. It accumulates while the pointed-to bytes are decimal digits and returns the resulting `int`; it reports neither invalid trailing text nor overflow. A single `char` is a byte value, not a string pointer, and a buffer returned by `read()` is not automatically NUL-terminated.
+| Existing fact                                         | Consequence for this exercise                                                                              |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **`atoi()` takes a pointer**                          | It expects a NUL-terminated sequence of characters, not one `char` value.                                  |
+| **`atoi()` stops at the first nondigit**              | It does not report invalid trailing token text, so calling it on a digit suffix would lose the `xv6` rule. |
+| **`atoi()` returns `int` without overflow reporting** | Any buffered-token design still needs an explicit range assumption or policy.                              |
+| **`read()` returns bytes plus a count**               | It does not append a NUL, so raw input storage is not automatically a string accepted by `atoi()`.         |
+
+These are the exact local behaviors of `atoi()` in [`user/ulib.c`](../../user/ulib.c), not the richer conversion contract of a hosted function such as `strtol()`.
 
 Those facts leave a design choice:
 
@@ -239,7 +259,14 @@ The return from `strchr()` is either a pointer into its first string or null. Fo
 
 ### Divisible by 5 or 6
 
-Divisibility means the remainder is zero. The word “or” is inclusive: a value divisible by either divisor qualifies, and a value such as 30 that is divisible by both still represents one input number and therefore produces one output line. Zero is mathematically divisible by both 5 and 6; the expanded fixture exercises both `0` and `00`.
+| Remainder by 5 | Remainder by 6 | Qualifies? | Output count for this token |
+| -------------- | -------------- | ---------- | --------------------------- |
+| **Zero**       | Nonzero        | Yes        | One line                    |
+| **Nonzero**    | Zero           | Yes        | One line                    |
+| **Zero**       | Zero           | Yes        | One line, not two           |
+| **Nonzero**    | Nonzero        | No         | No line                     |
+
+Divisibility means the remainder is zero, and the word “or” is inclusive. Zero belongs to the third row because it is mathematically divisible by both 5 and 6; the expanded fixture exercises both `0` and `00`.
 
 ## Deriving `user/sixfive.c`
 

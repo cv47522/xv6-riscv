@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 1040" width="1440" height="1040" role="img" aria-labelledby="title desc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Monaco, monospace">
+  <title id="title">The five memdump starter layouts</title>
+  <desc id="desc">Byte-level layouts for the five examples in the local memdump starter on the RISC-V little-endian ABI.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>
+  </defs>
+  <rect width="1440" height="1040" fill="#ffffff"/>
+  <text x="40" y="56" font-size="28" font-weight="600" fill="#1e1e1e">The five memdump starter layouts</text>
+  <text x="40" y="88" font-size="16" fill="#868e96">Current local starter, RISC-V little-endian ABI. Addresses increase from left to right.</text>
+
+  <rect x="40" y="120" width="650" height="180" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="60" y="160" font-size="19" font-weight="600" fill="#1e1e1e">Example 1  fmt = ii</text>
+  <rect x="60" y="180" width="290" height="82" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="76" y="210" font-size="14" fill="#1e1e1e"><tspan x="76">offset  0  1  2  3</tspan><tspan x="76" dy="19">bytes  72 f1 00 00</tspan><tspan x="76" dy="19">int32  61810</tspan></text>
+  <rect x="370" y="180" width="290" height="82" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="386" y="210" font-size="14" fill="#1e1e1e"><tspan x="386">offset  4  5  6  7</tspan><tspan x="386" dy="19">bytes  e9 07 00 00</tspan><tspan x="386" dy="19">int32  2025</tspan></text>
+
+  <rect x="730" y="120" width="670" height="180" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="750" y="160" font-size="19" font-weight="600" fill="#1e1e1e">Example 2  fmt = S</text>
+  <rect x="750" y="180" width="620" height="82" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="770" y="210" font-size="14" fill="#1e1e1e"><tspan x="770">offset  0  1  2  3  4  5  6  7  8</tspan><tspan x="770" dy="19">bytes  61 20 73 74 72 69 6e 67 00</tspan><tspan x="770" dy="19">ASCII   a     s  t  r  i  n  g  NUL</tspan></text>
+
+  <rect x="40" y="330" width="1360" height="190" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="60" y="370" font-size="19" font-weight="600" fill="#1e1e1e">Example 3  fmt = s  data = &amp;s</text>
+  <rect x="70" y="400" width="420" height="72" rx="8" fill="#f0f0ff" stroke="#6666cc" stroke-width="2"/>
+  <text x="90" y="427" font-size="14" fill="#1e1e1e"><tspan x="90">offset 0..7: pointer object s</tspan><tspan x="90" dy="20">bytes: address of literal (runtime-dependent)</tspan></text>
+  <line x1="500" y1="435" x2="630" y2="435" stroke="#6666cc" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="650" y="400" width="700" height="72" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="670" y="427" font-size="14" fill="#1e1e1e"><tspan x="670">pointed-to bytes: 61 6e 6f 74 68 65 72 00</tspan><tspan x="670" dy="20">ASCII:             a  n  o  t  h  e  r  NUL</tspan></text>
+
+  <rect x="40" y="550" width="1360" height="205" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="60" y="590" font-size="19" font-weight="600" fill="#1e1e1e">Example 4  fmt = p | i | h | c | S</text>
+  <rect x="60" y="615" width="250" height="88" rx="8" fill="#f0f0ff" stroke="#6666cc" stroke-width="2"/>
+  <text x="74" y="642" font-size="13" fill="#1e1e1e"><tspan x="74">p  offset 0..7</tspan><tspan x="74" dy="18">slot holds "hello" address</tspan><tspan x="74" dy="18">8-byte runtime value</tspan></text>
+  <rect x="325" y="615" width="240" height="88" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="339" y="642" font-size="13" fill="#1e1e1e"><tspan x="339">i  offset 8..11</tspan><tspan x="339" dy="18">77 6f 72 6c</tspan><tspan x="339" dy="18">1819438967</tspan></text>
+  <rect x="580" y="615" width="180" height="88" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="594" y="642" font-size="13" fill="#1e1e1e"><tspan x="594">h  offset 12..13</tspan><tspan x="594" dy="18">64 00</tspan><tspan x="594" dy="18">100</tspan></text>
+  <rect x="775" y="615" width="130" height="88" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="789" y="642" font-size="13" fill="#1e1e1e"><tspan x="789">c  offset 14</tspan><tspan x="789" dy="18">7a</tspan><tspan x="789" dy="18">'z'</tspan></text>
+  <rect x="920" y="615" width="310" height="88" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="934" y="642" font-size="13" fill="#1e1e1e"><tspan x="934">S  offset 15..20</tspan><tspan x="934" dy="18">78 79 7a 7a 79 00</tspan><tspan x="934" dy="18">"xyzzy" + NUL</tspan></text>
+  <rect x="1245" y="615" width="125" height="88" rx="8" fill="#ffd9d9" stroke="#c44" stroke-width="2"/>
+  <text x="1259" y="642" font-size="12" fill="#9c2c2c"><tspan x="1259">offset 21..23</tspan><tspan x="1259" dy="18">? ? ?</tspan><tspan x="1259" dy="18">unread</tspan></text>
+
+  <rect x="40" y="785" width="1360" height="190" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="60" y="825" font-size="19" font-weight="600" fill="#1e1e1e">Example 5  fmt = s | c | c | c | c | c</text>
+  <rect x="60" y="850" width="370" height="76" rx="8" fill="#f0f0ff" stroke="#6666cc" stroke-width="2"/>
+  <text x="78" y="878" font-size="14" fill="#1e1e1e"><tspan x="78">s  offset 0..7: stored pointer</tspan><tspan x="78" dy="20">follow it -&gt; "hello"</tspan></text>
+  <rect x="450" y="850" width="650" height="76" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="468" y="878" font-size="14" fill="#1e1e1e"><tspan x="468">c x 5  offsets 8..12: 77 6f 72 6c | 64</tspan><tspan x="468" dy="20">                         w  o  r  l | d</tspan></text>
+  <rect x="1120" y="850" width="250" height="76" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="1138" y="878" font-size="13" fill="#1e1e1e"><tspan x="1138">crosses member boundary:</tspan><tspan x="1138" dy="20">num1 (4B) | num2 byte 0</tspan></text>
+
+  <text x="40" y="1022" font-size="14" fill="#868e96">Blue = pointer slot/reference   Green = character bytes   Yellow = numeric field   Red = indeterminate and not consumed</text>
+</svg>

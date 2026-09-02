@@ -51,6 +51,18 @@ The breakpoint monitor is a deliberately small remote-GDB client, not a subproce
 > [!IMPORTANT]
 > The breakpoint hit is the intended stopping event, not a grader failure. `FAIL` is absent because QEMU stops at handler entry and is then destroyed before `sys_pause()` returns, so the shell never receives the next prompt and never runs `echo FAIL`. The grader does not wait ten ticks and would accept a call that reached `sys_pause` with the wrong integer.
 
+## Prerequisites
+
+| When                            | Read                                                                                                      | Why it matters here                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Read first**                  | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)          | Establishes the xv6 user-program shape, `argc`/`argv`, available headers, and `UPROGS` registration. |
+| **Read first**                  | [`C_Command_Line_Arguments.md`](../../../c-programming/C_Command_Line_Arguments.md#reading-the-arguments) | Reviews how `argc` bounds valid `argv` indices before the missing-argument path uses them.           |
+| **Use when tracing the call**   | [`06-build-artifacts.md`](../06-build-artifacts.md#the-four-line-stub-decoded)                            | Owns the generated stub, `a7`, `ecall`, dispatch, and return path shown in the first diagram.        |
+| **Use when checking semantics** | [`05-syscall-reference.md`](../05-syscall-reference.md#time-and-system)                                   | Records this tree's `pause(int)` name, tick unit, return behavior, and divergence from upstream xv6. |
+
+> [!NOTE]
+> The sibling C note is hosted-C background, not an API list for xv6. In this repository, [`user/user.h`](../../user/user.h) remains the complete callable user interface.
+
 ## Why the call is named `pause`
 
 Upstream xv6 calls this system call `sleep`. This tree reserves `sleep()` for the kernel's sleep/wakeup primitive in [`kernel/proc.c`](../../kernel/proc.c), so the user-facing system call is `pause`, number 13 in [`kernel/syscall.h`](../../kernel/syscall.h). The program remains named `sleep`, while the grader breakpoints `sys_pause`; [`05-syscall-reference.md`](../05-syscall-reference.md#divergences-from-posix) records the divergence.
@@ -133,7 +145,12 @@ _The main loop is “snapshot, wait, recheck.” The red wait state does not mea
 
 ## What a tick means
 
-`clockintr()` in [`kernel/trap.c`](../../kernel/trap.c) increments the global counter only on hart 0, calls `wakeup(&ticks)`, and schedules the next interrupt `1000000` RISC-V `time`-register timebase units later. Its source comment calls that interval about one tenth of a second.
+| Fact                 | Source-backed meaning                                                                                                                                               |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Counter owner**    | Only hart 0 increments the global `ticks` counter in `clockintr()` in [`kernel/trap.c`](../../kernel/trap.c); the other harts do not maintain per-hart tick counts. |
+| **Wakeup event**     | The same interrupt path calls `wakeup(&ticks)`, making waiters eligible to recheck their own elapsed-tick condition.                                                |
+| **Current interval** | The next interrupt is scheduled `1000000` RISC-V `time`-register timebase units later, which the source comment describes as about one tenth of a second.           |
+| **API contract**     | `pause(n)` accepts ticks, not seconds; the approximate wall-clock conversion is an observation about the current machine configuration.                             |
 
 | Call        | Approximate nominal interval |
 | ----------- | ---------------------------- |
@@ -144,7 +161,13 @@ _The main loop is “snapshot, wait, recheck.” The red wait state does not mea
 > [!CAUTION]
 > Ticks, not seconds, are the interface. The conversion is an observation about the current timer constant, not a guarantee for user programs to encode.
 
-For `n > 0`, the condition becomes false after between `n - 1` and `n` timer intervals because `ticks0` may be sampled anywhere within an interval. `pause(0)` returns immediately. Scheduling can delay the process after the final wakeup, so actual return may be later.
+| Boundary                 | Earliest source-level conclusion                                                                                                       |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **`n == 0`**             | The loop condition is false immediately, so no tick wakeup is required.                                                                |
+| **`n > 0`**              | The condition becomes false after between `n - 1` and `n` timer intervals because `ticks0` may be sampled anywhere within an interval. |
+| **After the final tick** | The process is eligible to run, but scheduler delay can make the observed return later than the nominal interval.                      |
+
+This timing range follows from sampling a discrete counter rather than starting a new timer at the instant of the call. The kernel guarantees an elapsed-tick condition, not exact wall-clock latency.
 
 ## Deriving `user/sleep.c`
 
