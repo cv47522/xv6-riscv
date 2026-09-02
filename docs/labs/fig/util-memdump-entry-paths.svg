@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 880" width="1440" height="880" role="img" aria-labelledby="title desc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Monaco, monospace">
+  <title id="title">How the memdump starter reaches the target function</title>
+  <desc id="desc">The three argc paths in user/memdump.c and the two that call the still-empty memdump function, showing where a valid byte count exists and where it is lost.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>
+  </defs>
+  <rect width="1440" height="880" fill="#ffffff"/>
+  <text x="40" y="56" font-size="28" font-weight="600" fill="#1e1e1e"><tspan x="40">How the memdump starter reaches the target function</tspan></text>
+  <text x="40" y="88" font-size="16" fill="#868e96"><tspan x="40">user/memdump.c as it stands in this tree. Only the target function's body is missing.</tspan></text>
+  <rect x="580" y="118" width="280" height="48" rx="8" fill="#f0f0ff" stroke="#6666cc" stroke-width="2"/>
+  <text x="720" y="148" font-size="16" text-anchor="middle" fill="#1e1e1e">main(argc, argv)</text>
+  <line x1="700" y1="166" x2="254" y2="216" stroke="#6666cc" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="720" y1="166" x2="720" y2="216" stroke="#6666cc" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="740" y1="166" x2="1186" y2="216" stroke="#6666cc" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="40" y="222" width="420" height="290" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="58" y="251" font-size="15" font-weight="600" fill="#1e1e1e"><tspan x="58">argc == 1  --  five built-in examples</tspan></text>
+  <rect x="58" y="272" width="384" height="30" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="68" y="292" font-size="12" fill="#1e1e1e"><tspan x="68">memdump("ii", (char*) a)            two ints</tspan></text>
+  <rect x="58" y="308" width="384" height="30" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="68" y="328" font-size="12" fill="#1e1e1e"><tspan x="68">memdump("S", "a string")            direct chars</tspan></text>
+  <rect x="58" y="344" width="384" height="30" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="68" y="364" font-size="12" fill="#1e1e1e"><tspan x="68">memdump("s", (char*) &amp;s)            pointer slot</tspan></text>
+  <rect x="58" y="380" width="384" height="30" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="68" y="400" font-size="12" fill="#1e1e1e"><tspan x="68">memdump("pihcS", (char*) &amp;example)  struct fields</tspan></text>
+  <rect x="58" y="416" width="384" height="30" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="68" y="436" font-size="12" fill="#1e1e1e"><tspan x="68">memdump("sccccc", (char*) &amp;example) byte view</tspan></text>
+  <text x="58" y="470" font-size="12" fill="#868e96"><tspan x="58">Each pointer names an object in this process. Its</tspan><tspan x="58" dy="16">valid length is implied, never passed as an argument.</tspan></text>
+  <rect x="500" y="222" width="440" height="290" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="518" y="251" font-size="15" font-weight="600" fill="#1e1e1e"><tspan x="518">argc == 2  --  format from argv[1]</tspan></text>
+  <rect x="518" y="272" width="404" height="30" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="528" y="292" font-size="12" fill="#1e1e1e"><tspan x="528">char data[512]; memset(data, '\0', 512)</tspan></text>
+  <rect x="518" y="314" width="404" height="48" rx="8" fill="#fff0f0" stroke="#e8590c" stroke-width="2"/>
+  <text x="528" y="334" font-size="12" fill="#1e1e1e"><tspan x="528">while (n &lt; 512)</tspan><tspan x="528" dy="16">  nn = read(0, data + n, 512 - n)</tspan></text>
+  <rect x="518" y="374" width="404" height="30" rx="8" fill="#f0fff0" stroke="#2f9e44" stroke-width="2"/>
+  <text x="528" y="394" font-size="12" fill="#1e1e1e"><tspan x="528">n = bytes actually read, 0 through 512</tspan></text>
+  <line x1="720" y1="404" x2="720" y2="424" stroke="#2f9e44" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="518" y="428" width="404" height="30" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
+  <text x="528" y="448" font-size="12" fill="#1e1e1e"><tspan x="528">memdump(argv[1], data)</tspan></text>
+  <text x="518" y="478" font-size="12" fill="#c92a2a"><tspan x="518">n is computed, then discarded: the callee gets an</tspan><tspan x="518" dy="16">address with no way to learn how many bytes are valid.</tspan></text>
+  <rect x="980" y="222" width="420" height="290" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
+  <text x="998" y="251" font-size="15" font-weight="600" fill="#1e1e1e"><tspan x="998">argc &gt; 2  --  rejected</tspan></text>
+  <rect x="998" y="272" width="384" height="52" rx="8" fill="#ffd9d9" stroke="#c92a2a" stroke-width="2"/>
+  <text x="1008" y="294" font-size="12" fill="#1e1e1e"><tspan x="1008">printf("Usage: memdump [FORMAT]\n");</tspan><tspan x="1008" dy="16">return 1;</tspan></text>
+  <text x="998" y="356" font-size="12" fill="#868e96"><tspan x="998">The starter accepts at most one format</tspan><tspan x="998" dy="16">argument. Nothing on this path reaches</tspan><tspan x="998" dy="16">the target function.</tspan></text>
+  <line x1="250" y1="512" x2="520" y2="568" stroke="#868e96" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="720" y1="512" x2="720" y2="568" stroke="#868e96" stroke-width="2" marker-end="url(#arrow)"/>
+  <rect x="390" y="572" width="660" height="66" rx="8" fill="#ffffff" stroke="#868e96" stroke-width="2" stroke-dasharray="8 6"/>
+  <text x="720" y="599" font-size="17" text-anchor="middle" fill="#1e1e1e">void memdump(char *fmt, char *data)</text>
+  <text x="720" y="623" font-size="13" text-anchor="middle" fill="#868e96">body is empty in this tree: "Your code here."</text>
+  <rect x="390" y="668" width="660" height="100" rx="8" fill="#ffd9d9" stroke="#c92a2a" stroke-width="2"/>
+  <text x="410" y="695" font-size="13" fill="#1e1e1e"><tspan x="410">The 2026 contract is memdump(char *fmt, char *data, int len).</tspan><tspan x="410" dy="18">Only the argc == 2 path ever computes a real length, and it drops</tspan><tspan x="410" dy="18">it; the built-in calls never had one. Reconcile the declaration,</tspan><tspan x="410" dy="18">all six call sites, and the grader as one change.</tspan></text>
+  <text x="40" y="811" font-size="15" fill="#495057"><tspan x="40">An address alone cannot justify a load. What carries the valid byte count into</tspan><tspan x="40" dy="20">memdump() is the design decision this exercise turns on.</tspan></text>
+</svg>

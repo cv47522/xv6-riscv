@@ -29,11 +29,32 @@ The three relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 2
 | **`sleep, returns`**       | `sleep`, then `echo OK`      | Requires a line matching `^OK$`, proving that the no-argument invocation returned control to the shell so it could execute the next command. It also applies the same two negative regexes.                                                                                                                                                                        |
 | **`sleep, makes syscall`** | `sleep 10`, then `echo FAIL` | Stops at a gdb breakpoint on `sys_pause`, then requires the echoed command line `$ sleep 10` and rejects `FAIL`. Reaching the breakpoint before the shell can run `echo FAIL` proves that the program made the required syscall; the test stops at handler entry, so it neither verifies the argument value nor waits for the requested interval.                  |
 
-The leading `make: 'kernel/kernel' is up to date.` is a build-status message, not a test result. `run_tests()` calls `gradelib.make()` before it applies the `sleep` title filter; that helper runs plain `make`, whose default target in this Makefile is `kernel/kernel`. GNU Make finds every kernel prerequisite older than the existing target and therefore runs no recipe. Each selected test subsequently starts the `qemu-gdb` target through quiet `make -s --no-print-directory`, which still updates dependencies such as `fs.img` when necessary. “Up to date” therefore means only that the preflight kernel link needed no work; it does not skip QEMU, reuse a prior test result, or compare `user/sleep.c` output.
+> [!NOTE]
+> The leading `make: 'kernel/kernel' is up to date.` is a build-status message, not a test result.
+
+It comes from a preflight build that happens before any test is selected:
+
+1. `run_tests()` calls `gradelib.make()` **before** it applies the `sleep` title filter.
+2. That helper runs plain `make`, whose default target in this Makefile is `kernel/kernel`.
+3. GNU Make finds every kernel prerequisite older than the existing target, so it runs no recipe and prints the message.
+4. Each selected test then starts the `qemu-gdb` target through quiet `make -s --no-print-directory`, which still updates dependencies such as `fs.img` when necessary.
+
+| The message does mean                     | The message does not mean                     |
+| ----------------------------------------- | --------------------------------------------- |
+| The preflight kernel link needed no work. | That QEMU was skipped.                        |
+|                                           | That a prior test result was reused.          |
+|                                           | That anything compared `user/sleep.c` output. |
 
 ### Why two tests can have the same Python function name
 
-The duplicate `def test_sleep_no_args():` declarations are legal because a Python function name is only a module variable. Each `@test(...)` decorator runs as its `def` is evaluated: `test()` constructs `register_test`, `register_test(original_function)` constructs a separate `run_test` wrapper, `TESTS.append(run_test)` preserves that wrapper in registration order, and the returned wrapper is assigned to the module name `test_sleep_no_args`. The second declaration replaces that name, but it does not remove the first wrapper already stored in `TESTS`; `run_tests()` iterates the list, so both wrappers execute with the distinct titles captured from their decorators.
+The duplicate `def test_sleep_no_args():` declarations are legal because a Python function name is only a module variable. Each `@test(...)` decorator runs as its `def` is evaluated, in this order:
+
+1. `test()` constructs `register_test`.
+2. `register_test(original_function)` constructs a separate `run_test` wrapper.
+3. `TESTS.append(run_test)` **preserves that wrapper in registration order**.
+4. The returned wrapper is assigned to the module name `test_sleep_no_args`.
+
+The second declaration replaces that name but does not remove the first wrapper already stored in `TESTS`. `run_tests()` iterates the list, so both wrappers execute, each with the distinct title captured from its own decorator.
 
 The repeated name is still misleading. `register_test()` copies the original function's `__name__` onto each wrapper, and `save()` derives a failed test's path from that name, so both failures use `xv6.out.sleep_no_args`; if both fail in one run, the later transcript can overwrite the earlier one.
 
@@ -65,7 +86,17 @@ The breakpoint monitor is a deliberately small remote-GDB client, not a subproce
 
 ## Why the call is named `pause`
 
-Upstream xv6 calls this system call `sleep`. This tree reserves `sleep()` for the kernel's sleep/wakeup primitive in [`kernel/proc.c`](../../kernel/proc.c), so the user-facing system call is `pause`, number 13 in [`kernel/syscall.h`](../../kernel/syscall.h). The program remains named `sleep`, while the grader breakpoints `sys_pause`; [`05-syscall-reference.md`](../05-syscall-reference.md#divergences-from-posix) records the divergence.
+> [!WARNING]
+> Grepping for the upstream name wastes time here. `sleep()` in this tree is a _kernel_ function, and the system call the exercise needs is `pause`.
+
+| Name in this tree | What it is                                                           | Defined in                                   |
+| ----------------- | -------------------------------------------------------------------- | -------------------------------------------- |
+| **`sleep()`**     | The kernel's sleep/wakeup primitive — reserved, not the system call. | [`kernel/proc.c`](../../kernel/proc.c)       |
+| **`pause(int)`**  | The user-facing system call, number 13.                              | [`kernel/syscall.h`](../../kernel/syscall.h) |
+| **`sys_pause()`** | Its kernel handler, and the symbol the grader breakpoints.           | [`kernel/sysproc.c`](../../kernel/sysproc.c) |
+| **`sleep`**       | The guest _program_ this exercise writes. The name is unchanged.     | `user/sleep.c` (the target)                  |
+
+[`05-syscall-reference.md`](../05-syscall-reference.md#divergences-from-posix) records the divergence from upstream xv6, which calls the system call itself `sleep`.
 
 ## The four existing layers
 
@@ -214,7 +245,13 @@ The focused grader and an interactive shell can report different results because
 | **`sleep 3` appears to return immediately** | The argument is three ticks, not three seconds. With the current timer interval, that is nominally about 0.3 seconds.                                                                                                                                                                                                           |
 | **`exec sleep failed` appears**             | `exec()` failed before `user/sleep.c:main()` ran. The shell prints this message in `user/sh.c` when it cannot load the guest executable, commonly because the active `fs.img` does not contain `sleep`.                                                                                                                         |
 
-The strongest deterministic improvement to the grader is to inspect the syscall argument at `sys_pause` and require 10. Because `sys_pause()` is existing kernel code rather than part of this exercise, the correct argument already establishes the intended wait without depending on host scheduling. If an end-to-end duration assertion is wanted, a guest-side helper can compare `uptime()` before and after the command in kernel ticks; host wall-clock timing should be only a coarse secondary check because QEMU startup and scheduling introduce unrelated delay.
+If the grader is to be strengthened, the options are not equally good:
+
+| Candidate assertion                                            | Determinism | Why                                                                                                                                   |
+| -------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inspect the syscall argument at `sys_pause` and require 10** | Highest     | `sys_pause()` is existing kernel code, so the correct argument already establishes the intended wait without depending on scheduling. |
+| **Compare guest `uptime()` before and after the command**      | Good        | Measures elapsed kernel ticks, the unit the interface actually promises.                                                              |
+| **Time the command on the host wall clock**                    | Coarse only | QEMU startup and host scheduling add unrelated delay, so this belongs as a secondary check at most.                                   |
 
 > [!WARNING]
 > Do not run the grader while an interactive QEMU instance is still using `fs.img`. A dependency rebuild can rewrite that image before the grader's second QEMU process discovers the write lock, leaving the running guest with a disk that changed underneath it. Quit QEMU with `Ctrl-a x`, confirm that `pgrep -af qemu-system-riscv64` finds no old instance, then rebuild or grade.
@@ -283,7 +320,15 @@ To reproduce the syscall test interactively, use two terminals:
     (gdb) backtrace
     ```
 
-The exact addresses in the backtrace change after a rebuild, but its named kernel frames should include `sys_pause`, `syscall`, and `usertrap`. Hitting the breakpoint confirms that `sleep 10` reached the handler, and observing `n == 10` adds the argument check missing from `grade-lab-util`; neither observation alone measures elapsed ticks or proves that no other implementation path consumed CPU. The reusable [console setup and VS Code workflow](../02-build-boot-and-usage.md#debugging-with-vs-code) explain debugger startup, controls, and cleanup; [manually debugging an xv6 user program](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) explains why the existing `sleep.c` breakpoint is unresolved and how to stop at `sleep.c:main` without changing `.vscode`.
+The exact addresses in the backtrace change after a rebuild, but its named kernel frames should include `sys_pause`, `syscall`, and `usertrap`. What each observation is worth:
+
+| Observation             | Proves                                                        | Still does not prove                                        |
+| ----------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| **The breakpoint hits** | `sleep 10` reached the handler through the real syscall path. | That the argument was correct.                              |
+| **`n == 10`**           | The argument check that `grade-lab-util` omits entirely.      | That any ticks elapsed.                                     |
+| **Neither, together**   | —                                                             | That no other path burned CPU, or how long the wait lasted. |
+
+Two other notes own the surrounding workflow: [console setup and the VS Code workflow](../02-build-boot-and-usage.md#debugging-with-vs-code) covers debugger startup, controls, and cleanup, and [manually debugging an xv6 user program](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) explains why the existing `sleep.c` breakpoint is unresolved and how to stop at `sleep.c:main` without changing `.vscode`.
 
 ## Questions
 

@@ -33,7 +33,19 @@ The three relevant tests in [`grade-lab-util`](../../grade-lab-util) remain wort
 | **`sixfive_readme` (10 points)** | `sixfive README`                                                                                                          | Requires exactly `6`, `6`, `1810`, `6`, and `1810` in that order, with no extra output.                                                                                                      | General behavior beyond the token shapes present in `README`.                            |
 | **`sixfive_all` (10 points)**    | Both supplied files, qualifying and nonqualifying EOF fixtures, three files with an empty middle file, and a missing path | Requires exact combined output, commits a qualifying number at EOF, rejects a nonqualifying number at EOF, preserves file order across an empty file, and reports the expected open failure. | An actual `read()` failure after a file was opened, or a policy for arithmetic overflow. |
 
-`assert_command_output()` removes console carriage returns, locates one command and its following marker command, and compares every intervening output line with `assert_equal()`. Extra, missing, reordered, or prefix-only lines now fail. The duplicate Python function name used by the last two tests does not prevent either from running: their decorators register separate wrappers before the second definition replaces the module variable, the same mechanism explained for the [`sleep` tests](util-sleep.md#why-two-tests-can-have-the-same-python-function-name).
+> [!IMPORTANT]
+> This grader is strict where `grade-lab-util`'s other tests are loose. `assert_command_output()` compares **whole lines by equality**, not by an unanchored regular expression.
+
+It removes console carriage returns, locates one command and its following marker command, then compares every intervening output line with `assert_equal()`. That makes four failure modes real here that the `sleep` and `memdump` tests tolerate:
+
+| Output defect         | `sleep` and `memdump` tests | `sixfive` tests |
+| --------------------- | --------------------------- | --------------- |
+| **Extra lines**       | Ignored                     | **Fail**        |
+| **Missing lines**     | Fail                        | **Fail**        |
+| **Reordered lines**   | Ignored                     | **Fail**        |
+| **Prefix-only match** | Passes                      | **Fail**        |
+
+The duplicate Python function name used by the last two tests does not prevent either from running: their decorators register separate wrappers before the second definition replaces the module variable, the same mechanism explained for the [`sleep` tests](util-sleep.md#why-two-tests-can-have-the-same-python-function-name).
 
 The checked fixture [`user/sixfive.txt`](../../user/sixfive.txt) makes several boundaries observable:
 
@@ -111,10 +123,25 @@ _Across both diagrams, green supplies data, yellow marks processing, blue marks 
 | **[`user/cat.c`](../../user/cat.c)**                                          | The smallest open/read/close lifecycle and the distinction among positive byte counts, EOF, and read failure.                             | Token state.                                                                |
 | **[`user/user.h`](../../user/user.h)**                                        | The complete callable interface in this freestanding user environment.                                                                    | Any function from the host C library that is not declared there.            |
 
-[`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) owns the exact `open`, `read`, and `close` contracts. [`book/ch01-operating-system-interfaces.md`](../book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection) owns the kernel-backed descriptor model, [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter) owns the reusable byte-stream and EOF explanation, and [`03-lab-workflow.md`](../03-lab-workflow.md#grading) owns grader operation and transcripts.
+Everything else this exercise touches is owned elsewhere and is deliberately not restated here:
 
-> [!NOTE]
-> Three sibling-repository examples are useful comparisons when working in this personal workspace. [`count_words.c`](../../../c-programming/notes/src/main/io_streams/file_streams/text_mode/count_words.c) demonstrates persistent token state and an explicit EOF commit; [`search_functions.c`](../../../c-programming/notes/src/main/strings/search_functions.c) distinguishes `strchr`'s single-character search from delimiter-set tokenization; and [`redirect_vs_read.c`](../../../operating-system/codes/src/main/virtualization/cpu-process-api/redirect_family/redirect_vs_read.c) demonstrates one `open()` followed by repeated `read()` calls and a final zero for EOF. They are host programs, not xv6 templates: their `FILE`, `fgetc`, `<ctype.h>`, `strtok`, `perror`, `ssize_t`, and POSIX flags are unavailable here.
+| Topic                                     | Owner                                                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **`open`, `read`, and `close` contracts** | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                    |
+| **The kernel-backed descriptor model**    | [`book/ch01`](../book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection) |
+| **Byte streams and EOF**                  | [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter)                      |
+| **Grader operation and transcripts**      | [`03-lab-workflow.md`](../03-lab-workflow.md#grading)                                            |
+
+Three sibling-repository examples are useful comparisons when working in this personal workspace:
+
+| Sibling example                                                                                                                    | Demonstrates                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`count_words.c`](../../../c-programming/notes/src/main/io_streams/file_streams/text_mode/count_words.c)                           | Persistent token state and an explicit EOF commit.                               |
+| [`search_functions.c`](../../../c-programming/notes/src/main/strings/search_functions.c)                                           | `strchr`'s single-character search, as distinct from delimiter-set tokenization. |
+| [`redirect_vs_read.c`](../../../operating-system/codes/src/main/virtualization/cpu-process-api/redirect_family/redirect_vs_read.c) | One `open()`, repeated `read()` calls, and a final zero for EOF.                 |
+
+> [!WARNING]
+> Those three are **host** programs, not xv6 templates. Their `FILE`, `fgetc`, `<ctype.h>`, `strtok`, `perror`, `ssize_t`, and POSIX flags do not exist in this freestanding environment; [`user/user.h`](../../user/user.h) is the complete callable interface.
 
 ## `wc()` as the existing scanner
 

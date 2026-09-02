@@ -52,7 +52,25 @@ Match `user/ex1copy.c`'s shape. Sections are `// ---` banner rules with an ALL-C
 
 Inline comments carry the rest. Put the explanation **next to the line it explains**; the top block is for what the whole program is about.
 
-Layer long explanations for scanning before reading: lead with the smallest structure that matches the information, such as an ASCII table for repeated cases, a numbered list for an ordered path, or a compact diagram for relationships and branches, then retain the causal detail immediately below it. Do not flatten exceptions, failure behavior, or source evidence into oversized cells, and do not add a visual merely because a prose section is long.
+### The scan-layer rule, in ASCII
+
+Someone reads this header with the code open, looking for one specific thing. **No section may open with a dense paragraph.** Lead with the smallest structure that matches the information, then keep the causal reasoning in prose immediately below it. C has no Markdown renderer, so the same information shapes are built from aligned text:
+
+| The paragraph is really...                                | Lead with                                                  |
+| --------------------------------------------------------- | ---------------------------------------------------------- |
+| **Repeated cases, per-argument rules, or return values**  | An aligned ASCII table with a `----` rule under the header |
+| **An ordered path through the program**                   | A numbered list, or the top-to-bottom data-path diagram    |
+| **Relationships, redirection, or before-and-after state** | A compact vertical ASCII diagram                           |
+| **One invariant or one likely mistake**                   | A short `NOTE:` or `WARNING:` line above the prose         |
+| **A constant whose value matters**                        | Name the constant, its value, and its header inline        |
+
+Three rules keep this from degrading into decoration:
+
+1. **Never simplify to fit.** Exceptions, failure behavior, and source evidence must survive into the prose below the structure. A 79-column budget is a reason to write tighter sentences, never a reason to drop a qualification.
+2. **Never inflate a cell.** If a column needs a sentence, it belongs under the table.
+3. **Never decorate what already scans.** Length alone does not justify a visual.
+
+Before you finish the file, reread the header using only its banners, ALL-CAPS titles, tables, lists, and diagrams. A reader skipping every prose sentence must still find the prerequisites, the interface, the data path, the failure behavior, and where each idea lives in the tree. Fix only the sections where that fails.
 
 ### Constraints that are not style preferences
 
@@ -123,7 +141,7 @@ Then fix the comments to match reality. Real behaviour is frequently _more_ inte
 - **Prerequisite map** — when the exercise depends on earlier material, distinguish what to read first from references to consult only when needed. Link the owning local note before individual examples, and label hosted or sibling-repository examples when their APIs are not available in xv6.
 - **`docs/02-build-boot-and-usage.md`** — only if the shared mechanics changed. Ordinary exercises need nothing here.
 - **`docs/05-syscall-reference.md`** — if this is the first exercise to use a call, check the entry is accurate.
-- Markdown rules: **never hard-wrap prose** (one continuous line per paragraph), bold the first column in comparison tables, use GitHub callouts (`> [!NOTE]`, `> [!WARNING]`) where they earn the emphasis, and follow the documented Mermaid band colors.
+- Markdown rules: **never hard-wrap prose** (one continuous line per paragraph), bold the first column in comparison tables, use GitHub callouts (`> [!NOTE]`, `> [!WARNING]`) where they earn the emphasis, and follow the documented Mermaid band colors. The scan-layer rule from step 3 applies to the Markdown section too — its Markdown equivalents for each information shape are in [`derive-lab-exercise.md`](derive-lab-exercise.md#step-3a---apply-the-scan-layer-rule).
 
 Add tests to [`grade-exercises`](../../grade-exercises) — one per claim the comments or docs make. Do not create a new `grade-*` file; the suite filters by test title, so prefix every title with the exercise name (`ex9ls: lists a named directory`).
 
@@ -143,7 +161,7 @@ git status --short
 
 After a rename, delete the stale build products (`user/_<oldname>`, `user/<oldname>.o|.d|.asm|.sym`). They are gitignored but survive `make` and confuse the next `ls`.
 
-Perform a final scan audit on the source header and documentation: headings, emphasized terms, tables, lists, diagrams, callouts, and code blocks should let a reader locate prerequisites, ownership, interfaces, branches, invariants, failure modes, and verification commands without reading every prose sentence. Fix retrieval gaps while preserving the detailed explanation; do not add decorative structure where the answer is already obvious at a glance.
+Then run the scan audit from step 3 over both the source header and the `docs/07-exercises.md` section you wrote. Fix only the retrieval gaps it exposes, and preserve every explanation while you do.
 
 ## Scope note
 

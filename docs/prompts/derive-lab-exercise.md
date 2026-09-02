@@ -61,9 +61,40 @@ Use applicable sections in this order:
 8. **Verifying it:** give the build, guest checks, focused grader command, and a gdb recipe only when kernel behavior is worth observing.
 9. **Questions:** provide five to eight source-answerable questions, including at least two failure scenarios.
 
-For every explanation that would otherwise begin with a dense paragraph, first choose the smallest scan layer that matches the information: a callout for one invariant, a table for repeated fields or alternatives, a numbered list for ordered operations, or a diagram for relationships and branching. Keep nuanced causal reasoning and every technical qualification in prose immediately below the scan layer; never force paragraph-sized explanations into table cells or Mermaid nodes merely to make the page more colorful.
+If an analogy materially helps, state where it stops matching the implementation. Apply all formatting and visual rules from `AGENTS.md` without repeating them here, and apply the scan-layer rule below to every section you write.
 
-Use at most two purposeful diagrams by default. If an analogy materially helps, state where it stops matching the implementation. Apply all formatting and visual rules from `AGENTS.md` without repeating them here. Before finishing, perform a scan audit: using only headings, emphasized terms, callouts, tables, lists, diagrams, and code blocks, a reader should be able to locate the contract, prerequisites, source ownership, state or control-flow branches, invariants, failure modes, and verification commands. Add or revise a visual aid only when that audit exposes a retrieval problem; do not decorate sections that already scan well.
+### Step 3a - Apply the scan-layer rule
+
+A lab note is read twice: once end to end, then repeatedly as a lookup surface while the reader implements. The second reading is the one that fails when a section is a wall of prose. **No explanation may open with a dense paragraph.** Lead with the smallest structure that matches the information, then keep the causal reasoning in prose immediately below it.
+
+| The paragraph is really...                                     | Lead with                              | Then keep in prose below it                     |
+| -------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------- |
+| **One invariant, warning, or decision to preserve**            | A GitHub callout                       | Why it holds, and what breaks without it        |
+| **Repeated fields, widths, alternatives, or two designs**      | A comparison table                     | The trade-off the table cannot express          |
+| **An ordered mechanism with no branching**                     | A numbered list                        | The one or two steps with a non-obvious reason  |
+| **Which file owns what, or what a check does not prove**       | A two-column ownership or limits table | The single exception worth naming               |
+| **Relationships, pointer hops, or a branch that splits paths** | A diagram                              | The consequence the picture cannot state        |
+| **A claim with source-backed constants**                       | A table of constant, value, and source | The portability boundary around those constants |
+
+Three rules keep this from degrading into decoration:
+
+1. **Never simplify to fit.** Restructuring may reorder and front-load, but every invariant, exception, failure mode, constant, and source citation must survive into the prose below. Losing a qualification to make a cell fit is a defect, not a style choice.
+2. **Never inflate a cell.** A table cell or Mermaid node holding a paragraph is a paragraph with borders drawn on it. Move that text below the visual.
+3. **Never decorate what already scans.** A three-line explanation that is already clear needs nothing. Add a visual only when the audit below shows a retrieval failure.
+
+Two diagrams is the working budget. A third is justified only when it carries a relationship the other two do not — for example, one figure for the data layout and a separate one for the program's control flow — and never when it restates a table.
+
+**The scan audit.** Before finishing, reread the note using _only_ headings, bolded terms, callouts, tables, lists, diagrams, and code blocks. A reader skipping every prose sentence must still be able to locate:
+
+- [ ] The contract the new file must satisfy
+- [ ] What to read first, and what to consult only when needed
+- [ ] Which document owns each piece of shared material
+- [ ] The state or control-flow branches
+- [ ] The invariants
+- [ ] The failure modes and traps
+- [ ] The build, run, and grading commands
+
+Each item that cannot be found is a retrieval problem: fix that section, and leave the ones that passed alone.
 
 ## Step 4 - Register related changes
 

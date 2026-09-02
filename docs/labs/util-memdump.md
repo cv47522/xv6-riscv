@@ -35,7 +35,16 @@ The two relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 20 
 | **`memdump, examples` (10 points)**        | `memdump`                                                                  | Requires some transcript lines beginning with `61810`, `2025`, `a string`, `another`, `1819438967`, `100`, `z`, `xyzzy`, `hello`, `w`, and `d`.                               | Has no negative regexes. It does not require the example headings, the pointer value, the `o`, `r`, or `l` lines from Example 5, exact lines, adjacency, or the handout's order; unrelated and trailing output can pass.                             |
 | **`memdump, format ii, S, p` (10 points)** | Runs three commands over `abcdefgh12345678\n`: formats `ii`, `S`, and `p`. | Requires some transcript lines beginning with `1684234849`, `1751606885`, `abcdefgh12345678`, and `64636261`. The two decimals are the first two little-endian 4-byte groups. | Does not isolate output by command, reject extra output, exercise `h`, `c`, or `s` directly, check cursor advancement after `p`, or check any short-input failure. Its `p` prefix is the old low-32-bit observation, not the 2026 eight-byte result. |
 
-`Runner.match()` delegates to `assert_lines_match()`, which walks every transcript line and removes every regular expression that matches somewhere. Because each expression begins with `^` but has no `$`, only the start of a line is constrained. The expressions need not match exact output lines or appear in the order passed to `r.match()`. The two Python tests share the name `test_memdump_examples`, but both decorators register their wrapper before the second definition replaces that module variable; [`util-sleep.md`](util-sleep.md#why-two-tests-can-have-the-same-python-function-name) explains that grader mechanism and its transcript-name side effect.
+Four mechanics of `assert_lines_match()`, which `Runner.match()` delegates to, explain why those columns are so much weaker than they look:
+
+| Mechanic                                         | What the grader actually does                                                                          | What it therefore cannot prove                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| **Walks every line and removes what matches**    | Each regular expression is discarded as soon as it matches somewhere in the transcript.                | That the matching line came from the command under test.           |
+| **Every expression is anchored `^` but not `$`** | Only the start of a line is constrained.                                                               | That the rest of the line is correct, or that the line ends there. |
+| **Order is not checked**                         | Expressions may match in any order, not the order passed to `r.match()`.                               | That the output follows the handout's sequence.                    |
+| **Both tests are named `test_memdump_examples`** | Each decorator registers its wrapper before the second `def` rebinds the module variable, so both run. | Which of the two wrote `xv6.out.memdump_examples` after a failure. |
+
+[`util-sleep.md`](util-sleep.md#why-two-tests-can-have-the-same-python-function-name) owns the duplicate-name mechanism and its transcript-name side effect.
 
 > [!WARNING]
 > Passing this local grader is not evidence that the 2026 bounds contract is satisfied. The grader contains no short-input assertion, and its `p` expectation conflicts with the current handout.
@@ -62,6 +71,14 @@ This checkout came from the 2025 lab branch: `labs/util:user/memdump.c` matches 
 | **`p` over standard input** | The grader requires a line beginning with `64636261` for input beginning `abcd`, observing only the first four bytes. | With `deadc0de\n` as input and `p` as the format, the program prints `6564306364616564`, the full first eight bytes interpreted as one little-endian 64-bit value. |
 | **Too little input**        | Neither starter interface nor grader communicates how many bytes `read()` supplied.                                   | With `a\n` as input and `i` as the format, the program must report that two input bytes cannot satisfy a four-byte item.                                           |
 
+### How the starter reaches the target
+
+![Three argc paths in user memdump.c: five built-in example calls, a standard-input path that reads into a 512-byte buffer and computes n, and a usage error; the first two converge on the still-empty two-argument memdump function](fig/util-memdump-entry-paths.svg)
+
+_Blue routes the `argc` dispatch, yellow marks a call into the target, pink marks the one input syscall, green marks the buffer holding its bytes, and red marks the failure path and the missing argument. [Edit the Excalidraw source.](fig/util-memdump-entry-paths.excalidraw)_
+
+The figure is the reconciliation problem in one picture. Six call sites reach the same two-argument function, and only one of them — the standard-input path — ever computes a real byte count. It computes `n` in the read loop and then passes only `data`, so the length is discarded at the very call that had it. The five built-in examples never had a count to lose: each passes the address of an object whose extent the compiler knows and the callee does not.
+
 The note uses the 2026 behavior as the intended contract because that is the exercise requested. Before implementation, the starter declaration, every call site, and the focused grader need to be reconciled as one change; changing only `memdump()` cannot make the old calls supply information they do not have. No such change is made here.
 
 ## The code to read first
@@ -75,9 +92,21 @@ The note uses the 2026 behavior as the intended contract because that is the exe
 | **[`user/printf.c`](../../user/printf.c)**                                     | The formatter actually available in xv6, including `%d`, `%c`, `%s`, `%x`, and `%lx`, plus its exact variadic argument expectations. | Memory bounds or the exercise's `i`, `p`, `h`, `c`, `s`, and `S` language. |
 | **[`user/cat.c`](../../user/cat.c)** and **[`user/wc.c`](../../user/wc.c)**    | The established 512-byte buffer size and the rule that only the byte count returned by `read()` is fresh input.                      | A reason that 512 is semantically required.                                |
 
-[`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns user-program layout and `UPROGS`, [`03-lab-workflow.md`](../03-lab-workflow.md#grading) owns grading and failed transcripts, [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) owns the `read()` return contract, and [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter) owns the reusable byte-stream explanation. No kernel mechanism is part of `memdump()` itself: the built-in examples inspect the process's own objects, and the argument form performs its one input syscall before the target function runs.
+Everything else this exercise touches is owned elsewhere and is deliberately not restated here:
 
-[`book/ch02-operating-system-organization.md`](../book/ch02-operating-system-organization.md) and [`book/ch03-page-tables.md`](../book/ch03-page-tables.md) own the wider xv6 address-space story, but both are placeholders. This note temporarily states only the narrow fact needed here: all addresses in the examples are user virtual addresses within this process. C object representation, pointer arithmetic, and structure padding instead belong to the sibling C notes linked below.
+| Topic                                            | Owner                                                                                                    |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Program layout and `UPROGS`**                  | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)         |
+| **Grading and failed transcripts**               | [`03-lab-workflow.md`](../03-lab-workflow.md#grading)                                                    |
+| **The `read()` return contract**                 | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                            |
+| **The reusable byte-stream explanation**         | [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter)                              |
+| **Address spaces and user virtual addresses**    | [`book/ch02`](../book/ch02-operating-system-organization.md), [`book/ch03`](../book/ch03-page-tables.md) |
+| **Object representation, pointers, and padding** | The sibling C notes listed under [Prerequisites](#prerequisites)                                         |
+
+> [!NOTE]
+> No kernel mechanism is part of `memdump()` itself. The built-in examples inspect the process's own objects, and the argument form performs its one input syscall before the target function runs.
+
+The two book chapters above are still placeholders, so this note holds one narrow fact on loan: every address in the examples is a user virtual address inside this process.
 
 ## `memmove()` as the existing byte walker
 
@@ -127,13 +156,34 @@ The sibling [`pointer_generic_void.c`](../../../c-programming/notes/src/main/poi
 
 ### Why `char *data`
 
-In the call `memdump("ii", (char *)a)`, the expression `a` first decays from an array of two `int` objects to an `int *` pointing at `a[0]`. The cast changes only the pointer type; it preserves the address and does not convert either integer. Standard C permits a character pointer to inspect the byte representation of any object, and arithmetic on `char *` advances one byte at a time. This is exactly the view a mixed-width memory walker needs.
+`memdump("ii", (char *)a)` looks like one operation but is three, and only the last one is visible in the source:
 
-Changing the parameter to `void *` would make conversions from object pointers implicit at the call boundary, but it would not remove the need for a character pointer inside the function: `void` is incomplete, so standard C provides neither `*data` nor `data + n` for a `void *`. The existing `memmove()` makes the same trade-off in two stages. Because `memdump` does not modify the bytes, `const` would express its read-only intent, but the supplied target does not use it.
+1. **Array decay.** `a`, an array of two `int` objects, becomes an `int *` pointing at `a[0]`.
+2. **The cast.** `(char *)` changes the pointer's type only. The address is preserved and neither integer is converted.
+3. **The byte view.** Standard C permits a character pointer to inspect the byte representation of _any_ object, and `+ 1` on a `char *` advances exactly one byte.
+
+Step 3 is the whole reason for the parameter type: a mixed-width walker needs a cursor whose unit of movement is the same unit the format string counts in.
+
+| Candidate parameter | What it buys                                                            | What it still costs                                                                                            |
+| ------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **`char *`**        | A complete one-byte element type; dereference and arithmetic both work. | Every call site needs an explicit cast, which is why the starter writes `(char *)` five times.                 |
+| **`void *`**        | Conversions from object pointers become implicit at the call boundary.  | `void` is incomplete, so neither `*data` nor `data + n` is defined; a character cursor is still needed inside. |
+| **`const char *`**  | Expresses that the function only observes bytes.                        | Not what the supplied target declares, so adopting it changes the starter's interface.                         |
+
+`memmove()` in [`user/ulib.c`](../../user/ulib.c) resolves this exact tension in two stages, taking `void *` publicly and converting once to `char *` internally.
 
 ### Values, representations, and byte order
 
-[`kernel/types.h`](../../kernel/types.h) defines `uint8`, `uint16`, `uint32`, and `uint64` from C types whose widths are confirmed by the RISC-V compiler selected by this Makefile: `char` is one byte, `short` is two, `int` is four, and pointers and `long` are eight. The target is little-endian, so the lowest-address byte contributes the least-significant eight bits of a multi-byte integer.
+[`kernel/types.h`](../../kernel/types.h) defines `uint8`, `uint16`, `uint32`, and `uint64` on top of the widths the RISC-V compiler selected by this Makefile actually uses:
+
+| C type                  | Width on this target | Alias in `kernel/types.h` | Format character that consumes it |
+| ----------------------- | -------------------- | ------------------------- | --------------------------------- |
+| **`char`**              | 1 byte               | `uint8`                   | `c`                               |
+| **`short`**             | 2 bytes              | `uint16`                  | `h`                               |
+| **`int`**               | 4 bytes              | `uint32`                  | `i`                               |
+| **`long` and pointers** | 8 bytes              | `uint64`                  | `p`, and the slot `s` consumes    |
+
+The target is little-endian, so the lowest-address byte contributes the least-significant eight bits of a multi-byte integer:
 
 | Source value | 32-bit hexadecimal | Bytes at increasing addresses on this target |
 | ------------ | ------------------ | -------------------------------------------- |
@@ -200,7 +250,14 @@ Aggregate initialization is an alternative way to set up the starter example, no
 
 _Addresses increase from left to right. In addition to the pointer and character colors defined above, yellow marks typed numeric fields, and red marks indeterminate bytes that the examples do not consume. The pointer bytes are symbolic because their numeric address depends on the linked image. [Edit the Excalidraw source.](fig/util-memdump-layouts.excalidraw)_
 
-Examples 4 and 5 pass the same structure address but impose different views. `pihcS` follows the declared member widths: 8, 4, 2, 1, then direct string bytes. `sccccc` treats the first eight bytes as a stored string pointer, then treats the next five bytes as characters. Those five characters cross a C member boundary: four come from `num1`, and the fifth is the low byte of `num2`. The format describes the bytes to consume; it does not ask the compiler for member names or types.
+Examples 4 and 5 pass the _same_ structure address and get different answers, because the format string — not the declaration — decides how the bytes are grouped:
+
+| Format       | Bytes consumed, in order | Relationship to the declared members                                          |
+| ------------ | ------------------------ | ----------------------------------------------------------------------------- |
+| **`pihcS`**  | 8, 4, 2, 1, then to NUL  | Follows the members exactly: `ptr`, `num1`, `num2`, `byte`, then `bytes`.     |
+| **`sccccc`** | 8, then 1, 1, 1, 1, 1    | Follows `ptr` as a string pointer, then reads five bytes that ignore members. |
+
+Those five `c` items cross a member boundary: four come from `num1` (`w`, `o`, `r`, `l`) and the fifth is the low byte of `num2` (`d`). That is the point of the example — the format describes bytes to consume, and never asks the compiler for member names or types.
 
 ### Why 512 bytes
 
@@ -212,7 +269,15 @@ Examples 4 and 5 pass the same structure address but impose different views. `pi
 
 The 512-byte capacity matches the established local buffers in `user/cat.c` and `user/wc.c`, but it is a convention rather than a filesystem or syscall requirement. `read()` accepts any nonnegative requested count that fits its interface.
 
-Capacity is not content length. After the read loop, `n` is the number of bytes actually obtained, while 512 remains only the maximum. Zero-filling the old starter makes short text appear safely NUL-terminated, but it loses the distinction between input bytes and unused capacity if only the pointer is passed. It also provides no spare terminator when input fills all 512 bytes. The explicit `len` in the 2026 contract carries the fact the target function needs.
+> [!IMPORTANT]
+> **Capacity is not content length.** After the read loop, `n` is the number of bytes actually obtained; 512 remains only the maximum.
+
+The old starter's `memset(data, '\0', sizeof(data))` hides that distinction in a way that fails twice:
+
+- **It erases the boundary between input and unused capacity.** Short text looks safely NUL-terminated, so a formatter that only receives the pointer cannot tell where the input stopped.
+- **It provides no spare terminator at full capacity.** If input fills all 512 positions, there is no zeroed byte left to stop a NUL-seeking scan.
+
+The explicit `len` in the 2026 contract is what carries the fact the target function actually needs.
 
 ## Deriving it
 
