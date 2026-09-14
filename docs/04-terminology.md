@@ -262,7 +262,7 @@ The word is standard across several fields with the same sense: **RPC** has clie
 
 Small things that cause confusion the first time:
 
-- **`printk` vs `printf`** — the kernel's is `printk` (`kernel/printk.c`), user space has its own `printf` (`user/printf.c`). Upstream renamed the kernel one from `printf.c` recently, which is why the 2025 lab branches still refer to the old name.
+- **`printk` vs `printf`** — the kernel's is `printk` (`kernel/printk.c`), user space has its own `printf` (`user/printf.c`). Upstream renamed the kernel one from `printf.c`, which is why the 2025 lab branches still refer to the old name while `labs/util-2026` already uses `printk.c`.
 - **The `_` prefix** — `user/_ls` is the linked executable, `user/ls.o` the object file, and `mkfs` strips the underscore so that inside xv6 the program is just `ls`. The reason is written in `mkfs/mkfs.c:147`: the binaries are named `_rm`, `_cat`, and so on "to keep the build operating system from trying to execute them in place of system binaries like `rm` and `cat`". The prefix protects **your host**, not xv6.
 - **`v6` in "xv6"** — refers to Unix Version 6, the 1975 system it re-implements, not a version of xv6 itself.
 - **"virt"** — QEMU's generic board name, not related to virtio, though the virt board is where the virtio devices live.

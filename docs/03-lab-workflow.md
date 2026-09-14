@@ -10,13 +10,13 @@ Running MIT's [6.1810](https://pdos.csail.mit.edu/6.1810/2026/) labs from this r
 
 ## How labs work here
 
-MIT distributes each lab as a separate branch of `xv6-labs-2025`. All nine branches were cut from the same base commit and are **independent siblings** — `util` is not an ancestor of `syscall`. Each branch contains stock xv6 plus that lab's starter files, grading script, and `#ifdef` guards.
+MIT distributes each lab as a separate branch of `xv6-labs-2026`. The branches are **independent siblings** — `util-2026` is not an ancestor of `syscall`. Each branch contains stock xv6 plus that lab's starter files, grading script, and `#ifdef` guards.
 
 This repository consolidates them: lab starter code is merged into `study` as you reach each lab, and your solutions accumulate on that one branch. The reasoning is in [00-repo-workflow.md](00-repo-workflow.md#why-one-branch-instead-of-one-per-lab).
 
 | Lab         | Branch         | Grading script      | Topic                              |
 | ----------- | -------------- | ------------------- | ---------------------------------- |
-| **util**    | `labs/util`    | `grade-lab-util`    | Unix utilities, first system call  |
+| **util**    | `labs/util-2026` | `grade-lab-util`  | Unix utilities, first system call  |
 | **syscall** | `labs/syscall` | `grade-lab-syscall` | Adding system calls, tracing       |
 | **pgtbl**   | `labs/pgtbl`   | `grade-lab-pgtbl`   | Page tables, superpages            |
 | **traps**   | `labs/traps`   | `grade-lab-traps`   | Trap handling, backtraces, alarms  |
@@ -107,32 +107,34 @@ make grade                      # every test for the current lab
 The harness (`gradelib.py`) boots QEMU for each test, drives the shell, and pattern-matches the output. A fresh, unimplemented lab scores zero — that is the correct starting state, not a broken setup:
 
 ```
-== Test exec, recursive find ==
+== Test exec via sh script ==
 $ make qemu-gdb
-exec, recursive find: FAIL (1.2s)
+exec via sh script: FAIL (1.2s)
     Number of appearances of 'hello'
     got:
       0
     expected:
       3
     QEMU output saved to xv6.out.test_find_sh
-Score: 0/131
+Score: 0/156
 ```
 
 Two things to note. Failures leave the full QEMU transcript in `xv6.out.<testname>` — read it, it usually shows the shell command that failed and exactly what your program printed. And the `$ make qemu-gdb` line is the harness reporting how it launched QEMU, not a command you need to run.
 
 ### The util lab's tests
 
-15 tests, 131 points:
+19 tests, 156 points:
 
-| Points | Tests                                                |
-| ------ | ---------------------------------------------------- |
-| **20** | `sleep` — no arguments, returns, makes syscall       |
-| **30** | `sixfive` — test, readme, all                        |
-| **20** | `memdump` — examples, and format `ii, S, p`          |
-| **30** | `find` — current directory, sub-directory, recursive |
-| **30** | `exec` — basic, multiple args, recursive find        |
-| **1**  | `time` — reads `time.txt`, the hours you spent       |
+| Points | Tests                                                                          |
+| ------ | ------------------------------------------------------------------------------ |
+| **25** | `sleep` — no arguments, returns, makes syscall, zero and non-numeric arguments |
+| **35** | `sixfive` — test, readme, all, standard input and missing file                 |
+| **25** | `memdump` — examples, format `ii, S, p`, formats `h`/`c` with bounds and usage |
+| **40** | `find` — current directory, sub-directory, recursive, missing and duplicate    |
+| **30** | `exec` — basic, multiple args, via sh script                                   |
+| **1**  | `time` — reads `time.txt`, the hours you spent                                 |
+
+The last four of those are the 2026 corner tests. They are what a solution that passes the older, looser checks most often fails: a `sleep` that hangs on `sleep 0`, a `sixfive` that cannot read standard input, a `memdump` that reads past the end of short input, and a `find` that recurses into `.` and reports the same file many times.
 
 The last one is why a full-marks run still fails if you have not created `time.txt`. Write a number into it:
 
@@ -146,7 +148,7 @@ Tag the snapshot, then push both:
 
 ```bash
 git add -A && git commit -m "feat(util): implement find, sixfive, memdump"
-git tag -a lab-util-done -m "util lab complete, 131/131"
+git tag -a lab-util-done -m "util lab complete, 156/156"
 git push origin study
 git push origin lab-util-done
 ```
@@ -182,4 +184,6 @@ This matters only if you are submitting to Gradescope as an enrolled student. Fo
 
 ## Compatibility note
 
-The lab branches were cut from xv6 as of 2025-08-25, and `study` tracks a newer upstream. One consequence has already been handled: upstream renamed `kernel/printf.c` to `kernel/printk.c`, so the Makefile's `OBJS_KCSAN` list was retargeted during the util merge. If a future lab merge fails to link with an error about a missing object, check whether upstream renamed the file and update the list the same way.
+The nine 2025 lab branches were cut from xv6 as of 2025-08-25, and `study` tracks a newer upstream. One consequence has already been handled: upstream renamed `kernel/printf.c` to `kernel/printk.c`, so the Makefile's `OBJS_KCSAN` list was retargeted during the util merge. If a future lab merge fails to link with an error about a missing object, check whether upstream renamed the file and update the list the same way.
+
+`labs/util-2026` does not have that problem — it was cut from a later upstream that already uses `printk.c`. Expect the opposite risk from the 2026 branches instead: they carry upstream changes `study` may not have yet, such as `-march=rv64gc`, `-std=gnu99`, and the `conf/lab.mk` prerequisite on every object rule.

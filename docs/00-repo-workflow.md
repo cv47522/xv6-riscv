@@ -16,7 +16,7 @@ There are two GitHub repositories and three remotes, but only **one working copy
 | ------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **origin**   | `git@github.com:cv47522/xv6-riscv.git`      | Your fork. This is where your work is pushed.                                                                     |
 | **upstream** | `https://github.com/mit-pdos/xv6-riscv.git` | MIT's public xv6. Read-only — never push here, never open a pull request.                                         |
-| **labs**     | `git@github.com:cv47522/xv6-labs-2025.git`  | Your fork of the 6.1810 labs repo. Source of lab starter code and grading scripts. Fetched from, never worked in. |
+| **labs**     | `git@github.com:cv47522/xv6-labs-2026.git`  | Your fork of the 6.1810 labs repo. Source of lab starter code and grading scripts. Fetched from, never worked in. |
 
 | Branch    | Role                                                                                                                                                        |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,7 +30,7 @@ There are two GitHub repositories and three remotes, but only **one working copy
 flowchart LR
     subgraph up["Read-only sources"]
         U["upstream/riscv<br/>mit-pdos/xv6-riscv"]
-        L["labs/util, labs/syscall, ...<br/>cv47522/xv6-labs-2025"]
+        L["labs/util-2026, labs/syscall, ...<br/>cv47522/xv6-labs-2026"]
     end
     subgraph local["Local working copy"]
         R["riscv<br/>pristine mirror"]
@@ -59,14 +59,14 @@ Already done in this checkout, but recorded here in case you clone it fresh on a
 git clone git@github.com:cv47522/xv6-riscv.git
 cd xv6-riscv
 git remote add upstream https://github.com/mit-pdos/xv6-riscv.git
-git remote add labs     git@github.com:cv47522/xv6-labs-2025.git
+git remote add labs     git@github.com:cv47522/xv6-labs-2026.git
 git fetch upstream
 git fetch labs
 git config rerere.enabled true
 ```
 
 > [!TIP]
-> `rerere` ("reuse recorded resolution") is not optional here — it is what makes the lab workflow bearable. Every lab branch was cut from the same 2025-08-25 base, so each one you merge re-presents the _same_ conflicts against your ever-growing `study` branch. With `rerere` on, git records how you resolved each hunk the first time and replays it automatically on every later merge.
+> `rerere` ("reuse recorded resolution") is not optional here — it is what makes the lab workflow bearable. The nine 2025 lab branches were all cut from the same 2025-08-25 base, so each one you merge re-presents the _same_ conflicts against your ever-growing `study` branch. With `rerere` on, git records how you resolved each hunk the first time and replays it automatically on every later merge.
 
 ## Everyday commands
 
@@ -176,7 +176,7 @@ git reset --hard upstream/riscv         # discards the stray commit
 ## Network constraints
 
 > [!CAUTION]
-> On the Nokia corporate network, `git://` (port 9418) does not work. The proxy accepts the TCP connection and then silently drops the git protocol handshake, so `git clone git://g.csail.mit.edu/xv6-labs-2025` hangs forever rather than failing with an error. `CONNECT` to port 9418 is refused as well, so there is no proxy tunnel workaround.
+> On the Nokia corporate network, `git://` (port 9418) does not work. The proxy accepts the TCP connection and then silently drops the git protocol handshake, so `git clone git://g.csail.mit.edu/xv6-labs-2026` hangs forever rather than failing with an error. `CONNECT` to port 9418 is refused as well, so there is no proxy tunnel workaround.
 
 Practical consequences:
 
@@ -184,6 +184,21 @@ Practical consequences:
 - MIT publishes the labs **only** over `git://` — there is no official HTTPS endpoint, GitHub mirror, or tarball. This is why the labs live on a GitHub fork instead.
 - If you ever need to re-fetch from MIT directly, do it from a network without the proxy (home connection or phone hotspot), then push to your GitHub fork.
 
-## The retired labs clone
+## The labs clone
 
-`~/personal/xv6-labs-2025` was the working copy used to bootstrap this setup. It is now redundant: its `main` branch was merged into `study`, and all nine lab branches live on the `labs` remote. The local directory can be deleted; the GitHub fork must be kept, since it is the only reachable source of lab starter code.
+`~/personal/xv6-labs-2026` is the single local clone of the labs fork. It exists only to reach MIT's `git://` server from an unproxied network and to push what it finds to GitHub; no work happens in it. It carries two remotes:
+
+| Remote     | URL                                      | Role                                                                                              |
+| ---------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **origin** | `git@github.com:cv47522/xv6-labs-2026.git` | The GitHub fork, reachable from any network. This is what `labs` in this repository points at.     |
+| **mit**    | `git://g.csail.mit.edu/xv6-labs-2026`      | MIT's publication point. Works only off the corporate network — see [Network constraints](#network-constraints). |
+
+The earlier `~/personal/xv6-labs-2025` clone was removed once the GitHub fork was renamed to `xv6-labs-2026`; it held nothing that the fork did not already have. The fork itself must be kept, since it is the only reachable source of lab starter code.
+
+Branch names on the fork carry the year only where two versions exist. `util-2026` and `riscv-2026` are MIT's current publications; plain `util`, `syscall`, `pgtbl`, and the rest are the 2025 branches, kept because `study` already merged from them. To pick up a newly published 2026 lab:
+
+```bash
+cd ~/personal/xv6-labs-2026
+git fetch mit                                     # unproxied network only
+git push origin mit/<labname>:refs/heads/<labname>-2026
+```
