@@ -155,7 +155,11 @@ OBJDUMP = $(TOOLPREFIX)objdump
 #  -ggdb -gdwarf-2          emit course-compatible gdb information.
 CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
 
-#  rv64gc is 64-bit RISC-V with the G extensions and compressed instructions.
+# rv64gc is 64-bit RISC-V with the G extensions and compressed instructions.
+# Deterministic builds.
+DETFLAGS = -ffile-prefix-map=$(CURDIR)=.
+
+CFLAGS += $(DETFLAGS)
 CFLAGS += -march=rv64gc
 
 #  xv6 uses GNU C99 extensions, including inline assembly.
@@ -250,7 +254,7 @@ $K/%.o: $K/%.c
 # Assembly uses minimal flags because it runs without a C environment and must
 # not be optimized or instrumented.
 $K/%.o: $K/%.S
-	$(CC) -march=rv64gc -g -c -o $@ $<
+	$(CC) -march=rv64gc -g $(DETFLAGS) -c -o $@ $<
 
 tags: $(OBJS)
 	etags kernel/*.S kernel/*.c
