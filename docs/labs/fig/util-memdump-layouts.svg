@@ -13,7 +13,7 @@
   <rect x="60" y="180" width="290" height="82" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
   <text x="76" y="210" font-size="14" fill="#1e1e1e"><tspan x="76">offset  0  1  2  3</tspan><tspan x="76" dy="19">bytes  72 f1 00 00</tspan><tspan x="76" dy="19">int32  61810</tspan></text>
   <rect x="370" y="180" width="290" height="82" rx="8" fill="#fffff0" stroke="#aa8800" stroke-width="2"/>
-  <text x="386" y="210" font-size="14" fill="#1e1e1e"><tspan x="386">offset  4  5  6  7</tspan><tspan x="386" dy="19">bytes  e9 07 00 00</tspan><tspan x="386" dy="19">int32  2025</tspan></text>
+  <text x="386" y="210" font-size="14" fill="#1e1e1e"><tspan x="386">offset  4  5  6  7</tspan><tspan x="386" dy="19">bytes  ea 07 00 00</tspan><tspan x="386" dy="19">int32  2026</tspan></text>
 
   <rect x="730" y="120" width="670" height="180" rx="8" fill="#ffffff" stroke="#adb5bd" stroke-width="2"/>
   <text x="750" y="160" font-size="19" font-weight="600" fill="#1e1e1e">Example 2  fmt = S</text>

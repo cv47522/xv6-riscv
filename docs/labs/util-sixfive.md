@@ -24,14 +24,19 @@ The handout defines a number as a sequence of decimal digits separated by charac
 | **Either divisor**            | A number qualifies when divisible by 5, by 6, or by both; a common multiple is printed once.                                                     |
 | **Numeric output**            | The fixture contains `06`, while the required output contains `6`, so leading zeros are not preserved.                                           |
 | **Character-at-a-time input** | The handout explicitly suggests one byte per `read`, keeping the parsing problem independent of buffer boundaries.                               |
+| **No input paths**            | With no file arguments the program reads standard input, so `echo 12 30 7 \| sixfive` prints `12` and `30`. The 2025 lab left this unspecified. |
 
-The three relevant tests in [`grade-lab-util`](../../grade-lab-util) remain worth 30 points, but each now isolates command output from the QEMU transcript and compares the complete ordered line list:
+> [!WARNING]
+> The standard-input path is a 2026 requirement that [`user/sixfive.c`](../../user/sixfive.c) does not yet satisfy. Its `main()` rejects `argc < 2` with a usage message, so the `sixfive, stdin and missing file` test fails while the other three sixfive tests pass. Reading standard input is descriptor 0 rather than a fourth `open()`, so the existing `sixfive(int fd, char *name)` helper already accepts the shape needed; what is missing is the `argc < 2` branch that calls it with descriptor 0.
+
+The four relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 35 points, and each isolates command output from the QEMU transcript and compares the complete ordered line list:
 
 | Test                             | Runs                                                                                                                      | Exact checks                                                                                                                                                                                 | What those checks do not prove                                                           |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **`sixfive_test` (10 points)**   | The supplied fixture plus `sf-edge`, `sf-seps`, and `sf-empty`                                                            | Requires the complete expected output for ordinary values and all separator classes, rejects invalid suffixes and embedded digits, and requires no output for empty or separator-only files. | Behavior for values outside the `int` range or an actual `read()` failure.               |
 | **`sixfive_readme` (10 points)** | `sixfive README`                                                                                                          | Requires exactly `6`, `6`, `1810`, `6`, and `1810` in that order, with no extra output.                                                                                                      | General behavior beyond the token shapes present in `README`.                            |
-| **`sixfive_all` (10 points)**    | Both supplied files, qualifying and nonqualifying EOF fixtures, three files with an empty middle file, and a missing path | Requires exact combined output, commits a qualifying number at EOF, rejects a nonqualifying number at EOF, preserves file order across an empty file, and reports the expected open failure. | An actual `read()` failure after a file was opened, or a policy for arithmetic overflow. |
+| **`sixfive_all` (10 points)**    | Both supplied files, qualifying and nonqualifying EOF fixtures, and three files with an empty middle file                 | Requires exact combined output, commits a qualifying number at EOF, rejects a nonqualifying number at EOF, and preserves file order across an empty file.                                    | An actual `read()` failure after a file was opened, or a policy for arithmetic overflow. |
+| **`sixfive, stdin and missing file` (5 points)** | `echo 12 30 7 \| sixfive` with no file arguments, then a randomly named missing path                       | Requires exactly `12` and `30` from standard input with `7` absent, then the exact `sixfive: cannot open NAME` line for the missing path.                                                    | Whether a file argument and standard input can be mixed, or what exit status either path produces. |
 
 > [!IMPORTANT]
 > This grader is strict where `grade-lab-util`'s other tests are loose. `assert_command_output()` compares **whole lines by equality**, not by an unanchored regular expression.
@@ -301,14 +306,14 @@ Divisibility means the remainder is zero, and the word “or” is inclusive. Ze
 
 | Aspect                | Fixed requirement or source-backed convention                                                                                                                                                                                |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Arguments**         | Process every path in `argv[1]` through `argv[argc - 1]`. The handout does not specify the no-path diagnostic.                                                                                                               |
+| **Arguments**         | Process every path in `argv[1]` through `argv[argc - 1]`. With no path at all, read standard input instead of reporting a usage error.                                                                                       |
 | **File lifecycle**    | Open each path read-only, consume it to EOF, detect a negative `read()` result, and close it. `user/cat.c` and `user/wc.c` provide the local convention.                                                                     |
 | **Character source**  | Follow the handout's one-character-at-a-time hint, using the returned byte count to distinguish data, EOF, and failure.                                                                                                      |
 | **Token grammar**     | Only the eight bytes in `" -\r\t\n./,"`, plus file start and EOF, are separators. Every byte inside a decimal token must be `0` through `9`.                                                                                 |
 | **Qualification**     | Print a completed decimal value when divisible by 5 or 6, once even if both tests hold.                                                                                                                                      |
 | **Output**            | Print the numeric value on its own line. Do not add filenames, labels, or diagnostics to descriptor 1.                                                                                                                       |
 | **Available APIs**    | Only declarations in `user/user.h`; there is no host C library.                                                                                                                                                              |
-| **Unspecified cases** | No-path behavior, integer overflow, post-open read failures, and whether processing continues after one file fails are not fixed by the handout. Match a deliberate local convention rather than assuming a test proved one. |
+| **Unspecified cases** | Integer overflow, post-open read failures, whether a path and standard input may be mixed, and whether processing continues after one file fails are not fixed by the handout. Match a deliberate local convention rather than assuming a test proved one. |
 
 ### Decisions and evidence
 
@@ -358,9 +363,10 @@ $ echo xv6 /6, 06 30 7 > sf-boundary
 $ sixfive sf-boundary
 $ echo x6 :6 6th > sf-invalid
 $ sixfive sf-invalid
+$ echo 12 30 7 | sixfive
 ```
 
-The supplied fixture should agree with the handout's `5`, `100`, `18`, and `6` example. The boundary file should produce the numeric values from `/6,`, `06`, and `30`, while the invalid-token file should produce no values. These are contract checks, not a predicted shell transcript; run them against the implementation and inspect its actual output.
+The supplied fixture should agree with the handout's `5`, `100`, `18`, and `6` example. The boundary file should produce the numeric values from `/6,`, `06`, and `30`, while the invalid-token file should produce no values. The final command takes the standard-input path and should print `12` and `30`. These are contract checks, not a predicted shell transcript; run them against the implementation and inspect its actual output.
 
 Exit QEMU with `Ctrl-a` then `x`, then run the focused grader:
 

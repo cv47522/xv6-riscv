@@ -28,12 +28,13 @@ For every fixed-width item, too few remaining bytes must produce `memdump: not e
 
 ### What the local grader checks
 
-The two relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 20 points:
+The three relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 25 points:
 
-| Test                                       | Commands                                                                   | Exact positive assertions                                                                                                                                                     | Negative assertions and limits                                                                                                                                                                                                                       |
-| ------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`memdump, examples` (10 points)**        | `memdump`                                                                  | Requires some transcript lines beginning with `61810`, `2025`, `a string`, `another`, `1819438967`, `100`, `z`, `xyzzy`, `hello`, `w`, and `d`.                               | Has no negative regexes. It does not require the example headings, the pointer value, the `o`, `r`, or `l` lines from Example 5, exact lines, adjacency, or the handout's order; unrelated and trailing output can pass.                             |
-| **`memdump, format ii, S, p` (10 points)** | Runs three commands over `abcdefgh12345678\n`: formats `ii`, `S`, and `p`. | Requires some transcript lines beginning with `1684234849`, `1751606885`, `abcdefgh12345678`, and `64636261`. The two decimals are the first two little-endian 4-byte groups. | Does not isolate output by command, reject extra output, exercise `h`, `c`, or `s` directly, check cursor advancement after `p`, or check any short-input failure. Its `p` prefix is the old low-32-bit observation, not the 2026 eight-byte result. |
+| Test                                                              | Commands                                                                                                                | Exact positive assertions                                                                                                                                                                     | Negative assertions and limits                                                                                                                                                                                             |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`memdump, examples` (10 points)**                               | `memdump`                                                                                                               | Requires some transcript lines beginning with `61810`, `2026`, `a string`, `another`, `1819438967`, `100`, `z`, `xyzzy`, `hello`, `w`, and `d`.                                               | Has no negative regexes. It does not require the example headings, the pointer value, the `o`, `r`, or `l` lines from Example 5, exact lines, adjacency, or the handout's order; unrelated and trailing output can pass.   |
+| **`memdump, format ii, S, p` (10 points)**                        | Runs three commands over `abcdefgh12345678\n`: formats `ii`, `S`, and `p`.                                              | Requires some transcript lines beginning with `1684234849`, `1751606885`, `abcdefgh12345678`, and `6867666564636261`. The two decimals are the first two little-endian 4-byte groups, and the hexadecimal value is all eight bytes of `abcdefgh` read as one little-endian 64-bit integer. | Does not isolate output by command, reject extra output, exercise `s` directly, or check cursor advancement after `p`.                                                                                                     |
+| **`memdump, formats h c, bounds checking, usage` (5 points)**     | `echo abcdefgh \| memdump h`, the same input with `c`, `echo a \| memdump i`, `echo abc \| memdump ii`, and `memdump a b c`. | Requires lines beginning `25185` (`0x6261` from `ab`), `a`, and `174285409` (`0x0a636261` from `abc\n`), plus `memdump: not enough data` and `Usage: memdump`. Forbids `2657`, the `0x00000a61` a zero-padding bug would print for `a\n`. | Matches the diagnostic as a substring, so it never checks which format character the message names. It does not exercise the bound on `p`, `s`, or `S`, and the two short-input commands share one transcript.             |
 
 Four mechanics of `assert_lines_match()`, which `Runner.match()` delegates to, explain why those columns are so much weaker than they look:
 
@@ -46,8 +47,8 @@ Four mechanics of `assert_lines_match()`, which `Runner.match()` delegates to, e
 
 [`util-sleep.md`](util-sleep.md#why-two-tests-can-have-the-same-python-function-name) owns the duplicate-name mechanism and its transcript-name side effect.
 
-> [!WARNING]
-> Passing this local grader is not evidence that the 2026 bounds contract is satisfied. The grader contains no short-input assertion, and its `p` expectation conflicts with the current handout.
+> [!NOTE]
+> The 2026 grader closed the two gaps the 2025 script left open: it asserts the full eight-byte `p` value and it requires the not-enough-data diagnostic. What it still cannot prove is that the diagnostic names the _right_ format character, or that `S` stops at the valid-region boundary rather than at a convenient zero byte, because every command it feeds `S` is NUL-terminated within the region.
 
 ## Prerequisites
 
@@ -60,33 +61,22 @@ Four mechanics of `assert_lines_match()`, which `Runner.match()` delegates to, e
 | **Use when checking arrays and strings** | [`C_Array.md`](../../../c-programming/C_Array.md#arrays-in-function-calls) and [`C_String.md`](../../../c-programming/C_String.md#core-concept) | Reviews array decay, separate lengths, embedded character arrays, string pointers, and NUL termination.                            |
 | **Worked comparison**                    | [`byte_memory_functions.c`](../../../c-programming/notes/src/main/memory/byte_memory_functions.c)                                               | Demonstrates exact byte counts, overlap, comparison, and byte inspection in hosted C; its headers and `printf()` are not xv6 APIs. |
 
-## 2025 starter versus 2026 handout
+## How the starter reaches the target
 
-This checkout came from the 2025 lab branch: `labs/util:user/memdump.c` matches the two-argument target introduced by commit `a41453e`, and the current working file still has that interface. The linked 2026 handout has evolved while its boot instructions still name `xv6-labs-2025`.
+![Three argc paths in user memdump.c: five built-in example calls passing sizeof, a standard-input path that reads into a 512-byte buffer and passes n, and a usage error; the first two converge on the still-empty three-argument memdump function](fig/util-memdump-entry-paths.svg)
 
-| Surface                     | This tree and local grader                                                                                            | 2026 handout                                                                                                                                                       |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Function contract**       | `memdump(char *fmt, char *data)` has no valid-byte count.                                                             | `memdump(char *fmt, char *data, int len)` must never read beyond `len`.                                                                                            |
-| **Built-in integer**        | The starter stores 2025, and the grader requires a line beginning with `2025`.                                        | The example stores and prints 2026.                                                                                                                                |
-| **`p` over standard input** | The grader requires a line beginning with `64636261` for input beginning `abcd`, observing only the first four bytes. | With `deadc0de\n` as input and `p` as the format, the program prints `6564306364616564`, the full first eight bytes interpreted as one little-endian 64-bit value. |
-| **Too little input**        | Neither starter interface nor grader communicates how many bytes `read()` supplied.                                   | With `a\n` as input and `i` as the format, the program must report that two input bytes cannot satisfy a four-byte item.                                           |
+_Blue routes the `argc` dispatch, yellow marks a call into the target, pink marks the one input syscall, green marks the buffer holding its bytes, and red marks the failure path. [Edit the Excalidraw source.](fig/util-memdump-entry-paths.excalidraw)_
 
-### How the starter reaches the target
+Six call sites reach the same function, and every one of them now supplies a bound. The five built-in examples pass `sizeof()` applied to the object whose address they are taking, and the standard-input path passes `n` — the byte count the read loop accumulated — rather than the 512-byte capacity of the buffer. The `argc > 2` path never reaches the target function at all.
 
-![Three argc paths in user memdump.c: five built-in example calls, a standard-input path that reads into a 512-byte buffer and computes n, and a usage error; the first two converge on the still-empty two-argument memdump function](fig/util-memdump-entry-paths.svg)
-
-_Blue routes the `argc` dispatch, yellow marks a call into the target, pink marks the one input syscall, green marks the buffer holding its bytes, and red marks the failure path and the missing argument. [Edit the Excalidraw source.](fig/util-memdump-entry-paths.excalidraw)_
-
-The figure is the reconciliation problem in one picture. Six call sites reach the same two-argument function, and only one of them — the standard-input path — ever computes a real byte count. It computes `n` in the read loop and then passes only `data`, so the length is discarded at the very call that had it. The five built-in examples never had a count to lose: each passes the address of an object whose extent the compiler knows and the callee does not.
-
-The note uses the 2026 behavior as the intended contract because that is the exercise requested. Before implementation, the starter declaration, every call site, and the focused grader need to be reconciled as one change; changing only `memdump()` cannot make the old calls supply information they do not have. No such change is made here.
+That distribution is the point worth reading off the figure. `sizeof()` works at each call site because the compiler knows the object's type there; inside `memdump()` the same object is only a `char *`, and `sizeof(data)` would yield the size of a pointer. The extent is knowable exactly once, at the boundary being crossed, which is why it has to travel as an argument. What remains unwritten is the body's use of it: `len` arrives correct and is then ignored until an implementation compares it against each item's width.
 
 ## The code to read first
 
 | Source                                                                         | Contributes                                                                                                                          | Deliberately does not contribute                                           |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
 | **[2026 util handout](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html)** | The six format characters, widths, `len` boundary, diagnostic, and examples.                                                         | A policy for unknown format characters or signed negative values.          |
-| **[`grade-lab-util`](../../grade-lab-util)**                                   | The current public commands, points, regex assertions, and observable blind spots.                                                   | The 2026 bounds checks or full-width `p` result.                           |
+| **[`grade-lab-util`](../../grade-lab-util)**                                   | The current public commands, points, regex assertions, the required diagnostic text, and observable blind spots.                     | Which format character the diagnostic must name, or a bounded `S` case.    |
 | **[`kernel/types.h`](../../kernel/types.h)**                                   | This tree's exact 8-, 16-, 32-, and 64-bit unsigned aliases.                                                                         | Structure offsets, byte order, or a generic formatting routine.            |
 | **[`user/ulib.c`](../../user/ulib.c)**                                         | `memmove()` demonstrates the local `void *` interface followed by byte-pointer traversal.                                            | Typed decoding or formatted output.                                        |
 | **[`user/printf.c`](../../user/printf.c)**                                     | The formatter actually available in xv6, including `%d`, `%c`, `%s`, `%x`, and `%lx`, plus its exact variadic argument expectations. | Memory bounds or the exercise's `i`, `p`, `h`, `c`, `s`, and `S` language. |
@@ -188,7 +178,7 @@ The target is little-endian, so the lowest-address byte contributes the least-si
 | Source value | 32-bit hexadecimal | Bytes at increasing addresses on this target |
 | ------------ | ------------------ | -------------------------------------------- |
 | **61810**    | `0x0000f172`       | `72 f1 00 00`                                |
-| **2025**     | `0x000007e9`       | `e9 07 00 00`                                |
+| **2026**     | `0x000007ea`       | `ea 07 00 00`                                |
 
 The source-level integer values are portable, but these byte sequences depend on the target widths and little-endian byte order. [`pointer_little_endian.c`](../../../c-programming/notes/src/main/pointers/pointer_little_endian.c) demonstrates the same one-object, multiple-width view in the sibling C notes.
 
@@ -272,12 +262,12 @@ The 512-byte capacity matches the established local buffers in `user/cat.c` and 
 > [!IMPORTANT]
 > **Capacity is not content length.** After the read loop, `n` is the number of bytes actually obtained; 512 remains only the maximum.
 
-The old starter's `memset(data, '\0', sizeof(data))` hides that distinction in a way that fails twice:
+The starter's `memset(data, '\0', sizeof(data))` hides that distinction in a way that fails twice:
 
-- **It erases the boundary between input and unused capacity.** Short text looks safely NUL-terminated, so a formatter that only receives the pointer cannot tell where the input stopped.
+- **It erases the boundary between input and unused capacity.** Short text looks safely NUL-terminated, so a formatter that trusted the buffer alone could not tell where the input stopped.
 - **It provides no spare terminator at full capacity.** If input fills all 512 positions, there is no zeroed byte left to stop a NUL-seeking scan.
 
-The explicit `len` in the 2026 contract is what carries the fact the target function actually needs.
+The explicit `len` is what carries the fact the target function actually needs, and the zero fill is why a bug that ignores `len` can still look correct on short input. The grader's forbidden `2657` is exactly that bug: for `a\n` it reads two real bytes plus two zeros from the `memset` and prints `0x00000a61` instead of refusing.
 
 ## Deriving it
 
@@ -296,14 +286,14 @@ The explicit `len` in the 2026 contract is what carries the fact the target func
 
 ### Decisions and evidence
 
-1. **Which contract is being implemented?** Reconcile the two-argument local starter and old grader with the three-argument 2026 handout before coding. Where will each built-in call obtain its exact valid-byte count, and where will the standard-input path pass `n` rather than capacity?
+1. **What does `len` describe at each call site?** The starter now passes `sizeof()` from the five built-in examples and `n` from the standard-input path. For each, state what the number counts: declared object bytes, string bytes including the NUL, or bytes actually delivered by `read()`. Which of the six is the only one that can vary between runs?
 2. **What does one unit of cursor movement mean?** Compare the parameter and local cursor types in `memmove()` with the pointer-arithmetic examples linked above. How many bytes would `char *`, `short *`, `int *`, and `uint64 *` each advance for `+ 1`?
 3. **Which integer types match the contract widths?** Verify the aliases in `kernel/types.h`, then compare them with the variadic types consumed for `%d`, `%x`, and `%lx` in `user/printf.c`. Which conversions require default integer promotion, and which require a full 64-bit argument?
 4. **How will the data position and remaining length stay consistent?** For every fixed-width format row, state the invariant relating bytes consumed, current address, and remaining valid bytes. Which check must be true before any access is attempted?
 5. **What distinguishes `s` from `S`?** Draw the number of pointer hops in Examples 2 and 3. Which format consumes a pointer-sized slot, and which begins with a character byte?
 6. **What ends a direct string?** Compare the 2026 handout's bounded `S` rule with `strlen()` and `%s` in local sources. Which existing functions assume they can keep reading until NUL, and why is that assumption insufficient for a non-NUL-terminated valid region?
 7. **How should an unknown format character behave?** The handout lists supported characters but specifies no diagnostic, cursor movement, or return status for any other byte, and the grader does not test one. Choose and document a conservative policy rather than inventing accidental behavior.
-8. **Which `p` observation is authoritative?** Compare the local `64636261` regex with the 2026 `6564306364616564` example and with `%x` versus `%lx` in `user/printf.c`. Update the grader contract before using a green result as evidence for the requested exercise.
+8. **Which conversion prints all eight bytes of a `p` item?** The grader requires `6867666564636261` for input beginning `abcdefgh`. Compare `%x` with `%lx` in `user/printf.c` and identify which one truncates a 64-bit value to its low 32 bits, and what the truncated line would look like.
 
 ### Traps
 
@@ -320,7 +310,8 @@ The explicit `len` in the 2026 contract is what carries the fact the target func
 | **Assuming a `char` array is aligned and typed for every wider load**     | Character storage has one-byte alignment, while converted wider pointers carry stronger alignment and object-type assumptions. The lab examples are ABI-specific; arbitrary formats can create unaligned positions. | C portability boundary, Makefile target ABI     |
 | **Skipping structure padding by summing source member sizes**             | The compiler's offsets and tail padding determine memory layout; source declarations do not promise a packed byte stream.                                                                                           | Sibling `structure_size_padding_bytes.c`        |
 | **Expecting a stable printed pointer**                                    | Link layout and runtime placement can change the address while every pointer relation remains correct.                                                                                                              | Handout's Example 4 caveat                      |
-| **Trusting the current `p` grader prefix as a 64-bit check**              | It accepts the old low-32-bit prefix and does not verify eight-byte output or cursor advancement.                                                                                                                   | `grade-lab-util`, 2026 handout                  |
+| **Printing a `p` item with `%x` rather than `%lx`**                       | The 64-bit value is truncated to its low 32 bits, so the line begins `64636261` instead of the full `6867666564636261` the grader now requires.                                                                     | `user/printf.c`, `grade-lab-util`               |
+| **Letting the starter's zero fill stand in for a bounds check**           | Short standard input is padded with NUL bytes, so an implementation that ignores `len` reads real zeros and prints a plausible number instead of refusing. The grader forbids exactly that value for `a\n`.          | `user/memdump.c`, `grade-lab-util`              |
 
 ## Verifying it
 
@@ -330,7 +321,7 @@ Before implementation, the untouched placeholder can still be compiled to verify
 make user/_memdump
 ```
 
-After the starter, implementation, and grader agree on the 2026 interface, boot xv6 and exercise every format family plus both bounds outcomes:
+The starter, its declaration, and the grader already agree on the three-argument interface, so the remaining work is entirely inside the body. Boot xv6 and exercise every format family plus both bounds outcomes:
 
 ```text
 $ memdump
@@ -347,7 +338,7 @@ Exit QEMU with `Ctrl-a` then `x`, then run the focused grader:
 ./grade-lab-util memdump
 ```
 
-Read `xv6.out.memdump_examples` after a failure, but remember that both same-named tests save to that path and the later failure can overwrite the earlier transcript. No kernel gdb recipe is useful here because the behavior being derived is user-space object traversal; inspect the generated `user/memdump.asm` only if a target-specific load width or alignment question remains.
+Read `xv6.out.memdump_examples` after a failure, but remember that both same-named tests save to that path and the later failure can overwrite the earlier transcript; the bounds test writes `xv6.out.memdump_corner` instead. No kernel gdb recipe is useful here because the behavior being derived is user-space object traversal; inspect the generated `user/memdump.asm` only if a target-specific load width or alignment question remains.
 
 ## Questions
 
@@ -358,4 +349,4 @@ Read `xv6.out.memdump_examples` after a failure, but remember that both same-nam
 5. **What failure occurs if `echo a | memdump i` performs the four-byte access before comparing the required width with `len`?** Distinguish the invalid memory observation from the diagnostic required afterward.
 6. **What failure occurs if `S` delegates directly to `%s` when the valid region contains no NUL?** Trace the loop for `%s` in `user/printf.c` and identify what tells it to stop.
 7. **Why is a 512-byte array not evidence that 512 bytes were read, and what happens to the old zero-fill argument when all 512 positions contain input?** Follow `n`, `nn`, and the requested count in the starter's read loop.
-8. **Why can the current grader pass a `p` line that is not the 2026 eight-byte value?** Compare the unanchored end of `^64636261`, `assert_lines_match()`, and the full-width handout example.
+8. **Why does the grader forbid a line beginning `2657` when the input is `a\n`?** Convert `0x00000a61` back to bytes, then find where those four bytes come from in the starter's `main()` and explain why printing them is a bounds failure rather than a formatting one.
