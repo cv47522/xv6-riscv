@@ -172,15 +172,15 @@ The raw call takes **two** arguments in this tree: the byte delta, and a mode fr
 
 Everything below `// ulib.c` in `user/user.h` runs entirely in user space. It matters because these do not trap, cannot be traced as system calls, and are linked in from `ULIB` rather than dispatched by the kernel.
 
-| Function                                                | Provided by      | Note                                                                                           |
-| ------------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
-| **`stat`**                                              | `user/ulib.c`    | `open` + `fstat` + `close`. Fails wherever those do.                                           |
-| **`gets`**                                              | `user/ulib.c`    | Reads one line from descriptor 0, one `read()` per character.                                  |
-| **`strcpy`**, **`strcmp`**, **`strlen`**, **`strchr`**  | `user/ulib.c`    | The whole string library. No `strncpy`, no `strdup`, no `snprintf`.                            |
-| **`memset`**, **`memmove`**, **`memcpy`**, **`memcmp`** | `user/ulib.c`    | Compiled with `-fno-builtin-*` so gcc cannot substitute its own.                               |
-| **`atoi`**                                              | `user/ulib.c`    | No error reporting; a non-numeric string yields `0`.                                           |
-| **`printf`**, **`fprintf`**                             | `user/printf.c`  | `fprintf` takes a descriptor, not a `FILE *`. Both are `__attribute__((format(printf, ...)))`. |
-| **`malloc`**, **`free`**                                | `user/umalloc.c` | A free list over `sbrk`. No `calloc`, no `realloc`.                                            |
+| Function                                                | Provided by      | Note                                                                                                                                                                                   |
+| ------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`stat`**                                              | `user/ulib.c`    | `open` + `fstat` + `close`. Fails wherever those do.                                                                                                                                   |
+| **`gets`**                                              | `user/ulib.c`    | Reads one line from descriptor 0, one `read()` per character.                                                                                                                          |
+| **`strcpy`**, **`strcmp`**, **`strlen`**, **`strchr`**  | `user/ulib.c`    | The whole string library. No `strncpy`, no `strdup`, no `snprintf`.                                                                                                                    |
+| **`memset`**, **`memmove`**, **`memcpy`**, **`memcmp`** | `user/ulib.c`    | Compiled with `-fno-builtin-*` so gcc cannot substitute its own.                                                                                                                       |
+| **`atoi`**                                              | `user/ulib.c`    | No error reporting; a non-numeric string yields `0`.                                                                                                                                   |
+| **`printf`**, **`fprintf`**                             | `user/printf.c`  | `fprintf` takes a descriptor, not a `FILE *`. Both are `__attribute__((format(printf, ...)))`. No `puts`, `putchar`, `putc`, or `sprintf` — `putc` is `static` inside `user/printf.c`. |
+| **`malloc`**, **`free`**                                | `user/umalloc.c` | A free list over `sbrk`. No `calloc`, no `realloc`.                                                                                                                                    |
 
 ## Divergences from POSIX
 
@@ -243,7 +243,10 @@ An unrecognized sequence is not an error: the final `else` prints the `%` and th
 | **A slice of a longer string**                | `printf("%.*s", n, p)`    | `write(fd, p, n)` — no precision modifier exists         |
 | **Arbitrary bytes, terminated or not**        | `fwrite(p, 1, n, stdout)` | `write(fd, p, n)` — there is no `fwrite` and no `FILE *` |
 
-`write()` is also the cheaper call by a wide margin. `putc()` in `user/printf.c` is one `write()` syscall per character, so `printf` emitting an _n_-byte string costs _n_ traps; `write(fd, p, n)` costs one. [`user/ex1copy.c`](../user/ex1copy.c) and [`user/cat.c`](../user/cat.c) both move whole buffers this way.
+`write()` is also the cheaper call by a wide margin, and the saving is on both sides of the trap. `putc()` in `user/printf.c` is one `write()` syscall per character, so any per-character loop — `printf("%c", p[i])` included — costs _n_ traps where `write(fd, p, n)` costs one. Inside the kernel, `consolewrite()` in `kernel/console.c` batches through a 32-byte buffer, so one 512-byte write crosses to the UART in 16 batches rather than 512 single-byte copies. [`user/ex1copy.c`](../user/ex1copy.c) and [`user/cat.c`](../user/cat.c) both move whole buffers this way.
+
+> [!NOTE]
+> A counted `printf("%c", p[i])` loop is **correct** — its bound is the loop counter, not a terminator, and `putc()` emits a zero byte faithfully. It is a cost choice, not a correctness one. `puts()` is the option that does not exist here at all, and hosted `puts` would be unusable anyway: it stops at a NUL, exactly like `%s`.
 
 ### `exit`, and the host headers
 

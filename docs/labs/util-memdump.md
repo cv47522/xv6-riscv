@@ -28,27 +28,24 @@ For every fixed-width item, too few remaining bytes must produce `memdump: not e
 
 ### What the local grader checks
 
-The three relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 25 points:
+The three relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 25 points. Their matcher has three consequences:
 
-| Test                                                          | Commands                                                                                                                     | Exact positive assertions                                                                                                                                                                                                                                                                  | Negative assertions and limits                                                                                                                                                                                           |
-| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`memdump, examples` (10 points)**                           | `memdump`                                                                                                                    | Requires some transcript lines beginning with `61810`, `2026`, `a string`, `another`, `1819438967`, `100`, `z`, `xyzzy`, `hello`, `w`, and `d`.                                                                                                                                            | Has no negative regexes. It does not require the example headings, the pointer value, the `o`, `r`, or `l` lines from Example 5, exact lines, adjacency, or the handout's order; unrelated and trailing output can pass. |
-| **`memdump, format ii, S, p` (10 points)**                    | Runs three commands over `abcdefgh12345678\n`: formats `ii`, `S`, and `p`.                                                   | Requires some transcript lines beginning with `1684234849`, `1751606885`, `abcdefgh12345678`, and `6867666564636261`. The two decimals are the first two little-endian 4-byte groups, and the hexadecimal value is all eight bytes of `abcdefgh` read as one little-endian 64-bit integer. | Does not isolate output by command, reject extra output, exercise `s` directly, or check cursor advancement after `p`.                                                                                                   |
-| **`memdump, formats h c, bounds checking, usage` (5 points)** | `echo abcdefgh \| memdump h`, the same input with `c`, `echo a \| memdump i`, `echo abc \| memdump ii`, and `memdump a b c`. | Requires lines beginning `25185` (`0x6261` from `ab`), `a`, and `174285409` (`0x0a636261` from `abc\n`), plus `memdump: not enough data` and `Usage: memdump`. Forbids `2657`, the `0x00000a61` a zero-padding bug would print for `a\n`.                                                  | Matches the diagnostic as a substring, so it never checks which format character the message names. It does not exercise the bound on `p`, `s`, or `S`, and the two short-input commands share one transcript.           |
+| Matcher behavior                     | Consequence                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Searches one combined transcript** | Each required expression is removed after its first match, so a line cannot be attributed to one command when a test runs several.                                          |
+| **Uses several anchoring strengths** | The first two tests use start-only patterns; the corner test uses exact value patterns, a diagnostic substring, a start-only usage pattern, and one exact negative pattern. |
+| **Checks no ordering**               | Matching output need not follow the handout's sequence, and unrelated output can appear between or after required lines.                                                    |
 
-Four mechanics of `assert_lines_match()`, which `Runner.match()` delegates to, explain why those columns are so much weaker than they look:
+| Exact test                                                    | Commands                                                                                                                     | Assertions                                                                                                                                                                                              | Limits                                                                                                                                        |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`memdump, examples` (10 points)**                           | `memdump`                                                                                                                    | Positive prefixes `^61810`, `^2026`, `^a string`, `^another`, `^1819438967`, `^100`, `^z`, `^xyzzy`, `^hello`, `^w`, and `^d`; no negative expressions.                                                 | Does not require headings, pointer output, `o`, `r`, or `l` from Example 5, exact line endings, adjacency, order, or absence of extra output. |
+| **`memdump, format ii, S, p` (10 points)**                    | Three commands over `abcdefgh12345678\n`, using `ii`, `S`, and `p`.                                                          | Positive prefixes `^1684234849`, `^1751606885`, `^abcdefgh12345678`, and `^6867666564636261`; no negative expressions. The numbers cover two little-endian 4-byte groups and one complete 8-byte group. | Does not isolate commands, reject extra output, exercise lowercase `s`, or check advancement after `p`.                                       |
+| **`memdump, formats h c, bounds checking, usage` (5 points)** | `echo abcdefgh \| memdump h`, the same input with `c`, `echo a \| memdump i`, `echo abc \| memdump ii`, and `memdump a b c`. | Exact positives `^25185$`, `^a$`, and `^174285409$`; diagnostic substring `memdump: not enough data`; usage prefix `^Usage: memdump`; exact negative `^2657$`.                                          | Does not check the format character in the diagnostic, bounds on `p`, `s`, or `S`, or which short-input command produced the diagnostic.      |
 
-| Mechanic                                         | What the grader actually does                                                                          | What it therefore cannot prove                                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| **Walks every line and removes what matches**    | Each regular expression is discarded as soon as it matches somewhere in the transcript.                | That the matching line came from the command under test.           |
-| **Every expression is anchored `^` but not `$`** | Only the start of a line is constrained.                                                               | That the rest of the line is correct, or that the line ends there. |
-| **Order is not checked**                         | Expressions may match in any order, not the order passed to `r.match()`.                               | That the output follows the handout's sequence.                    |
-| **Both tests are named `test_memdump_examples`** | Each decorator registers its wrapper before the second `def` rebinds the module variable, so both run. | Which of the two wrote `xv6.out.memdump_examples` after a failure. |
-
-[`util-sleep.md`](util-sleep.md#why-two-tests-can-have-the-same-python-function-name) owns the duplicate-name mechanism and its transcript-name side effect.
+Both example tests are named `test_memdump_examples`; their decorators register both wrappers before the second definition rebinds the Python name, so both run, but a later failure may overwrite `xv6.out.memdump_examples`. [`util-sleep.md`](util-sleep.md#why-two-tests-can-have-the-same-python-function-name) owns that mechanism.
 
 > [!NOTE]
-> The 2026 grader closed the two gaps the 2025 script left open: it asserts the full eight-byte `p` value and it requires the not-enough-data diagnostic. What it still cannot prove is that the diagnostic names the _right_ format character, or that `S` stops at the valid-region boundary rather than at a convenient zero byte, because every command it feeds `S` is NUL-terminated within the region.
+> The 2026 grader closed two gaps in the 2025 script: it asserts the full eight-byte `p` value and requires the not-enough-data diagnostic. It still cannot prove that the diagnostic names the _right_ format character or that `S` respects `len`, because the starter's zero fill places a convenient NUL immediately beyond the non-NUL-terminated input region.
 
 ## Prerequisites
 
@@ -68,9 +65,10 @@ Four mechanics of `assert_lines_match()`, which `Runner.match()` delegates to, e
 
 _The figure shows the starter as the 2026 lab supplies it, before the body exists. Blue routes the `argc` dispatch, yellow marks a call into the target, pink marks the one input syscall, green marks the buffer holding its bytes, and red marks the failure path. [Edit the Excalidraw source.](fig/util-memdump-entry-paths.excalidraw)_
 
-Six call sites reach the same function, and every one of them now supplies a bound. The five built-in examples pass `sizeof()` applied to the object whose address they are taking, and the standard-input path passes `n` — the byte count the read loop accumulated — rather than the 512-byte capacity of the buffer. The `argc > 2` path never reaches the target function at all.
+> [!IMPORTANT]
+> Each caller supplies the valid extent while it still knows the original object: the five examples pass `sizeof(object)`, standard input passes the accumulated byte count `n`, and the `argc > 2` usage path never calls `memdump()`.
 
-That distribution is the point worth reading off the figure. `sizeof()` works at each call site because the compiler knows the object's type there; inside `memdump()` the same object is only a `char *`, and `sizeof(data)` would yield the size of a pointer. The extent is knowable exactly once, at the boundary being crossed, which is why it has to travel as an argument. Everything the exercise adds is the body's use of that argument: `len` arrives correct from all six call sites and stays inert until each item's width is compared against what remains.
+Inside `memdump()`, `sizeof(data)` would measure only the pointer. The extent must therefore cross the call boundary as `len`, remain paired with the cursor, and justify each access before it occurs.
 
 ## The code to read first
 
@@ -85,20 +83,18 @@ That distribution is the point worth reading off the figure. `sizeof()` works at
 
 Everything else this exercise touches is owned elsewhere and is deliberately not restated here:
 
-| Topic                                            | Owner                                                                                                    |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| **Program layout and `UPROGS`**                  | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)         |
-| **Grading and failed transcripts**               | [`03-lab-workflow.md`](../03-lab-workflow.md#grading)                                                    |
-| **The `read()` return contract**                 | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                            |
-| **What `printf` can and cannot format**          | [`05-syscall-reference.md`](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string)   |
-| **The reusable byte-stream explanation**         | [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter)                              |
-| **Address spaces and user virtual addresses**    | [`book/ch02`](../book/ch02-operating-system-organization.md), [`book/ch03`](../book/ch03-page-tables.md) |
-| **Object representation, pointers, and padding** | The sibling C notes listed under [Prerequisites](#prerequisites)                                         |
+| Topic                                            | Owner                                                                                                     |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Program layout and `UPROGS`**                  | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)          |
+| **Grading and failed transcripts**               | [`03-lab-workflow.md`](../03-lab-workflow.md#grading)                                                     |
+| **The `read()` return contract**                 | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                             |
+| **What `printf` can and cannot format**          | [`05-syscall-reference.md`](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) |
+| **The reusable byte-stream explanation**         | [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter)                               |
+| **Address spaces and user virtual addresses**    | [`book/ch02`](../book/ch02-operating-system-organization.md), [`book/ch03`](../book/ch03-page-tables.md)  |
+| **Object representation, pointers, and padding** | The sibling C notes listed under [Prerequisites](#prerequisites)                                          |
 
 > [!NOTE]
-> No kernel mechanism is part of `memdump()` itself. The built-in examples inspect the process's own objects, and the argument form performs its one input syscall before the target function runs.
-
-The two book chapters above are still placeholders, so this note holds one narrow fact on loan: every address in the examples is a user virtual address inside this process.
+> `memdump()` traverses user-space objects; the argument form finishes all input reads before the target runs. Because the linked book chapters remain placeholders, this note holds one fact on loan: every example address is a user virtual address in this process.
 
 ## `memmove()` as the existing byte walker
 
@@ -134,7 +130,7 @@ memmove(void *vdst, const void *vsrc, int n)
 | **The function receives `n` separately**   | A pointer carries an address and type but not the size of the object or input region it came from. Bounds must travel as separate data after an array argument decays to a pointer. |
 | **Traversal direction depends on overlap** | That branch is specific to copying. `memdump` only observes bytes, so the overlap problem and write cursor are not part of its contract.                                            |
 
-The sibling [`pointer_generic_void.c`](../../../c-programming/notes/src/main/pointers/pointer_generic_void.c) demonstrates why a `void *` cannot be dereferenced or advanced, [`pointer_type_casting.c`](../../../c-programming/notes/src/main/pointers/pointer_type_casting.c) compares `int *` and `char *` views of one object, and [`array_memory.c`](../../../c-programming/notes/src/main/arrays/array_memory.c) shows byte-counting pointer subtraction and contiguous array elements. Those are hosted examples, so their standard-library headers and output functions are not xv6 APIs.
+Hosted sibling examples cover the same facts: [`pointer_generic_void.c`](../../../c-programming/notes/src/main/pointers/pointer_generic_void.c) tests `void *`, [`pointer_type_casting.c`](../../../c-programming/notes/src/main/pointers/pointer_type_casting.c) compares typed views, and [`array_memory.c`](../../../c-programming/notes/src/main/arrays/array_memory.c) shows contiguous bytes. Their headers and output functions are not xv6 APIs.
 
 ## The concept underneath
 
@@ -148,21 +144,15 @@ The sibling [`pointer_generic_void.c`](../../../c-programming/notes/src/main/poi
 
 ### Why `char *data`
 
-`memdump("ii", (char *)a)` looks like one operation but is three, and only the last one is visible in the source:
+`memdump("ii", (char *)a)` crosses three type views without changing the object:
 
-1. **Array decay.** `a`, an array of two `int` objects, becomes an `int *` pointing at `a[0]`.
-2. **The cast.** `(char *)` changes the pointer's type only. The address is preserved and neither integer is converted.
-3. **The byte view.** Standard C permits a character pointer to inspect the byte representation of _any_ object, and `+ 1` on a `char *` advances exactly one byte.
+| Stage           | Pointer view                          | Consequence                                                                                    |
+| --------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Array decay** | `a` becomes an `int *` naming `a[0]`. | The pointer has an address and element type, but no array length.                              |
+| **Cast**        | `(char *)` preserves that address.    | Neither integer nor any stored byte is converted.                                              |
+| **Byte cursor** | The target receives a `char *`.       | A character type may inspect any object's representation, and `+ 1` advances exactly one byte. |
 
-Step 3 is the whole reason for the parameter type: a mixed-width walker needs a cursor whose unit of movement is the same unit the format string counts in.
-
-| Candidate parameter | What it buys                                                            | What it still costs                                                                                            |
-| ------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **`char *`**        | A complete one-byte element type; dereference and arithmetic both work. | Every call site needs an explicit cast, which is why the starter writes `(char *)` five times.                 |
-| **`void *`**        | Conversions from object pointers become implicit at the call boundary.  | `void` is incomplete, so neither `*data` nor `data + n` is defined; a character cursor is still needed inside. |
-| **`const char *`**  | Expresses that the function only observes bytes.                        | Not what the supplied target declares, so adopting it changes the starter's interface.                         |
-
-`memmove()` in [`user/ulib.c`](../../user/ulib.c) resolves this exact tension in two stages, taking `void *` publicly and converting once to `char *` internally.
+A mixed-width walker therefore uses the same one-byte unit that the format widths and `len` count. `memmove()` takes `void *` publicly for convenient calls, then obtains the required character cursor internally; the supplied `memdump()` interface exposes that cursor directly.
 
 ### Values, representations, and byte order
 
@@ -204,22 +194,18 @@ flowchart LR
 
 _Blue marks address routing or pointer storage, green marks character data, and every arrow is one pointer relationship. The later layout figure adds yellow for numeric fields and red for bytes the examples do not consume._
 
-The `char **` label on the middle arrow is the whole of the type question, and it follows from what a pointer type declares. `data` is already a `char *`, so dereferencing it yields one character — the wrong width and the wrong meaning, because the item here is eight bytes, not one. A type that says "the thing at this address is a `char *`" is by construction a pointer to `char *`, written `char **`. One dereference of that view produces the stored address; a second reaches the characters. `S` needs none of this because its item _is_ the characters.
+Because `data` has type `char *`, dereferencing it directly yields one `char`. To describe a slot that instead contains a `char *`, the same address needs the type "pointer to `char *`": `char **`. One dereference then loads the stored address, and the next reaches a character.
 
-| Expression level                   | Type      | What it denotes                                    |
-| ---------------------------------- | --------- | -------------------------------------------------- |
-| **The cursor**                     | `char *`  | The address of the first byte of the pointer slot. |
-| **The cursor, viewed as the slot** | `char **` | The same address, now typed as holding an address. |
-| **One dereference of that view**   | `char *`  | The stored address, which leads out of the region. |
-| **Two dereferences**               | `char`    | The first character of the string being printed.   |
+> [!IMPORTANT]
+> A cast changes the compiler's interpretation of an address, not the bytes in memory. The same eight bytes can therefore be one stored pointer under `s` or eight character items under `cccccccc`.
 
-Nothing in memory changes between rows one and two. A cast rewrites only the compiler's opinion of what lives at the address, which is why the same bytes can be one item under `s` and eight separate items under `cccccccc`.
+| Format and argument | What `data` initially names                            | Interpretation and outcome                                                                                               |
+| ------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **`S` with `s`**    | The direct bytes `61 6e 6f 74 68 65 72 00`.            | Reads characters in place through NUL or `len`.                                                                          |
+| **`s` with `&s`**   | An eight-byte slot holding the address of `"another"`. | Viewing that slot as `char **` and dereferencing once produces the stored `char *`; following it reaches the characters. |
+| **`s` with `s`**    | The first eight characters of `"another"`.             | Reinterprets those letters as a fabricated address, which may be unmapped.                                               |
 
-In Example 3, `s` is a pointer variable whose value is the address of the literal `"another"`. Passing `s` would make `data` point directly at the character bytes `61 6e 6f 74 68 65 72 00`. The `s` format does not describe direct string bytes; it describes an eight-byte pointer value stored in the data region. Passing `&s` therefore makes the next eight bytes be the representation of that pointer variable, and the stored address leads to the literal.
-
-If `s` itself were passed for the lowercase format, the first eight letters would be reinterpreted as an address and then followed. That invented address is not the address of `"another"` and may be unmapped. Uppercase `S` is the direct-byte format for the region that begins with the first character.
-
-Conceptually, the lowercase case has two levels: `data` points to a pointer slot, and the value in that slot points to the string. The sibling [`pointer_to_pointer_lifecycle.c`](../../../c-programming/notes/src/main/strings/pointer_to_pointer_lifecycle.c) visualizes the same distinction between storage for a pointer and the row of characters it reaches.
+Lowercase `s` thus consumes a pointer-sized slot and follows one stored address; uppercase `S` starts at a character byte and follows no pointer. [`pointer_to_pointer_lifecycle.c`](../../../c-programming/notes/src/main/strings/pointer_to_pointer_lifecycle.c) visualizes the same separation between pointer storage and the character row it reaches.
 
 ### Structure layout
 
@@ -238,14 +224,14 @@ The declaration-to-offset mapping is implementation-defined, not a universal ser
 
 ### Array initialization
 
-| Form                                            | Valid? | Reason                                                                                                 |
-| ----------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------ |
-| **Initializer inside the structure type body**  | No     | The body defines a reusable type and member layout; it does not create one particular `bytes` object.  |
-| **`example.bytes = "xyzzy"` after declaration** | No     | An array is not a modifiable assignment target.                                                        |
-| **Copy into `example.bytes`**                   | Yes    | `strcpy` writes the literal's six bytes, including its NUL, into the already allocated embedded array. |
-| **Aggregate initialization of `example`**       | Yes    | The object declaration may initialize its pointer, integers, character, and embedded array together.   |
+| Form                                            | Valid? | Effect                                                                                  |
+| ----------------------------------------------- | ------ | --------------------------------------------------------------------------------------- |
+| **Initializer inside the structure type body**  | No     | A type body defines layout, not an object to initialize.                                |
+| **`example.bytes = "xyzzy"` after declaration** | No     | An array is not a modifiable assignment target.                                         |
+| **`strcpy(example.bytes, "xyzzy")`**            | Yes    | Writes six bytes, including NUL, but leaves the final two array elements indeterminate. |
+| **Aggregate initialization**                    | Yes    | Initializes the whole object and zeroes those two trailing array elements.              |
 
-Aggregate initialization is an alternative way to set up the starter example, not part of the `memdump` contract. It would also zero the two array elements after the string's NUL, whereas the current declaration followed by `strcpy` leaves those two elements indeterminate. The sibling [`array_basic.c`](../../../c-programming/notes/src/main/arrays/array_basic.c) shows character-array initialization at declaration, and [`student.c`](../../../c-programming/notes/src/main/structures/student.c) explains why structures can be assigned while arrays cannot.
+Initialization is starter context, not part of the `memdump` contract. [`array_basic.c`](../../../c-programming/notes/src/main/arrays/array_basic.c) and [`student.c`](../../../c-programming/notes/src/main/structures/student.c) own the general array and structure rules.
 
 ### The five starter layouts
 
@@ -264,67 +250,57 @@ Those five `c` items cross a member boundary: four come from `num1` (`w`, `o`, `
 
 ### Why 512 bytes
 
-| Quantity                       | What it means                                                                                                | What it does not prove                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| **`sizeof(data) == 512`**      | The automatic array can hold at most 512 bytes without allocation.                                           | That 512 bytes were read, that the input is a string, or that one byte remains for NUL. |
-| **`n` after the read loop**    | The number of input bytes actually obtained and therefore the valid extent to pass to the bounded formatter. | That a NUL occurs inside those bytes.                                                   |
-| **Filesystem block size 1024** | The disk block constant in [`kernel/fs.h`](../../kernel/fs.h).                                               | A required buffer size for `read()` or for this exercise.                               |
+| Quantity                    | What it establishes                        | What remains unknown                                                                 |
+| --------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
+| **`sizeof(data) == 512`**   | Maximum buffer capacity.                   | How many bytes were read, whether they form a string, or whether a spare NUL exists. |
+| **`n` after the read loop** | Valid input extent to pass to `memdump()`. | Whether a NUL occurs within that extent.                                             |
 
-The 512-byte capacity matches the established local buffers in `user/cat.c` and `user/wc.c`, but it is a convention rather than a filesystem or syscall requirement. `read()` accepts any nonnegative requested count that fits its interface.
+The 512-byte capacity follows `user/cat.c` and `user/wc.c`; it is a convention, not a `read()` or 1024-byte filesystem-block requirement from [`kernel/fs.h`](../../kernel/fs.h).
 
-> [!IMPORTANT]
-> **Capacity is not content length.** After the read loop, `n` is the number of bytes actually obtained; 512 remains only the maximum.
-
-The starter's `memset(data, '\0', sizeof(data))` hides that distinction in a way that fails twice:
-
-- **It erases the boundary between input and unused capacity.** Short text looks safely NUL-terminated, so a formatter that trusted the buffer alone could not tell where the input stopped.
-- **It provides no spare terminator at full capacity.** If input fills all 512 positions, there is no zeroed byte left to stop a NUL-seeking scan.
-
-The explicit `len` is what carries the fact the target function actually needs, and the zero fill is why a bug that ignores `len` can still look correct on short input. The grader's forbidden `2657` is exactly that bug: for `a\n` it reads two real bytes plus two zeros from the `memset` and prints `0x00000a61` instead of refusing.
+> [!WARNING]
+> Zero fill cannot replace `len`: short input gains plausible padding that hides overreads, while a full 512-byte input leaves no spare terminator. For `a\n`, ignoring `n == 2` reads two padded zeros and prints the grader's forbidden `2657` (`0x00000a61`) instead of refusing.
 
 ## Deriving it
 
 ### Contract
 
-| Concern             | Contract to preserve                                                                                                                                        |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Inputs**          | A NUL-terminated format string, the first address of a byte region, and, for the 2026 exercise, the count of valid bytes in that region.                    |
-| **Format state**    | Each recognized character describes the item beginning at the current data position; format traversal ends at the format string's NUL.                      |
-| **Data state**      | Fixed-width items consume their documented widths. The current position and remaining valid length must continue to describe the same suffix of the region. |
-| **Bounds**          | No load, string scan, or print may inspect a byte outside the valid region. A short fixed-width item prints the exact diagnostic and ends the dump.         |
-| **Indirect string** | `s` consumes one stored 64-bit pointer and prints the C string reached through it; the handout does not define validation of the pointed-to string itself.  |
-| **Direct string**   | `S` reads from the current region directly and stops at its NUL or the valid-region boundary, whichever occurs first.                                       |
-| **Output**          | Each described value appears in the representation required by its format character. Pointer addresses are runtime-dependent.                               |
-| **Environment**     | Only declarations in `user/user.h` and local integer aliases are available; there is no host C library.                                                     |
+| Concern                    | Contract to preserve                                                                                                                                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inputs**                 | A NUL-terminated format, the first byte of a region, and its valid byte count.                                                                                                                                    |
+| **State**                  | Each recognized format character describes the current cursor. Fixed-width items advance the cursor and reduce the remaining length by the same width; continuation after `S` finds NUL needs an explicit policy. |
+| **Bounds**                 | No access that decodes an item from the region may inspect beyond it. A short fixed-width item prints the exact diagnostic and ends the dump.                                                                     |
+| **`s`**                    | Bounds-checks and consumes one stored 64-bit pointer, then follows it; the handout neither validates that address nor bounds the separate string it names.                                                        |
+| **`S`**                    | Reads the current region directly through its first NUL or the valid boundary, whichever comes first.                                                                                                             |
+| **Output and environment** | Values use the required representations, runtime pointer values may vary, and only `user/user.h` plus local integer aliases are available.                                                                        |
 
 ### Decisions and evidence
 
-1. **What does `len` describe at each call site?** The starter now passes `sizeof()` from the five built-in examples and `n` from the standard-input path. For each, state what the number counts: declared object bytes, string bytes including the NUL, or bytes actually delivered by `read()`. Which of the six is the only one that can vary between runs?
-2. **What does one unit of cursor movement mean?** Compare the parameter and local cursor types in `memmove()` with the pointer-arithmetic examples linked above. How many bytes would `char *`, `short *`, `int *`, and `uint64 *` each advance for `+ 1`?
-3. **Which integer types match the contract widths?** Verify the aliases in `kernel/types.h`, then compare them with the variadic types consumed for `%d`, `%x`, and `%lx` in `user/printf.c`. Which conversions require default integer promotion, and which require a full 64-bit argument?
-4. **How will the data position and remaining length stay consistent?** For every fixed-width format row, state the invariant relating bytes consumed, current address, and remaining valid bytes. Which check must be true before any access is attempted?
-5. **What distinguishes `s` from `S`?** Draw the number of pointer hops in Examples 2 and 3. Which format consumes a pointer-sized slot, and which begins with a character byte?
-6. **What ends a direct string?** Compare the 2026 handout's bounded `S` rule with `strlen()` and `%s` in local sources. Which existing functions assume they can keep reading until NUL, and why is that assumption insufficient for a non-NUL-terminated valid region? Then search `user/user.h` and `user/printf.c` for anything that accepts an explicit byte count instead; [`05-syscall-reference.md`](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) lists every conversion this tree implements and what hosted C offers that it does not.
-7. **How should an unknown format character behave?** The handout lists supported characters but specifies no diagnostic, cursor movement, or return status for any other byte, and the grader does not test one. Choose and document a conservative policy rather than inventing accidental behavior.
-8. **Which conversion prints all eight bytes of a `p` item?** The grader requires `6867666564636261` for input beginning `abcdefgh`. Compare `%x` with `%lx` in `user/printf.c` and identify which one truncates a 64-bit value to its low 32 bits, and what the truncated line would look like.
+| Decision to derive           | Evidence to consult                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What each `len` counts**   | Classify the five `sizeof()` arguments and variable `n` as declared object bytes, string bytes including NUL, or bytes returned by `read()`.                                                                                                                                                                                                                                 |
+| **Cursor unit**              | Compare `char *`, `short *`, `int *`, and `uint64 *` increments with `memmove()` and the pointer-arithmetic examples.                                                                                                                                                                                                                                                        |
+| **Load and variadic types**  | Match `kernel/types.h` widths to `%d`, `%x`, and `%lx` consumption in `user/printf.c`, including default promotions.                                                                                                                                                                                                                                                         |
+| **Signed decimal policy**    | The handout fixes the widths of `i` and `h` but not how negative bit patterns are interpreted; compare the choice recorded in `user/memdump.c` with the unsigned aliases.                                                                                                                                                                                                    |
+| **State invariant**          | For each fixed width, relate bytes consumed, cursor movement, remaining length, and the check required before access.                                                                                                                                                                                                                                                        |
+| **String path and boundary** | Contrast the pointer hop for `s` with direct bounded `S`; verify why local `strlen()` and `%s` cannot enforce `len`, then search `user/user.h` and `user/printf.c` for an output primitive with an explicit byte count. [`05-syscall-reference.md`](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) records the missing hosted-C alternatives. |
+| **`S` continuation policy**  | The handout calls `S` "the rest," and the grader never follows an in-region NUL with another directive; decide whether continuation is meaningful and, if so, whether the NUL is consumed.                                                                                                                                                                                   |
+| **Unknown format policy**    | The handout and grader specify no diagnostic, movement, or status; choose and record a conservative behavior.                                                                                                                                                                                                                                                                |
+| **Complete `p` output**      | Compare `%x` with `%lx` in `user/printf.c`; derive which conversion preserves the required `6867666564636261` and what the truncated line would be.                                                                                                                                                                                                                          |
 
 ### Traps
 
-| Trap                                                                      | Why it fails                                                                                                                                                                                                        | Source that exposes it                          |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| **Treating `fmt` as a `printf` format string**                            | The lab language uses bare `i`, `p`, `h`, `c`, `s`, and `S`; local `printf` expects `%` conversions and reads variadic arguments rather than the memory region.                                                     | Handout, `user/printf.c`                        |
-| **Passing `s` instead of `&s` for lowercase `s`**                         | The data region then begins with character bytes, not a stored pointer, so those letters become a fabricated address.                                                                                               | `user/memdump.c`, layout figure                 |
-| **Treating lowercase `s` and uppercase `S` alike**                        | One requires an indirect pointer hop and consumes a fixed pointer slot; the other scans direct bytes under the remaining bound.                                                                                     | 2026 handout                                    |
-| **Using `void *` as the active cursor**                                   | Standard C defines neither dereference nor arithmetic for an incomplete `void` element type.                                                                                                                        | `user/ulib.c`, sibling `pointer_generic_void.c` |
-| **Using one typed cursor for every format**                               | Pointer increments scale by that type, so mixed widths skip or overlap bytes.                                                                                                                                       | Sibling `pointer_arithmetic.c`                  |
-| **Checking bounds after a typed access**                                  | The invalid read has already happened before the diagnostic can run.                                                                                                                                                | 2026 short-input requirement                    |
-| **Calling `strlen()` or printing `%s` before establishing a bounded NUL** | Both local routines continue until a NUL, which may lie beyond `len`. `vprintf()` in `user/printf.c` parses no precision modifier either, so `%.*s` — the hosted C escape hatch — is not available as a fallback.   | `user/ulib.c`, [`05-syscall-reference.md`](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) |
-| **Passing 512 instead of `n` as valid input length**                      | Unread capacity is not input, and a full buffer has no extra byte reserved for a terminator.                                                                                                                        | `read()` contract, starter loop                 |
-| **Assuming a `char` array is aligned and typed for every wider load**     | Character storage has one-byte alignment, while converted wider pointers carry stronger alignment and object-type assumptions. The lab examples are ABI-specific; arbitrary formats can create unaligned positions. | C portability boundary, Makefile target ABI     |
-| **Skipping structure padding by summing source member sizes**             | The compiler's offsets and tail padding determine memory layout; source declarations do not promise a packed byte stream.                                                                                           | Sibling `structure_size_padding_bytes.c`        |
-| **Expecting a stable printed pointer**                                    | Link layout and runtime placement can change the address while every pointer relation remains correct.                                                                                                              | Handout's Example 4 caveat                      |
-| **Printing a `p` item with `%x` rather than `%lx`**                       | The 64-bit value is truncated to its low 32 bits, so the line begins `64636261` instead of the full `6867666564636261` the grader now requires.                                                                     | `user/printf.c`, `grade-lab-util`               |
-| **Letting the starter's zero fill stand in for a bounds check**           | Short standard input is padded with NUL bytes, so an implementation that ignores `len` reads real zeros and prints a plausible number instead of refusing. The grader forbids exactly that value for `a\n`.         | `user/memdump.c`, `grade-lab-util`              |
+| Trap                                             | Failure                                                                                                                                    | Evidence                                                                   |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| **Using `fmt` as a `printf` format**             | Bare lab directives describe memory; `%` conversions consume variadic arguments.                                                           | 2026 handout, `user/printf.c`                                              |
+| **Confusing `s`, `&s`, and `S`**                 | Passing direct characters to lowercase `s` fabricates an address; treating `S` as indirect adds a pointer hop that is not there.           | `user/memdump.c`, layout figure, 2026 handout                              |
+| **Using `void *` or one wider cursor**           | `void *` cannot be dereferenced or advanced in standard C, while wider increments skip bytes in mixed layouts.                             | `user/ulib.c`, sibling `pointer_generic_void.c` and `pointer_arithmetic.c` |
+| **Checking bounds after access**                 | The invalid observation occurs before the diagnostic.                                                                                      | 2026 handout's short-input rule                                            |
+| **Delegating bounded `S` to `strlen()` or `%s`** | Both scan past `len` until NUL, and local `vprintf()` implements no `%.*s` precision.                                                      | `user/ulib.c`, `user/printf.c`, `docs/05-syscall-reference.md`             |
+| **Passing capacity or trusting zero fill**       | Unread bytes are not input; padding hides short overreads, and a full buffer has no spare NUL.                                             | `user/memdump.c`, `docs/05-syscall-reference.md`, `grade-lab-util`         |
+| **Assuming every wider view is portable**        | Character storage may be unaligned for wider types; arbitrary formats can create unaligned positions even though the target examples work. | `C_Pointers.md`, Makefile target ABI                                       |
+| **Ignoring structure padding**                   | Compiler offsets and tail padding, not summed member widths, determine the object representation.                                          | Sibling `structure_size_padding_bytes.c`                                   |
+| **Expecting a stable pointer value**             | Link layout and runtime placement may change the address without changing its relationships.                                               | 2026 handout's Example 4 caveat                                            |
+| **Using `%x` for `p`**                           | The output truncates to `64636261` instead of the required `6867666564636261`.                                                             | `user/printf.c`, `grade-lab-util`                                          |
 
 ## Verifying it
 
@@ -334,7 +310,7 @@ One build covers the starter, the build registration, and the body once it exist
 make user/_memdump
 ```
 
-The starter, its declaration, and the grader already agree on the three-argument interface, so every compile error the exercise can produce is inside the body. Boot xv6 and exercise every format family, both bounds outcomes, and the two behaviors the handout leaves undefined:
+Boot xv6 and exercise every format family, both bounds outcomes, and the handout's unspecified format case:
 
 ```text
 $ memdump
@@ -345,17 +321,14 @@ $ echo abcdefgh | memdump Sc
 $ echo abcdefgh | memdump z
 ```
 
-The first command covers the built-in direct and indirect strings, structure fields, and cross-field character view. The next two expose little-endian integer widths. `echo a | memdump i` must take the specified not-enough-data path, because `echo` supplies `a` plus a newline and no more.
-
-The last two are the cases no grader test reaches:
-
-| Command                       | What it isolates                                                                                                                                                                              |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `echo abcdefgh \| memdump Sc` | A direct string whose nine valid bytes contain no NUL, so only the `len` boundary can stop it. The trailing `c` then reports the shortage, which proves `S` consumed the region and not less. |
-| `echo abcdefgh \| memdump z`  | Whichever policy [decision 7](#decisions-and-evidence) settled on for an undefined format character. Compare the observed behavior against the one recorded in the source.                    |
-
-> [!WARNING]
-> A zero-filled buffer hides bounds bugs rather than causing them. `main()` clears all 512 bytes before reading, so a formatter that ignores `len` reads real zeros instead of faulting, and short input still produces plausible-looking output. Only inputs that reach the boundary — the two above and `echo a | memdump i` — can tell a bounds check from a coincidence.
+| Command                             | Evidence it supplies                                                                                                          |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **`memdump`**                       | Built-in direct and indirect strings, structure fields, and cross-field characters.                                           |
+| **`deadc0de` cases**                | Little-endian mixed widths and the complete 8-byte `p` value.                                                                 |
+| **`echo a \| memdump i`**           | A two-byte input reaches the required short-item diagnostic.                                                                  |
+| **`echo abcdefgh \| memdump Sc`**   | No NUL lies within the nine valid bytes, so `len` must stop `S`; the following `c` must then report a shortage.               |
+| **`echo abcdefgh \| memdump z`**    | The chosen unknown-format policy matches the one recorded in the source.                                                      |
+| **In-region NUL, then a directive** | No starter or grader case covers this path; use a temporary harness only if the source records a continuation policy for `S`. |
 
 Exit QEMU with `Ctrl-a` then `x`, then run the focused grader:
 
@@ -367,11 +340,10 @@ Read `xv6.out.memdump_examples` after a failure, but remember that both same-nam
 
 ## Questions
 
-1. **Why does casting `a` to `char *` preserve its address while changing the meaning of `+ 1`?** Compare array decay in sibling `array_basic.c` with the typed pointer increments in `pointer_type_casting.c`.
-2. **Why is `&s` one pointer level different from `s`, and which eight bytes does lowercase `s` initially consume?** Use Example 3 in the layout figure and the pointer-slot discussion above.
-3. **Why can Example 5 print `world` even though the structure has no character array containing that word?** Convert `num1` and `num2` to little-endian bytes and follow the five `c` directives through offset 12.
-4. **Why does `struct sss` occupy 24 bytes when its declared members total 23?** Check the compiler-verified offsets against the alignment rule in sibling `structure_size_padding_bytes.c`.
-5. **What failure occurs if `echo a | memdump i` performs the four-byte access before comparing the required width with `len`?** Distinguish the invalid memory observation from the diagnostic required afterward.
-6. **What failure occurs if `S` delegates directly to `%s` when the valid region contains no NUL?** Trace the loop for `%s` in `user/printf.c` and identify what tells it to stop.
-7. **Why is a 512-byte array not evidence that 512 bytes were read, and what happens to the old zero-fill argument when all 512 positions contain input?** Follow `n`, `nn`, and the requested count in the starter's read loop.
-8. **Why does the grader forbid a line beginning `2657` when the input is `a\n`?** Convert `0x00000a61` back to bytes, then find where those four bytes come from in the starter's `main()` and explain why printing them is a bounds failure rather than a formatting one.
+1. **Why does casting `a` to `char *` preserve its address but change `+ 1`?** Compare array decay in `array_basic.c` with typed increments in `pointer_type_casting.c`.
+2. **Why does lowercase `s` need `&s`, and which eight bytes does it consume first?** Use Example 3 in the layout figure.
+3. **How can Example 5 produce `world` without a character array containing it?** Follow the little-endian fields through offset 12.
+4. **Why is `struct sss` 24 rather than 23 bytes?** Check the compiler offsets against the alignment rule in `structure_size_padding_bytes.c`.
+5. **What fails if a fixed-width access occurs before its `len` check?** Separate the invalid observation from the later diagnostic.
+6. **What fails if `S` delegates to `%s` without finding a bounded NUL first?** Trace the loop in `user/printf.c` and identify its only stopping condition.
+7. **Why does the grader forbid `2657` for `a\n`, and why would full 512-byte input defeat the same zero-fill assumption?** Follow `n`, the padded bytes, and the lack of a spare terminator.
