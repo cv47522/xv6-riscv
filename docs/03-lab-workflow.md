@@ -10,13 +10,13 @@ Running MIT's [6.1810](https://pdos.csail.mit.edu/6.1810/2026/) labs from this r
 
 ## How labs work here
 
-MIT distributes each lab as a separate branch of `xv6-labs-2026`. The branches are **independent siblings** — `util-2026` is not an ancestor of `syscall`. Each branch contains stock xv6 plus that lab's starter files, grading script, and `#ifdef` guards.
+MIT distributes each lab as a separate branch of `xv6-labs-2026`. The branches are **independent siblings** — `util` is not an ancestor of `syscall`. Each branch contains stock xv6 plus that lab's starter files, grading script, and `#ifdef` guards.
 
 This repository consolidates them: lab starter code is merged into `study` as you reach each lab, and your solutions accumulate on that one branch. The reasoning is in [00-repo-workflow.md](00-repo-workflow.md#why-one-branch-instead-of-one-per-lab).
 
 | Lab         | Branch         | Grading script      | Topic                              |
 | ----------- | -------------- | ------------------- | ---------------------------------- |
-| **util**    | `labs/util-2026` | `grade-lab-util`  | Unix utilities, first system call  |
+| **util**    | `labs/util`    | `grade-lab-util`    | Unix utilities, first system call  |
 | **syscall** | `labs/syscall` | `grade-lab-syscall` | Adding system calls, tracing       |
 | **pgtbl**   | `labs/pgtbl`   | `grade-lab-pgtbl`   | Page tables, superpages            |
 | **traps**   | `labs/traps`   | `grade-lab-traps`   | Trap handling, backtraces, alarms  |
@@ -186,4 +186,7 @@ This matters only if you are submitting to Gradescope as an enrolled student. Fo
 
 The nine 2025 lab branches were cut from xv6 as of 2025-08-25, and `study` tracks a newer upstream. One consequence has already been handled: upstream renamed `kernel/printf.c` to `kernel/printk.c`, so the Makefile's `OBJS_KCSAN` list was retargeted during the util merge. If a future lab merge fails to link with an error about a missing object, check whether upstream renamed the file and update the list the same way.
 
-`labs/util-2026` does not have that problem — it was cut from a later upstream that already uses `printk.c`. Expect the opposite risk from the 2026 branches instead: they carry upstream changes `study` may not have yet, such as `-march=rv64gc`, `-std=gnu99`, and the `conf/lab.mk` prerequisite on every object rule.
+`labs/util` no longer has that problem — it now holds MIT's 2026 branch, cut from a later upstream that already uses `printk.c`. Expect the opposite risk from the 2026 branches instead: they carry upstream changes `study` may not have yet, such as `-march=rv64gc`, `-std=gnu99`, and the `conf/lab.mk` prerequisite on every object rule.
+
+> [!CAUTION]
+> `labs/util` was rewritten in place when the fork moved to 2026, so the branch tip `study` originally merged is **no longer on it**. The 2026 starter and grader were applied to this tree by hand rather than merged, so `git merge labs/util` is not a no-op: the branches meet at `7d01506`, and the merge would bring 14 commits touching 18 files — the lab's own `find`, `findtest.sh`, and `sixfive.txt` alongside upstream work such as deterministic builds, the `nlink` overflow fixes, and an `ialloc`/`iput` race fix. Diff against it to see what is still missing rather than merging blind.

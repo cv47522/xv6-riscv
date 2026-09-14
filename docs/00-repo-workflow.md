@@ -30,7 +30,7 @@ There are two GitHub repositories and three remotes, but only **one working copy
 flowchart LR
     subgraph up["Read-only sources"]
         U["upstream/riscv<br/>mit-pdos/xv6-riscv"]
-        L["labs/util-2026, labs/syscall, ...<br/>cv47522/xv6-labs-2026"]
+        L["labs/util, labs/syscall, ...<br/>cv47522/xv6-labs-2026"]
     end
     subgraph local["Local working copy"]
         R["riscv<br/>pristine mirror"]
@@ -195,10 +195,13 @@ Practical consequences:
 
 The earlier `~/personal/xv6-labs-2025` clone was removed once the GitHub fork was renamed to `xv6-labs-2026`; it held nothing that the fork did not already have. The fork itself must be kept, since it is the only reachable source of lab starter code.
 
-Branch names on the fork carry the year only where two versions exist. `util-2026` and `riscv-2026` are MIT's current publications; plain `util`, `syscall`, `pgtbl`, and the rest are the 2025 branches, kept because `study` already merged from them. To pick up a newly published 2026 lab:
+The fork carries **one branch per lab and no year suffixes**. `util` and `riscv` are MIT's 2026 publications; `syscall`, `pgtbl`, `traps`, `cow`, `lock`, `fs`, `net`, and `mmap` are still their 2025 branches, because MIT has not published 2026 counterparts yet. Each is replaced in place as its 2026 version appears:
 
 ```bash
 cd ~/personal/xv6-labs-2026
 git fetch mit                                     # unproxied network only
-git push origin mit/<labname>:refs/heads/<labname>-2026
+git push --force origin mit/<labname>:refs/heads/<labname>
 ```
+
+> [!WARNING]
+> That push rewrites the branch. It is safe here only because nothing depends on the fork's branch tips: `study` carries its own merge of whatever it took, so the commits it merged stay reachable from `cv47522/xv6-riscv` even after the lab branch moves off them. The 2025 `util` tip `db9a9d8` is the worked example — it was replaced by the 2026 branch and is still reachable from `origin/study`. After any such push, run `git fetch --prune labs` here; the replaced branch arrives as a **forced update**, which is expected rather than a sign of damage.
