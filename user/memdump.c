@@ -2,27 +2,25 @@
 #include "user/user.h"
 #include "kernel/fcntl.h"
 
-
-void memdump(char *fmt, char *data);
-
+void memdump(char *fmt, char *data, int len);
 
 int
 main(int argc, char *argv[])
 {
-  if(argc == 1){
+  if (argc == 1) {
     // Layout: docs/labs/util-memdump.md#the-five-starter-layouts
     printf("Example 1:\n");
-    int a[2] = { 61810, 2025 };
+    int a[2] = {61810, 2026};
     // Byte-view rationale: docs/labs/util-memdump.md#why-char-data
-    memdump("ii", (char*) a);
+    memdump("ii", (char *)a, sizeof(a));
 
     printf("Example 2:\n");
-    memdump("S", "a string");
+    memdump("S", "a string", sizeof("a string"));
 
     printf("Example 3:\n");
     char *s = "another";
     // Pointer-slot rationale: docs/labs/util-memdump.md#why-s-needs-s
-    memdump("s", (char *) &s);
+    memdump("s", (char *)&s, sizeof(s));
 
     // ABI layout: docs/labs/util-memdump.md#structure-layout
     struct sss {
@@ -41,34 +39,34 @@ main(int argc, char *argv[])
     strcpy(example.bytes, "xyzzy");
 
     printf("Example 4:\n");
-    memdump("pihcS", (char*) &example);
+    memdump("pihcS", (char *)&example, sizeof(example));
 
     printf("Example 5:\n");
-    memdump("sccccc", (char*) &example);
-  } else if (argc == 2){
+    memdump("sccccc", (char *)&example, sizeof(example));
+  } else if (argc == 2) {
     // format in argv[1], up to 512 bytes of data from standard input.
     // Capacity rationale: docs/labs/util-memdump.md#why-512-bytes
     char data[512];
     int n = 0;
     memset(data, '\0', sizeof(data));
-    while(n < sizeof(data)){
+    while (n < sizeof(data)) {
       int nn = read(0, data + n, sizeof(data) - n);
-      if(nn <= 0)
+      if (nn <= 0)
         break;
       n += nn;
     }
-    memdump(argv[1], data);
+    memdump(argv[1], data, n);
   } else {
-    printf("Usage: memdump [FORMAT]\n");
-    return 1;
+    printf("Usage: memdump [format]\n");
+    exit(1);
   }
-  return 0;
+  exit(0);
 }
 
 // Cursor-type rationale: docs/labs/util-memdump.md#why-char-data
 void
-memdump(char *fmt, char *data)
+memdump(char *fmt, char *data, int len)
 {
-  // Your code here.
+  // Your code here.  `data` holds `len` valid bytes.
 
 }
