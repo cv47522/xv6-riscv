@@ -26,9 +26,6 @@ The handout defines a number as a sequence of decimal digits separated by charac
 | **Character-at-a-time input** | The handout explicitly suggests one byte per `read`, keeping the parsing problem independent of buffer boundaries.                               |
 | **No input paths**            | With no file arguments the program reads standard input, so `echo 12 30 7 \| sixfive` prints `12` and `30`. The 2025 lab left this unspecified. |
 
-> [!WARNING]
-> The standard-input path is a 2026 requirement that [`user/sixfive.c`](../../user/sixfive.c) does not yet satisfy. Its `main()` rejects `argc < 2` with a usage message, so the `sixfive, stdin and missing file` test fails while the other three sixfive tests pass. Reading standard input is descriptor 0 rather than a fourth `open()`, so the existing `sixfive(int fd, char *name)` helper already accepts the shape needed; what is missing is the `argc < 2` branch that calls it with descriptor 0.
-
 The four relevant tests in [`grade-lab-util`](../../grade-lab-util) are worth 35 points, and each isolates command output from the QEMU transcript and compares the complete ordered line list:
 
 | Test                             | Runs                                                                                                                      | Exact checks                                                                                                                                                                                 | What those checks do not prove                                                           |
@@ -317,7 +314,7 @@ Divisibility means the remainder is zero, and the word “or” is inclusive. Ze
 
 ### Decisions and evidence
 
-1. **Which argument indices are input paths?** Read `main()` in `user/wc.c` and compare the `argc`/`argv` construction in [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#how-command-words-reach-main-via-argcargv). What does `argv[0]` contain, and which grader test requires a second path?
+1. **Which argument indices are input paths?** Read `main()` in `user/wc.c` and compare the `argc`/`argv` construction in [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#how-command-words-reach-main-via-argcargv). What does `argv[0]` contain, which grader test requires a second path, and which descriptor stands in for a path when `argc` is 1?
 2. **What are the three possible `read()` outcomes?** Use the files-and-descriptors table in [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors). Which result contains a byte, which represents EOF, and which represents failure?
 3. **How will one input byte be classified?** Verify the argument order and return contract of `strchr()` in `user/ulib.c`, and keep the exact handout separator string as one string rather than as an array of strings.
 4. **What state distinguishes `6`, `xv6`, and `6th` before their boundary arrives?** Map each byte through the three-class table and the token model above. A digit alone does not prove that the enclosing token is decimal.
@@ -331,6 +328,7 @@ Divisibility means the remainder is zero, and the word “or” is inclusive. Ze
 | Trap                                                                  | Why it fails                                                                                                                                                                                 | Source that exposes it                   |
 | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | **Requiring exactly one path**                                        | Passes the two one-file tests but cannot satisfy the handout's “for each input file” contract; `sixfive_all` is intended to expose this.                                                     | `grade-lab-util`, `user/wc.c`            |
+| **Rejecting a missing path as a usage error**                         | No argument means standard input, not a mistake. A usage message there leaves `echo 12 30 7 \| sixfive` printing nothing, which the 2026 corner test rejects.                                | Handout, `user/cat.c`, `user/wc.c`       |
 | **Treating every nondigit as a separator**                            | Extracts false numbers from `xv6`, `6th`, or `:6`; only the eight allowed bytes are boundaries.                                                                                              | Handout, `README`                        |
 | **Declaring separators as separate strings**                          | `strchr()` expects one NUL-terminated search string and one character, not an array of string pointers.                                                                                      | `user/ulib.c`, `user/user.h`             |
 | **Calling `strchr()` on raw read data**                               | A read buffer is not NUL-terminated, so string search can continue into stale or unrelated bytes. Use `strchr()` on the fixed separator string, with the input byte as the search character. | `user/cat.c`, `user/ulib.c`              |

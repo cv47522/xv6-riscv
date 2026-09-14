@@ -100,9 +100,15 @@ main(int argc, char *argv[])
   // assigns i before its first comparison. Neither variable needs a sentinel.
   int fd, i;
 
+  // Q: Why read descriptor 0 instead of reporting a usage error?
+  // A: The handout defines no-argument invocation as reading standard input,
+  // which the shell has already connected to a pipe or the terminal. cat.c and
+  // wc.c take the same branch, and wc() passes an empty name because there is
+  // no filename to report in a diagnostic.
   if (argc < 2) {
     fprintf(2, "Usage: sixfive FILE1 [FILE2 ...]\n");
-    return 1;
+    sixfive(0, "");
+    return 0;
   }
 
   // Q: Why not declare int i in the for initializer?
