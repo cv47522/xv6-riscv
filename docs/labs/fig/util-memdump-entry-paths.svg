@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 880" width="1440" height="880" role="img" aria-labelledby="title desc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Monaco, monospace">
   <title id="title">How the memdump starter reaches the target function</title>
-  <desc id="desc">The three argc paths in user/memdump.c and the two that call the still-empty memdump function, showing where each call obtains the valid byte count it passes.</desc>
+  <desc id="desc">The three argc paths in user/memdump.c and the two that call the target memdump function, showing where each call obtains the valid byte count it passes.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>
   </defs>
   <rect width="1440" height="880" fill="#ffffff"/>
   <text x="40" y="56" font-size="28" font-weight="600" fill="#1e1e1e"><tspan x="40">How the memdump starter reaches the target function</tspan></text>
-  <text x="40" y="88" font-size="16" fill="#868e96"><tspan x="40">user/memdump.c as it stands in this tree. Only the target function's body is missing.</tspan></text>
+  <text x="40" y="88" font-size="16" fill="#868e96"><tspan x="40">user/memdump.c as the 2026 starter supplies it. Only the target function's body is missing.</tspan></text>
   <rect x="580" y="118" width="280" height="48" rx="8" fill="#f0f0ff" stroke="#6666cc" stroke-width="2"/>
   <text x="720" y="148" font-size="16" text-anchor="middle" fill="#1e1e1e">main(argc, argv)</text>
   <line x1="700" y1="166" x2="258" y2="216" stroke="#6666cc" stroke-width="2" marker-end="url(#arrow)"/>

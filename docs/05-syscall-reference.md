@@ -186,6 +186,8 @@ Everything below `// ulib.c` in `user/user.h` runs entirely in user space. It ma
 
 These are the places where habits from Linux produce code that compiles and then misbehaves, or does not compile at all.
 
+### Open flags
+
 **Open flags have different names and different values.** xv6's are in `kernel/fcntl.h`:
 
 | Meaning          | xv6              | Linux `<fcntl.h>` | Same?                   |
@@ -197,6 +199,8 @@ These are the places where habits from Linux produce code that compiles and then
 | Truncate         | `O_TRUNC` 0x400  | `O_TRUNC` 0x200   | **No** — value          |
 
 `O_CREATE` carries the trailing E that POSIX drops, so a copied-in Linux idiom fails to compile — which is the good outcome. There is no `O_APPEND`, `O_EXCL`, or `O_NONBLOCK`.
+
+### Calls, limits, and error reporting
 
 **Other differences worth holding on to:**
 
@@ -210,6 +214,38 @@ These are the places where habits from Linux produce code that compiles and then
 | **Descriptor limit** | `NOFILE` = 16 per process, `NFILE` = 100 system-wide       | Thousands, tunable with `ulimit`    |
 | **Path limits**      | `MAXPATH` = 128, `DIRSIZ` = 14 per component               | `PATH_MAX` = 4096, `NAME_MAX` = 255 |
 | **Links**            | Hard links only                                            | Hard and symbolic                   |
+
+### `printf` conversions, and the missing bounded string
+
+**`printf` understands thirteen conversions and no modifiers.** `vprintf()` in [`user/printf.c`](../user/printf.c) matches conversion characters directly, one `else if` per spelling. There is no format-flag parser at all, so nothing between the `%` and the conversion character is recognized:
+
+| Accepted              | Reads from the argument list  | Not accepted anywhere              |
+| --------------------- | ----------------------------- | ---------------------------------- |
+| **`%d`**              | `int`                         | Precision — `%.3f`, `%.*s`, `%.8s` |
+| **`%ld`**, **`%lld`** | `uint64`, printed signed      | Field width and padding — `%8d`    |
+| **`%u`**              | `uint32`                      | Flags — `%-5s`, `%+d`, `%05d`      |
+| **`%lu`**, **`%llu`** | `uint64`                      | Any floating point — `%f`, `%e`    |
+| **`%x`**              | `uint32`                      | `%n`, `%o`, `%i`, `%zu`, `%hhd`    |
+| **`%lx`**, **`%llx`** | `uint64`                      |                                    |
+| **`%p`**              | `uint64`, as `0x` + 16 digits |                                    |
+| **`%c`**              | `uint32`, one byte emitted    |                                    |
+| **`%s`**              | `char *`, or `(null)` for 0   |                                    |
+| **`%%`**              | Nothing                       |                                    |
+
+An unrecognized sequence is not an error: the final `else` prints the `%` and the character, "to draw attention". The function's own header comment says it understands only `%d`, `%x`, `%p`, `%c`, and `%s`, which has been stale since the `u`, `l`, and `ll` spellings were added — read the body, not the comment.
+
+> [!IMPORTANT]
+> **There is no bounded string conversion, so printing a counted run of bytes is a `write()`, not a `printf()`.** `%s` is the only string conversion and its loop is `for (; *s; s++)`, which stops at a NUL and nothing else. A region that is not NUL-terminated inside its valid length cannot be printed correctly by any format string this tree implements.
+
+| Printing this                                 | Hosted C would use        | Here                                                     |
+| --------------------------------------------- | ------------------------- | -------------------------------------------------------- |
+| **A real C string, terminator inside buffer** | `printf("%s", p)`         | Same — `%s` is correct whenever the NUL is guaranteed    |
+| **A slice of a longer string**                | `printf("%.*s", n, p)`    | `write(fd, p, n)` — no precision modifier exists         |
+| **Arbitrary bytes, terminated or not**        | `fwrite(p, 1, n, stdout)` | `write(fd, p, n)` — there is no `fwrite` and no `FILE *` |
+
+`write()` is also the cheaper call by a wide margin. `putc()` in `user/printf.c` is one `write()` syscall per character, so `printf` emitting an _n_-byte string costs _n_ traps; `write(fd, p, n)` costs one. [`user/ex1copy.c`](../user/ex1copy.c) and [`user/cat.c`](../user/cat.c) both move whole buffers this way.
+
+### `exit`, and the host headers
 
 > [!WARNING]
 > `exit` is declared `int exit(int)` but is `__attribute__((noreturn))`, so the compiler will treat any code after it as unreachable. Its argument is genuinely delivered: the parent's `wait(&status)` receives it.

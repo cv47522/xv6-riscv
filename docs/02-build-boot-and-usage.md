@@ -67,30 +67,45 @@ $ ls
 ..             1 1 1024
 README         2 2 2441
 findtest.sh    2 3 91
-sixfive.txt    2 4 19
-cat            2 5 35424
-echo           2 6 34336
-forktest       2 7 17312
-grep           2 8 42784
-init           2 9 34800
-kill           2 10 34272
-ln             2 11 34080
-ls             2 12 41552
-mkdir          2 13 34328
-rm             2 14 34312
-sh             2 15 56168
-stressfs       2 16 35184
-usertests      2 17 196904
-grind          2 18 50552
-wc             2 19 36368
-zombie         2 20 33696
-logstress      2 21 36232
-forphan        2 22 35080
-dorphan        2 23 34520
-sync           2 24 33760
-ex1copy        2 25 34560
-memdump        2 26 35664
-console        3 27 0
+sixfive.txt    2 4 82
+sf-empty       2 5 0
+sf-seps        2 6 8
+sf-edge        2 7 40
+sf-good-eof    2 8 2
+sf-bad-eof     2 9 1
+cat            2 10 35408
+echo           2 11 34344
+forktest       2 12 17312
+grep           2 13 42784
+init           2 14 34800
+kill           2 15 34272
+ln             2 16 34080
+ls             2 17 41552
+mkdir          2 18 34328
+rm             2 19 34312
+sh             2 20 56168
+stressfs       2 21 35192
+usertests      2 22 199240
+grind          2 23 50544
+wc             2 24 36368
+zombie         2 25 33680
+logstress      2 26 36216
+forphan        2 27 35080
+dorphan        2 28 34528
+sync           2 29 33768
+ex1copy        2 30 34560
+ex2create      2 31 34304
+ex3fork        2 32 34416
+ex4exec        2 33 33808
+ex5forkexec    2 34 34648
+ex6redirect    2 35 34640
+ex7pipe        2 36 34672
+ex8pipefork    2 37 35408
+ex9ls          2 38 36216
+sleep          2 39 34144
+sixfive        2 40 36704
+memdump        2 41 42776
+console        3 42 0
 ```
 
 The four columns are `name`, `type`, `inode number`, `size in bytes` — see the `printf` in `user/ls.c:49`. The type codes come from `kernel/stat.h`:
@@ -103,7 +118,10 @@ The four columns are `name`, `type`, `inode number`, `size in bytes` — see the
 
 Two things worth noticing. `console` has size 0 because it is a device, not stored data — reads and writes route to `kernel/console.c` instead of the disk. And every one of these files came from `UPROGS` in the Makefile: if a program is not listed there, it never reaches `fs.img`, and the shell reports `exec ... failed` no matter how cleanly it compiled.
 
-`findtest.sh`, `sixfive.txt`, the `sf-*` parser fixtures, and `memdump` are present because `conf/lab.mk` currently selects `LAB=util`. See [03-lab-workflow.md](03-lab-workflow.md).
+`findtest.sh`, `sixfive.txt`, the `sf-*` parser fixtures, `sleep`, `sixfive`, and `memdump` are present because `conf/lab.mk` currently selects `LAB=util`. See [03-lab-workflow.md](03-lab-workflow.md).
+
+> [!NOTE]
+> Sizes in that listing are a snapshot, not constants. Every one of them moves when the compiler, the flags, or a program's own source changes; `memdump` grew from 35664 to 42776 bytes when its body was written. Read the listing for which files exist and what their type codes mean, and run `ls` in the guest for a current size.
 
 ## Keyboard controls
 

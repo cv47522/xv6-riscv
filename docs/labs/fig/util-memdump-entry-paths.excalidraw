@@ -70,11 +70,11 @@
    "locked": false,
    "fontSize": 16,
    "fontFamily": 3,
-   "text": "user/memdump.c as it stands in this tree. Only the target function's body is missing.",
+   "text": "user/memdump.c as the 2026 starter supplies it. Only the target function's body is missing.",
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "user/memdump.c as it stands in this tree. Only the target function's body is missing.",
+   "originalText": "user/memdump.c as the 2026 starter supplies it. Only the target function's body is missing.",
    "lineHeight": 1.25,
    "baseline": 12.8,
    "autoResize": true

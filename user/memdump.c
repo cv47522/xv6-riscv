@@ -2,8 +2,6 @@
 #include "user/user.h"
 #include "kernel/fcntl.h"
 
-// Q: Where imple pipe for example like `$ echo a | memdump i`? How does memdump read `a` from pipe when main() reads `i` from  stdin instead?
-
 void memdump(char *fmt, char *data, int len);
 
 int
@@ -22,7 +20,7 @@ main(int argc, char *argv[])
     printf("Example 3:\n");
     char *s = "another";
     // Pointer-slot rationale: docs/labs/util-memdump.md#why-s-needs-s
-    memdump("s", (char *)&s, sizeof(s)); // Q: Isn't s already of type char*?
+    memdump("s", (char *)&s, sizeof(s));
 
     // ABI layout: docs/labs/util-memdump.md#structure-layout
     struct sss {
@@ -44,7 +42,7 @@ main(int argc, char *argv[])
     memdump("pihcS", (char *)&example, sizeof(example));
 
     printf("Example 5:\n");
-    memdump("sccccc", (char *)&example, sizeof(example)); // Q: Why didn't memdump print example.num*?
+    memdump("sccccc", (char *)&example, sizeof(example));
   } else if (argc == 2) {
     // format in argv[1], up to 512 bytes of data from standard input.
     // Capacity rationale: docs/labs/util-memdump.md#why-512-bytes
@@ -52,12 +50,15 @@ main(int argc, char *argv[])
     int n = 0;
     memset(data, '\0', sizeof(data));
     while (n < sizeof(data)) {
-      // Q: Why keep reading? Doesn't reading once already fill the buffer (provide edge cases)?
+      // read() returns what one call could deliver, not what was asked for:
+      // a pipe hands over whatever the writer has flushed so far. Loop until
+      // it reports 0 (EOF) so a split write still arrives whole.
       int nn = read(0, data + n, sizeof(data) - n); // Read FD 0 (stdin)
       if (nn <= 0)
         break;
       n += nn;
     }
+    // n, not sizeof(data): capacity is not content length.
     memdump(argv[1], data, n);
   } else {
     printf("Usage: memdump [format]\n");
@@ -66,65 +67,133 @@ main(int argc, char *argv[])
   exit(0);
 }
 
+// ---------------------------------------------------------------------------
+//  MEMDUMP: WALKING ONE BOUNDED BYTE REGION
+// ---------------------------------------------------------------------------
+//
+//  `data` is a cursor, not an object. A character pointer is the only kind
+//  allowed to inspect any object's byte representation, and `+ 1` on it
+//  advances exactly one byte -- the same unit `fmt` counts in. `len` has to
+//  travel separately because a pointer carries an address and a type, never
+//  an extent.
+//  Cursor-type rationale: docs/labs/util-memdump.md#why-char-data
+//
+//   Fmt  Width   Bytes at the cursor are read as   Printed with
+//   ---  ------  -------------------------------   ----------------------
+//    i        4  int                               %d
+//    h        2  short                             %d
+//    c        1  char                              %c
+//    p        8  uint64                            %lx
+//    s        8  char *, then followed             %s, after the hop
+//    S   varies  characters, in place              write(), byte-counted
+//
+//  `s` and `S` differ by exactly one dereference:
+//
+//      s:  cursor --> [ 8-byte pointer slot ] --> "text"
+//      S:  cursor --> "text"
+//
+//  Two bounds rules, both of which the grader's short-input cases check:
+//
+//   1. Every fixed-width row compares `left` with the width BEFORE the load.
+//      Checking afterwards is not a check: the invalid read already happened.
+//   2. `S` never scans past `left`. Nothing promises a NUL inside the valid
+//      region, so printf's `%s` -- which stops only at a NUL -- cannot be
+//      used here, and this tree implements no bounded string conversion to
+//      fall back on: docs/05-syscall-reference.md, "printf conversions".
+//
+//  Not specified by the handout, decided here: an unrecognized format
+//  character ends the dump with a diagnostic. Skipping it silently would
+//  leave the cursor describing a different item than the reader expects for
+//  every character that follows.
+// ---------------------------------------------------------------------------
 
-// Cursor-type rationale: docs/labs/util-memdump.md#why-char-data
+// Bytes a format character consumes: 0 for the variable-width 'S', and -1
+// for a character the format language does not define.
+static int
+itemwidth(char f)
+{
+  switch (f) {
+  case 'c':
+    return sizeof(char);
+  case 'h':
+    return sizeof(short);
+  case 'i':
+    return sizeof(int);
+  case 'p':
+    return sizeof(uint64);
+  case 's':
+    // The slot holds a pointer, so size the step by what gets dereferenced
+    // rather than by uint64; the two agree on this ABI but need not.
+    return sizeof(char *);
+  case 'S':
+    return 0;
+  default:
+    return -1;
+  }
+}
+
+// Print the characters at `cur` up to the first NUL or the end of the valid
+// region, whichever comes first, and report how many bytes were consumed.
+static int
+dumpstring(char *cur, int left)
+{
+  int n = 0;
+
+  while (n < left && cur[n] != '\0')
+    n++;
+  // write() takes an explicit count, so the bound cannot be overrun; %s and
+  // strlen() would both keep going until they found a NUL somewhere. It is
+  // also one syscall rather than putc()'s one write() per character.
+  write(1, cur, n);
+  printf("\n");
+  // Consume the terminator too, but only when it is inside the region.
+  return n < left ? n + 1 : n;
+}
+
 void
 memdump(char *fmt, char *data, int len)
 {
-  // Your code here.  `data` holds `len` valid bytes.
-  int i = 0;
-  char *data_ptr = data;
+  char *cur = data;
+  int left = len;
+  int i;
 
-  while (fmt[i] != '\0') {
-    char format = fmt[i];
-    switch (format) {
-      case 'i':
-        if (strlen(data_ptr) < sizeof(uint32)) {
-          printf("Error: Not enough data for 'i' format\n");
-          exit(1);
-        }
-        // Cast to int pointer so that pointer arithmetic works correctly, then dereference to get the int value
-        printf("%d\n", *((uint32 *) data_ptr));
-        data_ptr += sizeof(uint32); // Move the pointer forward by the size of an int
-        break;
-      case 'h':
-        if (strlen(data_ptr) < sizeof(uint16)) {
-          printf("Error: Not enough data for 'h' format\n");
-          exit(1);
-        }
-        printf("%d\n", *((uint16 *) data_ptr));  // Q: Is using nested parenthesis a best practice?
-        data_ptr += sizeof(uint16);
-        break;
-      case 'S':
-        printf("%s\n", data_ptr);
-        break;
-      case 's':
-        if (strlen(data_ptr) < sizeof(char *)) {
-          printf("Error: Not enough data for 's' format\n");
-          exit(1);
-        }
-        printf("%s\n", *((char **) data_ptr)); // Q: Diff between S & s (they look the same to me) // Q: I don't understand why we need to cast w/ char** (draw .excalidraw)?
-        data_ptr += sizeof(char *); // Move the pointer forward by the size of a char pointer
-        break;
-      case 'c':
-        if (strlen(data_ptr) < sizeof(char)) {
-          printf("Error: Not enough data for 'c' format\n");
-          exit(1);
-        }
-        printf("%c\n", *data_ptr); // Q: No need to cast data since it's already a char pointer
-        data_ptr += sizeof(char);
-        break;
-      case 'p':
-        if (strlen(data_ptr) < sizeof(uint64)) {
-          printf("Error: Not enough data for 'p' format\n");
-          exit(1);
-        }
-        printf("%lx\n", *((uint64 *) data_ptr));
-        data_ptr += sizeof(uint64); // Or: data_ptr += sizeof(void *); // Q: Which is better to use here?
-        break;
+  for (i = 0; fmt[i] != '\0'; i++) {
+    int width = itemwidth(fmt[i]);
+
+    if (width < 0) {
+      printf("memdump: unknown format '%c'\n", fmt[i]);
+      return;
+    }
+    if (left < width) {
+      printf("memdump: not enough data for '%c'\n", fmt[i]);
+      return;
     }
 
-    i++;
-  }
+    switch (fmt[i]) {
+    case 'i':
+      printf("%d\n", *(int *)cur);
+      break;
+    case 'h':
+      printf("%d\n", *(short *)cur);
+      break;
+    case 'c':
+      printf("%c\n", *cur);
+      break;
+    case 'p':
+      // %lx, not %x: user/printf.c reads %x as a uint32 and would drop the
+      // high four bytes of the value.
+      printf("%lx\n", *(uint64 *)cur);
+      break;
+    case 's':
+      // One hop. The cursor names the slot; the slot holds the address.
+      printf("%s\n", *(char **)cur);
+      break;
+    case 'S':
+      width = dumpstring(cur, left);
+      break;
+    }
 
+    cur += width;
+    left -= width;
+  }
 }
