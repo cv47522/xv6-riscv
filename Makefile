@@ -352,7 +352,7 @@ UPROGS=\
 	$U/_ex9ls\
 	$U/_sleep\
 	$U/_sixfive\
-
+	$U/_memdump\
 
 
 
@@ -439,7 +439,6 @@ ifeq ($(LAB),util)
 	UEXTRA += user/sf-edge
 	UEXTRA += user/sf-good-eof
 	UEXTRA += user/sf-bad-eof
-	UPROGS += $U/_memdump
 endif
 
 
