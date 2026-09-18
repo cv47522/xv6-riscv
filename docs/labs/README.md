@@ -13,6 +13,8 @@ One note per lab exercise that needed more thinking than typing: what the exerci
 | **[util-sleep.md](util-sleep.md)**     | `util` | `sleep` (easy) — the first system call a program of your own ever makes         |
 | **[util-sixfive.md](util-sixfive.md)** | `util` | `sixfive` (moderate) — streaming decimal tokens across exact file boundaries    |
 | **[util-memdump.md](util-memdump.md)** | `util` | `memdump` (moderate) — typed values, byte views, pointers, and structure layout |
+| **[util-find.md](util-find.md)**       | `util` | `find` — directory records, pathnames, and recursive search                    |
+| **[util-exec.md](util-exec.md)**       | `util` | `exec` — running a command for each matched path with fork/exec/wait            |
 
 ## What belongs here, and what does not
 
