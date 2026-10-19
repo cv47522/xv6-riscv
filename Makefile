@@ -24,7 +24,8 @@
 #  conf/lab.mk optionally sets LAB=NAME. LAB adds -DLAB_NAME/-DSOL_NAME,
 #  selects lab-specific objects and programs, and makes `grade` run
 #  grade-lab-NAME. Edit conf/lab.mk and run `make clean` when switching labs.
-#  The leading `-` lets plain xv6 build when conf/lab.mk is absent.
+#  The leading `-` only tolerates a missing file here; the kernel and usys.S
+#  rules below list it as a prerequisite, so editing it rebuilds those.
 -include conf/lab.mk
 
 # Short aliases used throughout, purely to keep the lists below readable.
@@ -251,13 +252,14 @@ $K/kernel: $(OBJS) $(OBJS_KCSAN) $K/kernel.ld
 # EXTRAFLAG applies KCSAN only to OBJS, excluding OBJS_KCSAN.
 $(OBJS): EXTRAFLAG := $(KCSANFLAG)
 
-# $@ is kernel/foo.o; $< is kernel/foo.c.
-$K/%.o: $K/%.c
+# $@ is kernel/foo.o; $< is kernel/foo.c. Depending on conf/lab.mk rebuilds
+# every object when LAB changes, since LAB_* and SOL_* alter what compiles.
+$K/%.o: $K/%.c conf/lab.mk
 	$(CC) $(CFLAGS) $(EXTRAFLAG) -c -o $@ $<
 
 # Assembly uses minimal flags because it runs without a C environment and must
 # not be optimized or instrumented.
-$K/%.o: $K/%.S
+$K/%.o: $K/%.S conf/lab.mk
 	$(CC) -march=rv64gc -g $(DETFLAGS) -c -o $@ $<
 
 tags: $(OBJS)
@@ -294,7 +296,7 @@ _%: %.o $(ULIB) $U/user.ld
 #
 #  Edit usys.pl, kernel/syscall.h, kernel/syscall.c, and user/user.h when
 #  adding a syscall. usys.S is generated, ignored, and removed by `make clean`.
-$U/usys.S : $U/usys.pl
+$U/usys.S : $U/usys.pl conf/lab.mk
 	perl $U/usys.pl > $U/usys.S
 
 $U/usys.o : $U/usys.S
@@ -366,11 +368,6 @@ UPROGS += \
 	$U/_secret
 endif
 
-ifeq ($(LAB),lock)
-UPROGS += \
-	$U/_stats
-endif
-
 ifeq ($(LAB),traps)
 UPROGS += \
 	$U/_call\
@@ -413,7 +410,8 @@ endif
 ifeq ($(LAB),lock)
 UPROGS += \
 	$U/_kalloctest\
-	$U/_bcachetest
+	$U/_stats\
+	$U/_rwlktest
 endif
 
 ifeq ($(LAB),fs)
@@ -443,6 +441,9 @@ ifeq ($(LAB),util)
 	UEXTRA += user/sf-edge
 	UEXTRA += user/sf-good-eof
 	UEXTRA += user/sf-bad-eof
+endif
+ifeq ($(LAB),syscall)
+	UEXTRA += user/exec.sh
 endif
 
 
@@ -492,6 +493,9 @@ endif
 # The fs lab forces a single core so its filesystem tests are reproducible.
 ifeq ($(LAB),fs)
 CPUS := 1
+endif
+ifeq ($(LAB),lock)
+CPUS := 4
 endif
 
 FWDPORT1 = $(shell expr `id -u` % 5000 + 25999)
@@ -567,7 +571,7 @@ grade:
 # Require a git repo, confirm a non-lab branch, reject tracked changes, and
 # warn that untracked files are excluded. The `study` branch prompts here.
 submit-check:
-	@if ! test -d .git; then \
+	@if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then \
 		echo No .git directory, is this a git repository?; \
 		false; \
 	fi
