@@ -15,7 +15,7 @@ main(int argc, char *argv[])
   }
 
   // atoi() cannot distinguish "0" from invalid text; this lab requires only
-  // the missing-argument diagnostic. See docs/labs/util-sleep.md.
+  // the missing-argument diagnostic. See docs/labs/01-util-sleep.md.
   ticks = atoi(argv[1]);
   pause(ticks);
   return 0;

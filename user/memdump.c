@@ -7,10 +7,10 @@ int
 main(int argc, char *argv[])
 {
   if (argc == 1) {
-    // Layout: docs/labs/util-memdump.md#the-five-starter-layouts
+    // Layout: docs/labs/03-util-memdump.md#the-five-starter-layouts
     printf("Example 1:\n");
     int a[2] = {61810, 2026};
-    // Byte-view rationale: docs/labs/util-memdump.md#why-char-data
+    // Byte-view rationale: docs/labs/03-util-memdump.md#why-char-data
     memdump("ii", (char *)a, sizeof(a));
 
     printf("Example 2:\n");
@@ -18,16 +18,16 @@ main(int argc, char *argv[])
 
     printf("Example 3:\n");
     char *s = "another";
-    // Pointer-slot rationale: docs/labs/util-memdump.md#why-s-needs-s
+    // Pointer-slot rationale: docs/labs/03-util-memdump.md#why-s-needs-s
     memdump("s", (char *)&s, sizeof(s));
 
-    // ABI layout: docs/labs/util-memdump.md#structure-layout
+    // ABI layout: docs/labs/03-util-memdump.md#structure-layout
     struct sss {
       char *ptr;
       int num1;
       short num2;
       char byte;
-      // Initialization: docs/labs/util-memdump.md#array-initialization
+      // Initialization: docs/labs/03-util-memdump.md#array-initialization
       char bytes[8];
     } example;
 
@@ -62,7 +62,7 @@ main(int argc, char *argv[])
 
     printf("Edge 2 (NUL inside len, then another item):\n");
     // Double quotes make string literals, not characters. "a" is a 2-byte array {'a','\0'}.
-    // Quoting rules: docs/labs/util-memdump.md#array-initialization
+    // Quoting rules: docs/labs/03-util-memdump.md#array-initialization
     char split[5] = {'a', 'b', '\0', 'c', 'd'};
     // The terminator is consumed along with the string, or `c` re-reads 'a'.
     // The last byte therefore has to differ from the first, or both outcomes
@@ -87,7 +87,7 @@ main(int argc, char *argv[])
     memdump("S", "", 0);
   } else if (argc == 2) {
     // format in argv[1], up to 512 bytes of data from standard input.
-    // Capacity rationale: docs/labs/util-memdump.md#why-512-bytes
+    // Capacity rationale: docs/labs/03-util-memdump.md#why-512-bytes
     char data[512];
     // Capacity as a signed count, because every other quantity here is one.
     // Comparing `n` against sizeof()'s unsigned type would convert `n` instead.
@@ -121,7 +121,7 @@ main(int argc, char *argv[])
 //  advances exactly one byte -- the same unit `fmt` counts in. `len` has to
 //  travel separately because a pointer carries an address and a type, never
 //  an extent.
-//  Cursor-type rationale: docs/labs/util-memdump.md#why-char-data
+//  Cursor-type rationale: docs/labs/03-util-memdump.md#why-char-data
 //
 //   Fmt  Width   Bytes at the cursor are read as   Printed with
 //   ---  ------  -------------------------------   ----------------------

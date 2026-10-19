@@ -43,4 +43,6 @@ _“Outline of how a trap from user code is handled.” — redrawn from `trap.t
 
 ## Lab connection
 
+- The trap path, trapframe, and `a0`/`a7` register roles are held on loan in [the util `sleep` note](../labs/01-util-sleep.md#the-foundation-a-c-call-that-becomes-a-trap) until this chapter is written; move that material here and leave a link behind.
+
 [ostep]: ../../../operating-system/The_Process_Abstraction.md

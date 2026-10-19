@@ -27,15 +27,15 @@ Check before citing. The clock-tick system call is `pause`, not `sleep` — `sle
 
 `docs/` is strictly owned, and a second explanation of anything is a second thing to keep correct. Link instead of restating.
 
-| Topic                                                  | Owner                             |
-| ------------------------------------------------------ | --------------------------------- |
-| Program mechanics, `UPROGS`, C house style             | `docs/02-build-boot-and-usage.md` |
-| Lab selection, `make grade`, transcripts               | `docs/03-lab-workflow.md`         |
-| System-call signatures and failure modes               | `docs/05-syscall-reference.md`    |
-| `ecall`, `a7`, the stub, ELF, build artifacts          | `docs/06-build-artifacts.md`      |
-| The lecture exercises under `user/`                    | `docs/07-exercises.md`            |
-| Kernel mechanisms, chapter by chapter                  | `docs/book/ch*.md`                |
-| One 6.1810 lab exercise, derivation only               | `docs/labs/<lab>-<exercise>.md`   |
+| Topic                                         | Owner                                |
+| --------------------------------------------- | ------------------------------------ |
+| Program mechanics, `UPROGS`, C house style    | `docs/02-build-boot-and-usage.md`    |
+| Lab selection, `make grade`, transcripts      | `docs/03-lab-workflow.md`            |
+| System-call signatures and failure modes      | `docs/05-syscall-reference.md`       |
+| `ecall`, `a7`, the stub, ELF, build artifacts | `docs/06-build-artifacts.md`         |
+| The lecture exercises under `user/`           | `docs/07-exercises.md`               |
+| Kernel mechanisms, chapter by chapter         | `docs/book/ch*.md`                   |
+| One 6.1810 lab exercise, derivation only      | `docs/labs/<NN>-<lab>-<exercise>.md` |
 
 **Lab notes never contain the solution**, including after the exercise is graded. Every fenced `c` block must be a contiguous, verbatim quotation from an existing non-target source; the exercise's target file gets a contract table, a decision checklist, and a trap table instead. `AGENTS.md` carries the verification rules.
 

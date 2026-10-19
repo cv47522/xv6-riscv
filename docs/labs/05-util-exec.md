@@ -13,13 +13,13 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#exec
 
 ## What the exercise asks for
 
-| Contract             | Required behavior                                                                                              |
-| -------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Input**            | After the start path and sought name, accept `-exec` followed by a command and any of its fixed arguments.     |
-| **Per match**        | Run that command with the matched path as its final argument instead of printing the path.                     |
-| **Process lifetime** | Use `fork` and `exec` for each invocation; the parent uses `wait` so it can continue after the child.          |
-| **Earlier mode**     | Keep the plain `find` behavior described in [`util-find.md`](util-find.md) when no `-exec` request is present. |
-| **Build**            | Extend the same `user/find.c` and `$U/_find` entry; no second guest program or new system call is requested.   |
+| Contract             | Required behavior                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Input**            | After the start path and sought name, accept `-exec` followed by a command and any of its fixed arguments.           |
+| **Per match**        | Run that command with the matched path as its final argument instead of printing the path.                           |
+| **Process lifetime** | Use `fork` and `exec` for each invocation; the parent uses `wait` so it can continue after the child.                |
+| **Earlier mode**     | Keep the plain `find` behavior described in [`04-util-find.md`](04-util-find.md) when no `-exec` request is present. |
+| **Build**            | Extend the same `user/find.c` and `$U/_find` entry; no second guest program or new system call is requested.         |
 
 The handout's wording says “add a `-exec cmd`,” while its actual example is `find . wc -exec echo hi`: `wc` is the sought name, `echo hi` is the command, and the matched `./wc` is appended after `hi`. This is the exercise's syntax, not the host Unix `find -exec ... ;` grammar. [`user/sh.c`](../../user/sh.c) passes `-exec` as an ordinary argument; it does not interpret it.
 
@@ -37,7 +37,7 @@ The script is [`user/findtest.sh`](../../user/findtest.sh), installed as a guest
 
 | When                | Read                                                                                                                                                                                                                                            | Ownership                                                                                                                                             |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Read first**      | [`util-find.md`](util-find.md)                                                                                                                                                                                                                  | The same target file's traversal, matching, path, and directory constraints.                                                                          |
+| **Read first**      | [`04-util-find.md`](04-util-find.md)                                                                                                                                                                                                            | The same target file's traversal, matching, path, and directory constraints.                                                                          |
 | **Read first**      | [`The_Process_Abstraction.md`](../../../operating-system/The_Process_Abstraction.md#7-the-process-api-fork--exec--wait)                                                                                                                         | The sibling study repository's portable fork/exec/wait concept; then compare the actual xv6 example [`user/ex5forkexec.c`](../../user/ex5forkexec.c). |
 | **Read first**      | [`C_Command_Line_Arguments.md`](../../../c-programming/C_Command_Line_Arguments.md#reading-the-arguments)                                                                                                                                       | How argument indices and pointer arrays represent command words.                                                                                      |
 | **Use when needed** | [`book/ch01-operating-system-interfaces.md`](../book/ch01-operating-system-interfaces.md), [`07-exercises.md`](../07-exercises.md#ex5forkexec--the-shells-execution-model), and [`05-syscall-reference.md`](../05-syscall-reference.md#process) | This tree's process mechanism, example behavior, and call contracts.                                                                                  |
@@ -156,7 +156,7 @@ _Pink is the process request, blue chooses or waits, yellow runs the replacement
 | **Form the child's argument vector** | Where do the command name, fixed arguments, matched path, and final null pointer belong under [`sys_exec()`](../../kernel/sysfile.c)'s `MAXARG` boundary?                        |
 | **Keep the search alive**            | Which branch of [`ex5forkexec.c`](../../user/ex5forkexec.c) survives successful `exec`, and which branch can continue visiting later matches?                                    |
 | **Account for one invocation**       | What does [`wait()`](../05-syscall-reference.md#process) return, and how would you handle `fork` failure, `exec` failure, or a child exit without losing the rest of the search? |
-| **Preserve plain search**            | Which observations in [`util-find.md`](util-find.md#what-the-exercise-asks-for) should still hold when there is no `-exec` marker?                                               |
+| **Preserve plain search**            | Which observations in [`04-util-find.md`](04-util-find.md#what-the-exercise-asks-for) should still hold when there is no `-exec` marker?                                         |
 
 | Trap                                                           | Observable consequence                                                                             | Source to inspect                                                                                               |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |

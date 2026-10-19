@@ -20,7 +20,7 @@ enum token_state {
 //
 // Only bytes in " -\r\t\n./," are boundaries. Other nondigits invalidate the
 // entire token, so xv6 does not contribute the number 6. See the full state
-// model in docs/labs/util-sixfive.md.
+// model in docs/labs/02-util-sixfive.md.
 
 static void
 print_if_multiple(int value)

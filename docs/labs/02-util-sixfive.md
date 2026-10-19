@@ -47,7 +47,7 @@ It removes console carriage returns, locates one command and its following marke
 | **Reordered lines**   | Ignored                     | **Fail**        |
 | **Prefix-only match** | Passes                      | **Fail**        |
 
-The duplicate Python function name used by the last two tests does not prevent either from running: their decorators register separate wrappers before the second definition replaces the module variable, the same mechanism explained for the [`sleep` tests](util-sleep.md#why-two-tests-can-have-the-same-python-function-name).
+The duplicate Python function name used by the last two tests does not prevent either from running: their decorators register separate wrappers before the second definition replaces the module variable, the same mechanism explained for the [`sleep` tests](01-util-sleep.md#why-two-tests-can-have-the-same-python-function-name).
 
 The checked fixture [`user/sixfive.txt`](../../user/sixfive.txt) makes several boundaries observable:
 

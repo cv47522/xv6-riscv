@@ -190,4 +190,4 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 - [Build, boot, and basic GDB usage](02-build-boot-and-usage.md#debugging)
 - [Terminology lookup](04-terminology.md)
 - [ELF and build artifacts](06-build-artifacts.md#what-elf-is)
-- [The util `sleep` exercise](labs/util-sleep.md)
+- [The util `sleep` exercise](labs/01-util-sleep.md)

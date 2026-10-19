@@ -8,10 +8,10 @@ int
 main(int argc, char *argv[])
 {
   if (argc == 1) {
-    // Layout: docs/labs/util-memdump.md#the-five-starter-layouts
+    // Layout: docs/labs/03-util-memdump.md#the-five-starter-layouts
     printf("Example 1:\n");
     int a[2] = {61810, 2026};
-    // Byte-view rationale: docs/labs/util-memdump.md#why-char-data
+    // Byte-view rationale: docs/labs/03-util-memdump.md#why-char-data
     memdump("ii", (char *)a, sizeof(a));
 
     printf("Example 2:\n");
@@ -19,16 +19,16 @@ main(int argc, char *argv[])
 
     printf("Example 3:\n");
     char *s = "another";
-    // Pointer-slot rationale: docs/labs/util-memdump.md#why-s-needs-s
+    // Pointer-slot rationale: docs/labs/03-util-memdump.md#why-s-needs-s
     memdump("s", (char *)&s, sizeof(s));
 
-    // ABI layout: docs/labs/util-memdump.md#structure-layout
+    // ABI layout: docs/labs/03-util-memdump.md#structure-layout
     struct sss {
       char *ptr;
       int num1;
       short num2;
       char byte;
-      // Initialization: docs/labs/util-memdump.md#array-initialization
+      // Initialization: docs/labs/03-util-memdump.md#array-initialization
       char bytes[8];
     } example;
 
@@ -61,7 +61,7 @@ main(int argc, char *argv[])
     memdump("S", str2, 7);
   } else if (argc == 2) {
     // format in argv[1], up to 512 bytes of data from standard input.
-    // Capacity rationale: docs/labs/util-memdump.md#why-512-bytes
+    // Capacity rationale: docs/labs/03-util-memdump.md#why-512-bytes
     char data[512];
     int n = 0;
     memset(data, '\0', sizeof(data));

@@ -10,7 +10,7 @@ If the target is empty, ask for the lab and exercise. Do not infer it from `conf
 
 ---
 
-Create `docs/labs/<lab>-<exercise>.md`. Teach enough to derive the exercise, then stop before solution code or pseudocode. Read `AGENTS.md`, `docs/labs/README.md`, and `docs/labs/util-sleep.md` first; they own the detailed style, scope, and no-solution rules.
+Create `docs/labs/<NN>-<lab>-<exercise>.md`. Teach enough to derive the exercise, then stop before solution code or pseudocode. Read `AGENTS.md`, `docs/labs/README.md`, and `docs/labs/01-util-sleep.md` first; they own the detailed style, scope, and no-solution rules.
 
 ## Step 1 - Establish ground truth
 
@@ -34,16 +34,17 @@ Verify every symbol and behavioral claim against this tree. Record meaningful up
 
 ## Step 2 - Define ownership
 
-Name the note `docs/labs/<lab>-<exercise>.md`, using lowercase handout terms. Link shared material to its owner:
+Name the note `docs/labs/<NN>-<lab>-<exercise>.md`, using lowercase handout terms; `<NN>` is the next two-digit position in the `docs/labs/README.md` table. Link shared material to its owner:
 
-| Topic                                        | Owner                             |
-| -------------------------------------------- | --------------------------------- |
-| **Program layout, `UPROGS`, and C style**    | `docs/02-build-boot-and-usage.md` |
-| **Lab selection, grading, and transcripts**  | `docs/03-lab-workflow.md`         |
-| **System-call signatures and failures**      | `docs/05-syscall-reference.md`    |
-| **`ecall`, registers, stubs, and artifacts** | `docs/06-build-artifacts.md`      |
-| **Kernel mechanisms**                        | The matching `docs/book/ch*.md`   |
-| **Terminology**                              | `docs/04-terminology.md`          |
+| Topic                                        | Owner                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Program layout, `UPROGS`, and C style**    | `docs/02-build-boot-and-usage.md`                                                                 |
+| **Lab selection, grading, and transcripts**  | `docs/03-lab-workflow.md`                                                                         |
+| **System-call signatures and failures**      | `docs/05-syscall-reference.md`                                                                    |
+| **`ecall`, registers, stubs, and artifacts** | `docs/06-build-artifacts.md`                                                                      |
+| **Trap path, trapframe, and harts**          | `docs/labs/01-util-sleep.md`, on loan until `docs/book/ch04-traps-and-system-calls.md` is written |
+| **Kernel mechanisms**                        | The matching `docs/book/ch*.md`                                                                   |
+| **Terminology**                              | `docs/04-terminology.md`                                                                          |
 
 When an owning document is still a placeholder, say that the note holds the material temporarily.
 

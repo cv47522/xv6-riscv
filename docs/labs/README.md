@@ -8,13 +8,13 @@
 
 One note per lab exercise that needed more thinking than typing: what the exercise actually asks for, which existing code you have to understand before writing anything, and the decisions the implementation comes down to.
 
-| Note                                   | Lab    | Exercise                                                                        |
-| -------------------------------------- | ------ | ------------------------------------------------------------------------------- |
-| **[util-sleep.md](util-sleep.md)**     | `util` | `sleep` (easy) — the first system call a program of your own ever makes         |
-| **[util-sixfive.md](util-sixfive.md)** | `util` | `sixfive` (moderate) — streaming decimal tokens across exact file boundaries    |
-| **[util-memdump.md](util-memdump.md)** | `util` | `memdump` (moderate) — typed values, byte views, pointers, and structure layout |
-| **[util-find.md](util-find.md)**       | `util` | `find` — directory records, pathnames, and recursive search                    |
-| **[util-exec.md](util-exec.md)**       | `util` | `exec` — running a command for each matched path with fork/exec/wait            |
+| Note                                         | Lab    | Exercise                                                                        |
+| -------------------------------------------- | ------ | ------------------------------------------------------------------------------- |
+| **[01-util-sleep.md](01-util-sleep.md)**     | `util` | `sleep` (easy) — the first system call, and the foundation for later labs       |
+| **[02-util-sixfive.md](02-util-sixfive.md)** | `util` | `sixfive` (moderate) — streaming decimal tokens across exact file boundaries    |
+| **[03-util-memdump.md](03-util-memdump.md)** | `util` | `memdump` (moderate) — typed values, byte views, pointers, and structure layout |
+| **[04-util-find.md](04-util-find.md)**       | `util` | `find` — directory records, pathnames, and recursive search                     |
+| **[05-util-exec.md](05-util-exec.md)**       | `util` | `exec` — running a command for each matched path with fork/exec/wait            |
 
 ## What belongs here, and what does not
 
@@ -33,10 +33,10 @@ The split against the other collections:
 
 ## Writing the next one
 
-Follow the shape of [util-sleep.md](util-sleep.md):
+Follow the shape of [01-util-sleep.md](01-util-sleep.md):
 
 - **Open with what the handout asks**, paraphrased, plus the grader's tests for that exercise, since the tests are the operational definition of "done".
 - **Map prerequisites before the walkthrough.** Separate material to read first from references to consult when needed, and link an owning concept note before individual example files.
-- **Explain only the existing code the exercise forces you to read.** Link out for anything another document already owns; a second explanation of `ecall` is a second thing to keep correct.
+- **Explain only the existing code the exercise forces you to read.** Link out for anything another document already owns; a second explanation of `ecall` is a second thing to keep correct. For the trap path, trapframe, register roles, or harts, link to [the foundation section of 01-util-sleep.md](01-util-sleep.md#the-foundation-a-c-call-that-becomes-a-trap), which holds that material on loan until [ch04](../book/ch04-traps-and-system-calls.md) is written.
 - **Layer dense explanations for scanning.** Lead with the smallest useful callout, table, list, or diagram, then retain nuanced causal detail below it; visual structure must improve retrieval rather than decorate the page.
 - **End with decisions, not code** — a numbered checklist where each item names the file that answers it, then a trap table, then verification commands.

@@ -74,7 +74,7 @@ The documentation visual-readability rules above apply inside `.c` and `.h` comm
 
 ## Lab Notes
 
-`docs/labs/<lab>-<exercise>.md` holds one note per 6.1810 lab exercise that needs deriving rather than transcribing. `docs/prompts/derive-lab-exercise.md` is the procedure; the rules below are what a note has to satisfy however it was produced.
+`docs/labs/<NN>-<lab>-<exercise>.md` holds one note per 6.1810 lab exercise that needs deriving rather than transcribing. `docs/prompts/derive-lab-exercise.md` is the procedure; the rules below are what a note has to satisfy however it was produced.
 
 - **Never write the solution, in any form, including after the exercise is graded.** Every fenced `c` block in a lab note must be a contiguous, verbatim quotation from an existing non-target source and must cite that source. The exercise's target file gets a contract table, a decision checklist, and a trap table instead. The check below catches unmatched lines, but it cannot prove contiguity or exclude a completed solution, so inspect every block manually too:
 
