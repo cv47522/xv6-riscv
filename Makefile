@@ -189,6 +189,10 @@ CFLAGS += -ffreestanding
 #  and host startup files because xv6 supplies both.
 CFLAGS += -fno-common -nostdlib
 
+#  User programs are linked at virtual address 0, so a null pointer can be a
+#  valid address; gcc must not delete null checks or treat *0 as unreachable.
+CFLAGS += -fno-delete-null-pointer-checks
+
 #  -nostdlib does not disable compiler builtins. Disable them explicitly so
 #  gcc neither emits missing libc calls nor bypasses xv6 implementations.
 CFLAGS += -fno-builtin-strncpy -fno-builtin-strncmp -fno-builtin-strlen -fno-builtin-memset
