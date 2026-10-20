@@ -75,7 +75,7 @@ The five intended README results are `6`, `6`, `1810`, `6`, and `1810`: the stan
 | **Read first**                     | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                             | Defines the positive, zero, and negative results from `open()`, `read()`, and `close()` that drive the file lifecycle. |
 | **Use when mapping arguments**     | [`C_Command_Line_Arguments.md`](../../../c-programming/C_Command_Line_Arguments.md#reading-the-arguments) | Reviews why paths start at `argv[1]` and why every access must remain below `argc`.                                    |
 | **Use when checking divisibility** | [`C_Operators.md`](../../../c-programming/C_Operators.md#arithmetic-operators)                            | Reviews remainder and inclusive logical OR without prescribing the scanner around them.                                |
-| **Worked comparison**              | [`count_words.c`](../../../c-programming/notes/src/main/io_streams/file_streams/text_mode/count_words.c)  | Shows persistent token state and an explicit EOF commit in hosted C; its streams and library helpers are not xv6 APIs. |
+| **Worked comparison**              | [`count_words.c`](../../../c-programming/notes/src/main/library/io_streams/file_streams/text_mode/count_words.c)  | Shows persistent token state and an explicit EOF commit in hosted C; its streams and library helpers are not xv6 APIs. |
 
 ## Setup in this tree
 
@@ -138,8 +138,8 @@ Three sibling-repository examples are useful comparisons when working in this pe
 
 | Sibling example                                                                                                                    | Demonstrates                                                                     |
 | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| [`count_words.c`](../../../c-programming/notes/src/main/io_streams/file_streams/text_mode/count_words.c)                           | Persistent token state and an explicit EOF commit.                               |
-| [`search_functions.c`](../../../c-programming/notes/src/main/strings/search_functions.c)                                           | `strchr`'s single-character search, as distinct from delimiter-set tokenization. |
+| [`count_words.c`](../../../c-programming/notes/src/main/library/io_streams/file_streams/text_mode/count_words.c)                           | Persistent token state and an explicit EOF commit.                               |
+| [`search_functions.c`](../../../c-programming/notes/src/main/arrays_and_strings/strings/library_functions/search_functions.c)                                           | `strchr`'s single-character search, as distinct from delimiter-set tokenization. |
 | [`redirect_vs_read.c`](../../../operating-system/codes/src/main/virtualization/cpu-process-api/redirect_family/redirect_vs_read.c) | One `open()`, repeated `read()` calls, and a final zero for EOF.                 |
 
 > [!WARNING]
@@ -379,7 +379,7 @@ Use `SIXFIVE_PROGRAM=sixfive2 ./grade-lab-util sixfive` to run the same contract
 1. **Why does `strchr(" -\r\t\n./,", c)` answer a membership question even though its name means “string character”?** Trace the loop and return values in `user/ulib.c`.
 2. **Why is `xv6` one invalid token rather than the token `xv` followed by the number 6?** Identify which character classes the letters belong to and whether any allowed separator occurs.
 3. **Why must invalid-token state survive later digits?** Walk `xv6.30` through the state model and identify the first real boundary.
-4. **Why can EOF require work even though `read()` returned no byte?** Compare `sf-good-eof` with the explicit EOF commit in the sibling [`count_words.c`](../../../c-programming/notes/src/main/io_streams/file_streams/text_mode/count_words.c).
+4. **Why can EOF require work even though `read()` returned no byte?** Compare `sf-good-eof` with the explicit EOF commit in the sibling [`count_words.c`](../../../c-programming/notes/src/main/library/io_streams/file_streams/text_mode/count_words.c).
 5. **What failure appears if a successful one-byte `read()` is tested correctly but its byte is passed directly to `atoi()`?** Compare the `char` value's type with the function declaration in `user/user.h`.
 6. **What failure appears if a larger buffer is searched with `strchr()` without adding a NUL terminator?** Compare `read()`'s byte-count contract with `strchr()`'s stopping condition in `user/ulib.c`.
 7. **Why does the grader remove carriage returns before comparing output?** Trace the console transcript format and the complete-line comparison in `assert_command_output()`.

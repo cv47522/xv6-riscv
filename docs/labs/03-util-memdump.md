@@ -56,8 +56,8 @@ Both example tests are named `test_memdump_examples`; their decorators register 
 | **Read first**                           | [`C_Custom_Data_Types.md`](../../../c-programming/C_Custom_Data_Types.md#memory-placement-and-portability)                                      | Owns structure member order, alignment, padding, and the portability boundary around object layout.                                                         |
 | **Use when reading memory helpers**      | [`C_Standard_Library.md`](../../../c-programming/C_Standard_Library.md#memory-blocks---stringh-and-stdlibh)                                     | Contrasts byte-counted `memset`, `memcpy`, `memmove`, and `memcmp` with NUL-terminated string operations.                                                   |
 | **Use when checking arrays and strings** | [`C_Array.md`](../../../c-programming/C_Array.md#arrays-in-function-calls) and [`C_String.md`](../../../c-programming/C_String.md#core-concept) | Reviews array decay, separate lengths, embedded character arrays, string pointers, and NUL termination.                                                     |
-| **Worked comparison**                    | [`byte_memory_functions.c`](../../../c-programming/notes/src/main/memory/byte_memory_functions.c)                                               | Demonstrates exact byte counts, overlap, comparison, and byte inspection in hosted C; its headers and `printf()` are not xv6 APIs.                          |
-| **Worked comparison**                    | [`pointer_cast_print_width.c`](../../../c-programming/notes/src/main/pointers/pointer_cast_print_width.c)                                       | Runs this exercise's six read widths against one region in hosted C, including the `char **` hop and counted output; `%.*s` and `fwrite` do not exist here. |
+| **Worked comparison**                    | [`byte_memory_functions.c`](../../../c-programming/notes/src/main/library/standard_library/memory_functions/byte_memory_functions.c)                                               | Demonstrates exact byte counts, overlap, comparison, and byte inspection in hosted C; its headers and `printf()` are not xv6 APIs.                          |
+| **Worked comparison**                    | [`pointer_cast_print_width.c`](../../../c-programming/notes/src/main/pointers/basics/pointer_cast_print_width.c)                                       | Runs this exercise's six read widths against one region in hosted C, including the `char **` hop and counted output; `%.*s` and `fwrite` do not exist here. |
 
 ## How the starter reaches the target
 
@@ -130,7 +130,7 @@ memmove(void *vdst, const void *vsrc, int n)
 | **The function receives `n` separately**   | A pointer carries an address and type but not the size of the object or input region it came from. Bounds must travel as separate data after an array argument decays to a pointer. |
 | **Traversal direction depends on overlap** | That branch is specific to copying. `memdump` only observes bytes, so the overlap problem and write cursor are not part of its contract.                                            |
 
-Hosted sibling examples cover the same facts: [`pointer_generic_void.c`](../../../c-programming/notes/src/main/pointers/pointer_generic_void.c) tests `void *`, [`pointer_type_casting.c`](../../../c-programming/notes/src/main/pointers/pointer_type_casting.c) compares typed views, and [`array_memory.c`](../../../c-programming/notes/src/main/arrays/array_memory.c) shows contiguous bytes. Their headers and output functions are not xv6 APIs.
+Hosted sibling examples cover the same facts: [`pointer_generic_void.c`](../../../c-programming/notes/src/main/pointers/basics/pointer_generic_void.c) tests `void *`, [`pointer_type_casting.c`](../../../c-programming/notes/src/main/pointers/basics/pointer_type_casting.c) compares typed views, and [`array_memory.c`](../../../c-programming/notes/src/main/arrays_and_strings/arrays/array_memory.c) shows contiguous bytes. Their headers and output functions are not xv6 APIs.
 
 ## The concept underneath
 
@@ -172,7 +172,7 @@ The target is little-endian, so the lowest-address byte contributes the least-si
 | **61810**    | `0x0000f172`       | `72 f1 00 00`                                |
 | **2026**     | `0x000007ea`       | `ea 07 00 00`                                |
 
-The source-level integer values are portable, but these byte sequences depend on the target widths and little-endian byte order. [`pointer_little_endian.c`](../../../c-programming/notes/src/main/pointers/pointer_little_endian.c) demonstrates the same one-object, multiple-width view in the sibling C notes.
+The source-level integer values are portable, but these byte sequences depend on the target widths and little-endian byte order. [`pointer_little_endian.c`](../../../c-programming/notes/src/main/pointers/arithmetic/pointer_little_endian.c) demonstrates the same one-object, multiple-width view in the sibling C notes.
 
 ### Why `s` needs `&s`
 
@@ -205,7 +205,7 @@ Because `data` has type `char *`, dereferencing it directly yields one `char`. T
 | **`s` with `&s`**   | An eight-byte slot holding the address of `"another"`. | Viewing that slot as `char **` and dereferencing once produces the stored `char *`; following it reaches the characters. |
 | **`s` with `s`**    | The first eight characters of `"another"`.             | Reinterprets those letters as a fabricated address, which may be unmapped.                                               |
 
-Lowercase `s` thus consumes a pointer-sized slot and follows one stored address; uppercase `S` starts at a character byte and follows no pointer. [`pointer_to_pointer_lifecycle.c`](../../../c-programming/notes/src/main/strings/pointer_to_pointer_lifecycle.c) visualizes the same separation between pointer storage and the character row it reaches.
+Lowercase `s` thus consumes a pointer-sized slot and follows one stored address; uppercase `S` starts at a character byte and follows no pointer. [`pointer_to_pointer_lifecycle.c`](../../../c-programming/notes/src/main/pointers/array_of_pointers/pointer_to_pointer_lifecycle.c) visualizes the same separation between pointer storage and the character row it reaches.
 
 ### Structure layout
 
@@ -220,7 +220,7 @@ The RISC-V compiler lays out the starter's `struct sss` in declaration order wit
 | **15-22** | 8     | `bytes`         | `strcpy` writes `78 79 7a 7a 79 00` for `xyzzy` and its NUL; the final two array bytes remain indeterminate because `example` was not zero-initialized. |
 | **23**    | 1     | Tail padding    | An indeterminate padding byte, not a declared member.                                                                                                   |
 
-The declaration-to-offset mapping is implementation-defined, not a universal serialization format. [`structure_size_padding_bytes.c`](../../../c-programming/notes/src/main/structures/structure_size_padding_bytes.c) owns the longer alignment and padding explanation.
+The declaration-to-offset mapping is implementation-defined, not a universal serialization format. [`structure_size_padding_bytes.c`](../../../c-programming/notes/src/main/custom_data_types/structures/structure_size_padding_bytes.c) owns the longer alignment and padding explanation.
 
 ### Array initialization
 
@@ -232,7 +232,7 @@ The declaration-to-offset mapping is implementation-defined, not a universal ser
 | **Aggregate initialization**                    | Yes    | Initializes the whole object and zeroes those two trailing array elements.                                                                                                                 |
 | **`{"a", "b"}` for a `char` array**             | No     | A brace-wrapped string literal is a valid initializer for the whole array, so the first one consumes it and every later item is an excess element. Character constants take single quotes. |
 
-Initialization is starter context, not part of the `memdump` contract. [`array_basic.c`](../../../c-programming/notes/src/main/arrays/array_basic.c) and [`student.c`](../../../c-programming/notes/src/main/structures/student.c) own the general array and structure rules.
+Initialization is starter context, not part of the `memdump` contract. [`array_basic.c`](../../../c-programming/notes/src/main/arrays_and_strings/arrays/array_basic.c) and [`student.c`](../../../c-programming/notes/src/main/custom_data_types/structures/student.c) own the general array and structure rules.
 
 ### The five starter layouts
 

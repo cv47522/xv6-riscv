@@ -38,7 +38,7 @@ Restructure dense concept sections with compact tables, lists, callouts, and one
 
 **Files:**
 
-- Create: `/home/wahsieh/personal/c-programming/notes/src/main/memory/byte_memory_functions.c`
+- Create: `/home/wahsieh/personal/c-programming/notes/src/main/library/standard_library/memory_functions/byte_memory_functions.c`
 - Modify: `/home/wahsieh/personal/c-programming/C_Standard_Library.md`
 - Modify: `/home/wahsieh/personal/c-programming/C_Pointers.md`
 - Modify: `/home/wahsieh/personal/c-programming/C_Pointer_Arithmetic.md`
