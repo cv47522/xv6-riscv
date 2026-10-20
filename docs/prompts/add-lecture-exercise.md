@@ -40,9 +40,9 @@ Renaming an existing file: use `git mv`, then update `Makefile` `UPROGS`, `docs/
 
 ## Step 3 — Write the comment block
 
-Match `user/ex1copy.c`'s shape. Sections are `// ---` banner rules with an ALL-CAPS title; prose is two-space indented under `//`. Include, in this order, whichever apply:
+Match `user/ex1copy.c`'s shape. Enclose each multiline comment in `/* ... */`, with delimiters on separate lines and ` *` body prefixes; keep `//` for a single-line comment. Sections use dashed banner rules with an ALL-CAPS title, and prose retains its indentation after the body prefix. Include, in this order, whichever apply:
 
-1. **One-line header** — `// ex5forkexec.c: fork() a child, exec() a program in it, wait() for it.`
+1. **Summary line** — `ex5forkexec.c: fork() a child, exec() a program in it, wait() for it.` Put it at the top of the multiline teaching block; use `//` only when the entire comment is one line.
 2. **Provenance** — the lecture it comes from, the upstream URL, and the host `man` page if one exists.
 3. **`RUNNING IT`** — literal transcripts, with the `%` host prompt and `$` guest prompt distinguished. Include the _interesting_ invocations, not just the bare one.
 4. **A diagram** — ASCII, showing the data path or the before/after state. This is usually the highest-value part of the file.
@@ -74,7 +74,7 @@ Before you finish the file, reread the header using only its banners, ALL-CAPS t
 
 ### Constraints that are not style preferences
 
-- **79 columns maximum**, including the `//`. Verify mechanically, never by eye:
+- **79 columns maximum**, including comment delimiters and the ` *` prefix. Verify mechanically, never by eye:
 
     ```bash
     awk 'length > 79 {print FILENAME" "FNR": "length}' user/ex*.c
@@ -83,6 +83,7 @@ Before you finish the file, reread the header using only its banners, ALL-CAPS t
 - **ASCII only.** No box-drawing characters, no typographic quotes, no em dashes. Use `--` and `->`. The comment has to stay readable in `objdump -S` output and in gdb's `layout src`.
 - **Draw diagrams top-to-bottom, not left-to-right.** A vertical flow fits the column budget and matches the order the statements below it execute. A side-by-side before/after is the most common way to blow past 79 columns.
 - **Never end a `//` line with a backslash.** It continues the comment onto the next line and `-Werror=comment` fails the build. This bites ASCII diagrams that use `\` for a diagonal — redraw with `+`, `|`, and `-`.
+- **Never nest block comments or include a literal closing delimiter in their text.** Keep ASCII drawings and quoted syntax valid inside the surrounding block.
 - **Answer the questions the code actually raises.** If a line looks arbitrary — `wait((int *)0)`, a trailing `0` in an argv array, a magic `6` — explain it where it sits. These are the highest-value comments in the file.
 - **Prefer the mechanism over the summary.** "`fdalloc()` scans `p->ofile[]` from 0 and returns the first empty slot" beats "the kernel picks a free descriptor".
 

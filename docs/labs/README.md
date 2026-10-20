@@ -35,8 +35,11 @@ The split against the other collections:
 
 Follow the shape of [01-util-sleep.md](01-util-sleep.md):
 
-- **Open with what the handout asks**, paraphrased, plus the grader's tests for that exercise, since the tests are the operational definition of "done".
+- **Open with one contract**, distinguishing handout requirements from repository conventions, then document what each grader test actually asserts. A passing score may leave part of the contract unchecked; [the sleep note](01-util-sleep.md#what-the-grader-does-not-prove) shows how to record that boundary.
 - **Map prerequisites before the walkthrough.** Separate material to read first from references to consult when needed, and link an owning concept note before individual example files.
 - **Explain only the existing code the exercise forces you to read.** Link out for anything another document already owns; a second explanation of `ecall` is a second thing to keep correct. For the trap path, trapframe, register roles, or harts, link to [the foundation section of 01-util-sleep.md](01-util-sleep.md#the-foundation-a-c-call-that-becomes-a-trap), which holds that material on loan until [ch04](../book/ch04-traps-and-system-calls.md) is written.
 - **Layer dense explanations for scanning.** Lead with the smallest useful callout, table, list, or diagram, then retain nuanced causal detail below it; visual structure must improve retrieval rather than decorate the page.
-- **End with decisions, not code** — a numbered checklist where each item names the file that answers it, then a trap table, then verification commands.
+- **Choose figures by what they teach.** Follow [Lab figure formats](../../AGENTS.md#lab-figure-formats): Mermaid for logical relationships and flow; Excalidraw when manual spatial layout carries meaning. Preserve an effective existing figure rather than converting it for uniformity.
+- **End with decisions, not code** — link back to the contract, give a numbered checklist where each item names the file that answers it, then a trap table and verification commands. Keep optional grader internals beside verification.
+
+Use [derive-lab-exercise.md](../prompts/derive-lab-exercise.md) for the writing procedure and [AGENTS.md](../../AGENTS.md#lab-notes) for the authoritative rules. When revising an existing note, keep its technical evidence and incoming links while consolidating repeated explanations; the sleep note's extra concept loans are not a requirement to repeat that background in every lab.

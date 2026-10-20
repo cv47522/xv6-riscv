@@ -13,7 +13,8 @@ alwaysApply: true
 ## The ones that bite
 
 - **Never hard-wrap Markdown prose.** One continuous line per paragraph, no column limit, and do not reflow paragraphs your change does not touch.
-- **C comments are the opposite: hard limit 79 columns, ASCII only.** Verify with `awk 'length > 79 {print FNR": "length}' <file>`, never by eye. Never end a `//` line with a backslash — `-Werror=comment` fails the build.
+- **Use `/* ... */` for multiline C comments and `//` for single-line comments**, including C examples in Markdown. Put block delimiters on separate lines with ` *` body prefixes. Preserve native comment syntax in other languages and never edit generated artifacts for style; see `AGENTS.md` for the details.
+- **C comments have a hard limit of 79 columns and use ASCII only.** Count delimiters and body prefixes. Verify with `awk 'length > 79 {print FNR": "length}' <file>`, never by eye. Never nest block comments or end a `//` line with a backslash — `-Werror=comment` fails the build.
 - **Never run `make fmt`.** It reformats every file under `kernel/`, `user/`, and `mkfs/`, and turns the next lab merge into a conflict on nearly all of them. Match `.clang-format` by hand: put a top-level function's return type on its own line, then its full signature, then the opening brace.
 - **There is no host C library.** `-ffreestanding -nostdlib`; `user/user.h` is the complete set of functions a user program can call. No `<stdio.h>`, no `EXIT_SUCCESS`, no `FILE *`.
 - **Do not restructure the build or nest `user/` into subdirectories.** Four mechanisms assume the flat layout and three fail silently; the Makefile is merged from the lab branches, so layout changes conflict forever after. The analysis is in `docs/02-build-boot-and-usage.md`.

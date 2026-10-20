@@ -48,18 +48,20 @@ Name the note `docs/labs/<NN>-<lab>-<exercise>.md`, using lowercase handout term
 
 When an owning document is still a placeholder, say that the note holds the material temporarily.
 
+When revising an existing note, inventory its incoming section links, concept loans, figures, and editable figure sources before changing the structure. Map material being shortened to either its retained explanation or a substantive owning document; a placeholder is not a replacement for the explanation.
+
 ## Step 3 - Write the note
 
 Use applicable sections in this order:
 
-1. **What the exercise asks for:** paraphrase the handout and list each relevant grader test, its points, its exact checks, and the limits of what those checks prove.
+1. **What the exercise asks for:** write one contract table distinguishing handout requirements from repository conventions. Separately list each relevant grader test, its points, commands, positive and negative assertions, breakpoints, and evidence limits. Keep regex and harness caveats below the compact test table.
 2. **Prerequisites:** add a compact map that separates material to read first from references to use when needed. Link to the owning xv6 note and, when the concept is already taught in a sibling study repository, link to that top-level note before linking individual example sources. State when a hosted-C example teaches a concept but is not an xv6 API template.
 3. **Naming or setup divergences:** include only differences that would otherwise send readers to a missing symbol.
 4. **The code to read first:** show which existing files contribute what and what each deliberately does not do.
 5. **The key existing function:** quote one contiguous function verbatim, cite its source, and explain its consequential lines and control flow.
 6. **The concept underneath:** use source-backed constants and distinguish observations from guarantees.
-7. **Deriving it:** give a contract table, source-anchored decision questions, and a trap table. Do not prescribe the target program's ordered statements.
-8. **Verifying it:** give the build, guest checks, focused grader command, and a gdb recipe only when kernel behavior is worth observing.
+7. **Deriving it:** link back to the contract, then give source-anchored decision questions and a trap table. Do not repeat the requirements or prescribe the target program's ordered statements.
+8. **Verifying it:** give the build, guest checks, focused grader command, and a gdb recipe only when kernel behavior is worth observing. Keep optional exercise-specific harness internals and troubleshooting here; refer back to the grader evidence limits instead of explaining them again.
 9. **Questions:** provide five to eight source-answerable questions, including at least two failure scenarios.
 
 If an analogy materially helps, state where it stops matching the implementation. Apply all formatting and visual rules from `AGENTS.md` without repeating them here, and apply the scan-layer rule below to every section you write.
@@ -83,7 +85,9 @@ Three rules keep this from degrading into decoration:
 2. **Never inflate a cell.** A table cell or Mermaid node holding a paragraph is a paragraph with borders drawn on it. Move that text below the visual.
 3. **Never decorate what already scans.** A three-line explanation that is already clear needs nothing. Add a visual only when the audit below shows a retrieval failure.
 
-Two diagrams is the working budget. A third is justified only when it carries a relationship the other two do not — for example, one figure for the data layout and a separate one for the program's control flow — and never when it restates a table.
+Apply the diagram budget and [Lab figure formats](../../AGENTS.md#lab-figure-formats) from `AGENTS.md`. For each proposed figure, identify the relationship or spatial arrangement the reader needs to see, choose its format accordingly, and keep detailed values or causal explanations in adjacent tables or prose. Do not convert an effective existing figure merely to match the sleep note.
+
+Apply that section's teaching-label and detail-view rules: define unfamiliar abbreviations before use, make action labels state who does what, and locate the action through source files or enclosing groups. When a retained Excalidraw drawing adds detail, link its SVG and editable source beside the overview and explain what the reader will find there.
 
 **The scan audit.** Before finishing, reread the note using _only_ headings, bolded terms, callouts, tables, lists, diagrams, and code blocks. A reader skipping every prose sentence must still be able to locate:
 
@@ -97,6 +101,13 @@ Two diagrams is the working budget. A third is justified only when it carries a 
 
 Each item that cannot be found is a retrieval problem: fix that section, and leave the ones that passed alone.
 
+### Step 3b - Check ownership and repetition
+
+- Locate the single contract and the single account of grader assertions and limits. Replace repeated versions with links while retaining context needed at the point of use.
+- Compare the prose, tables, and diagrams. Keep an overview plus its detailed evidence; remove a second full explanation of the same mechanism. Move paragraph-sized cells and labels into adjacent prose.
+- Check each cut against the ownership map from step 2. Preserve invariants, exceptions, failure behavior, constants, and source citations, including details previously carried only by an image.
+- Check the structure against step 3: the derivation must remain reachable before optional grader-protocol or debugger detail. Preserve or update incoming section anchors.
+
 ## Step 4 - Register related changes
 
 - Add the note to `docs/labs/README.md`.
@@ -105,7 +116,7 @@ Each item that cannot be found is a retrieval problem: fix that section, and lea
 
 ## Step 5 - Audit the no-solution boundary
 
-Read the note as someone about to implement the exercise. Remove anything that can be copied as the answer, replace missing choices with source-anchored questions, and cut explanations already owned elsewhere.
+Read the note as someone about to implement the exercise. Remove anything that can be copied as the answer, replace missing choices with source-anchored questions, and cut explanations already owned elsewhere. Inspect diagrams too: an ordered target algorithm is still a solution when drawn rather than written in C.
 
 Every fenced `c` block must be a contiguous, verbatim quotation from an existing non-target file and must cite that file. Inspect this manually. The following smoke check finds unmatched nonblank lines, but it cannot prove order, contiguity, or that the target solution was excluded:
 
@@ -129,5 +140,9 @@ git status --short
 ```
 
 Manually compare every grader claim with the corresponding test body; the `sed` command validates only names and point values. Generate any quoted transcript by running its command rather than predicting its output.
+
+Follow the harness when a claimed observation depends on how execution stops: distinguish installing a breakpoint from asserting it was hit. For GDB recipes, distinguish live machine registers from saved user registers and verify commands against the current build rather than hard-coding source line numbers.
+
+Render changed diagrams with the available renderer and inspect readability, branch labels, and contrast. Check an Excalidraw export against its editable source. If rendering is unavailable, report that limitation rather than claiming visual verification. Finish with the scan audit and the ownership/repetition audit above, and confirm that no new hard wraps were introduced into Markdown prose.
 
 Do not create nested `docs/labs/<lab>/` directories, restructure `docs/`, or add the solution after grading.
