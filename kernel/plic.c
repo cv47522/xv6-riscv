@@ -4,9 +4,11 @@
 #include "riscv.h"
 #include "defs.h"
 
-//
-// the riscv Platform Level Interrupt Controller (PLIC).
-//
+/*
+ *
+ * the riscv Platform Level Interrupt Controller (PLIC).
+ *
+ */
 
 void
 plicinit(void)
@@ -21,8 +23,10 @@ plicinithart(void)
 {
   int hart = cpuid();
 
-  // set enable bits for this hart's S-mode
-  // for the uart and virtio disk.
+  /*
+   * set enable bits for this hart's S-mode
+   * for the uart and virtio disk.
+   */
   *(volatile uint32 *)PLIC_SENABLE(hart) =
     (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ);
 

@@ -22,8 +22,10 @@
 
 #define NINODES 200
 
-// Disk layout:
-// [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
+/*
+ * Disk layout:
+ * [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
+ */
 
 int nbitmap = FSSIZE / BPB + 1;
 int ninodeblocks = NINODES / IPB + 1;
@@ -144,10 +146,12 @@ main(int argc, char *argv[])
     if ((fd = open(argv[i], 0)) < 0)
       die(argv[i]);
 
-    // Skip leading _ in name when writing to file system.
-    // The binaries are named _rm, _cat, etc. to keep the
-    // build operating system from trying to execute them
-    // in place of system binaries like rm and cat.
+    /*
+     * Skip leading _ in name when writing to file system.
+     * The binaries are named _rm, _cat, etc. to keep the
+     * build operating system from trying to execute them
+     * in place of system binaries like rm and cat.
+     */
     if (shortname[0] == '_')
       shortname += 1;
 

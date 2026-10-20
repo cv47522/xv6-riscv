@@ -1,5 +1,7 @@
-// Create a zombie process that
-// must be reparented at exit.
+/*
+ * Create a zombie process that
+ * must be reparented at exit.
+ */
 
 #include "kernel/types.h"
 #include "kernel/stat.h"

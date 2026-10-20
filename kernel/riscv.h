@@ -30,9 +30,11 @@ w_mstatus(uint64 x)
   asm volatile("csrw mstatus, %0" : : "r"(x));
 }
 
-// machine exception program counter, holds the
-// instruction address to which a return from
-// exception will go.
+/*
+ * machine exception program counter, holds the
+ * instruction address to which a return from
+ * exception will go.
+ */
 static inline void
 w_mepc(uint64 x)
 {
@@ -128,9 +130,11 @@ w_mie(uint64 x)
   asm volatile("csrw mie, %0" : : "r"(x));
 }
 
-// supervisor exception program counter, holds the
-// instruction address to which a return from
-// exception will go.
+/*
+ * supervisor exception program counter, holds the
+ * instruction address to which a return from
+ * exception will go.
+ */
 static inline void
 w_sepc(uint64 x)
 {
@@ -175,8 +179,10 @@ w_mideleg(uint64 x)
   asm volatile("csrw mideleg, %0" : : "r"(x));
 }
 
-// Supervisor Trap-Vector Base Address
-// low two bits are mode.
+/*
+ * Supervisor Trap-Vector Base Address
+ * low two bits are mode.
+ */
 static inline void
 w_stvec(uint64 x)
 {
@@ -247,8 +253,10 @@ w_pmpaddr0(uint64 x)
 
 #define MAKE_SATP(pagetable) (SATP_SV39 | (((uint64)pagetable) >> 12))
 
-// supervisor address translation and protection;
-// holds the address of the page table.
+/*
+ * supervisor address translation and protection;
+ * holds the address of the page table.
+ */
 static inline void
 w_satp(uint64 x)
 {
@@ -343,8 +351,10 @@ r_fp()
   return x;
 }
 
-// read and write tp, the thread pointer, which xv6 uses to hold
-// this core's hartid (core number), the index into cpus[].
+/*
+ * read and write tp, the thread pointer, which xv6 uses to hold
+ * this core's hartid (core number), the index into cpus[].
+ */
 static inline uint64
 r_tp()
 {
@@ -430,8 +440,10 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PXSHIFT(level) (PGSHIFT + (9 * (level)))
 #define PX(level, va)  ((((uint64)(va)) >> PXSHIFT(level)) & PXMASK)
 
-// one beyond the highest possible virtual address.
-// MAXVA is actually one bit less than the max allowed by
-// Sv39, to avoid having to sign-extend virtual addresses
-// that have the high bit set.
+/*
+ * one beyond the highest possible virtual address.
+ * MAXVA is actually one bit less than the max allowed by
+ * Sv39, to avoid having to sign-extend virtual addresses
+ * that have the high bit set.
+ */
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))

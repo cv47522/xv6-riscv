@@ -8,19 +8,21 @@ enum token_state {
   TOKEN_INVALID,
 };
 
-// ---------------------------------------------------------------------------
-//  STREAMING TOKEN STATE
-// ---------------------------------------------------------------------------
-//
-//   State           Meaning                         Boundary or EOF action
-//   --------------  ------------------------------  ----------------------
-//   TOKEN_BOUNDARY  no token is being scanned       nothing
-//   TOKEN_NUMBER    every byte so far is a digit    test the numeric value
-//   TOKEN_INVALID   the token contains a nondigit   discard the token
-//
-// Only bytes in " -\r\t\n./," are boundaries. Other nondigits invalidate the
-// entire token, so xv6 does not contribute the number 6. See the full state
-// model in docs/labs/02-util-sixfive.md.
+/*
+ * ---------------------------------------------------------------------------
+ *  STREAMING TOKEN STATE
+ * ---------------------------------------------------------------------------
+ *
+ *   State           Meaning                         Boundary or EOF action
+ *   --------------  ------------------------------  ----------------------
+ *   TOKEN_BOUNDARY  no token is being scanned       nothing
+ *   TOKEN_NUMBER    every byte so far is a digit    test the numeric value
+ *   TOKEN_INVALID   the token contains a nondigit   discard the token
+ *
+ * Only bytes in " -\r\t\n./," are boundaries. Other nondigits invalidate the
+ * entire token, so xv6 does not contribute the number 6. See the token
+ * contract in docs/labs/02-util-sixfive.md.
+ */
 
 static void
 print_if_multiple(int value)
@@ -32,37 +34,48 @@ print_if_multiple(int value)
 static void
 sixfive(int fd, char *name)
 {
-  // Q: Why not initialize state to TOKEN_BOUNDARY in this declaration?
-  // A: That is valid C. The separate assignment matches xv6's usual style of
-  // declaring locals first and then initializing the function's state.
+  /*
+   * Q: Why not initialize state to TOKEN_BOUNDARY in this declaration?
+   * A: That is valid C. The separate assignment matches xv6's usual style of
+   * declaring locals first and then initializing the function's state.
+   */
   enum token_state state;
 
-  // Q: Why not initialize c to -1?
-  // A: A positive read result overwrites c before the loop body uses it. On
-  // EOF or error, the body does not run, so a sentinel value would be unused.
+  /*
+   * Q: Why not initialize c to -1?
+   * A: A positive read result overwrites c before the loop body uses it. On
+   * EOF or error, the body does not run, so a sentinel value would be unused.
+   */
   char c;
 
-  // Q: Why not initialize n and value to -1?
-  // A: read assigns n before the condition examines it, while decimal
-  // accumulation requires value to begin at zero rather than at -1.
+  /*
+   * Q: Why not initialize n and value to -1?
+   * A: read assigns n before the condition examines it, while decimal
+   * accumulation requires value to begin at zero rather than at -1.
+   */
   int n, value;
 
   state = TOKEN_BOUNDARY;
   value = 0;
-  // Q: Why not read a buffer as wc.c does?
-  // A: A buffer can work if state survives between reads and only n bytes are
-  // examined. One-byte reads follow the handout and remove buffer boundaries.
-  // Q: Why can't read() receive c instead of &c?
-  // A: read() needs the address of writable storage where it can copy bytes.
-  // c is the byte value. Passing it would misinterpret that value as an
-  // address rather than as writable storage.
+  /*
+   * Q: Why not read a buffer as wc.c does?
+   * A: A buffer can work if state survives between reads and only n bytes are
+   * examined. One-byte reads follow the handout and remove buffer boundaries.
+   * Q: Why can't read() receive c instead of &c?
+   * A: read() needs the address of writable storage where it can copy bytes.
+   * c is the byte value. Passing it would misinterpret that value as an
+   * address rather than as writable storage.
+   */
   while ((n = read(fd, &c, 1)) > 0) {
-    // Q: Why is no string comparison needed after strchr()?
-    // A: strchr() returns a pointer to the matching character or zero, not a
-    // string. Nonzero is true in an if condition, and zero is false.
-    // Q: Why compare digit bounds instead of using atoi()?
-    // A: c is one byte, while atoi() requires a pointer to a NUL-terminated
-    // string. The bounds test classifies the byte without building a string.
+    /*
+     * Q: Why is no string comparison needed after strchr()?
+     * A: user/ulib.c returns a pointer into the searched string on a match,
+     * or zero otherwise. The condition tests membership, not string equality;
+     * no new string is returned. This version does not match the final NUL.
+     * Q: Why compare digit bounds instead of using atoi()?
+     * A: c is one byte, while atoi() requires a pointer to a NUL-terminated
+     * string. The bounds test classifies the byte without building a string.
+     */
     if (strchr(" -\r\t\n./,", c)) {
       if (state == TOKEN_NUMBER)
         print_if_multiple(value);
@@ -74,9 +87,12 @@ sixfive(int fd, char *name)
         value = 0;
       }
       if (state == TOKEN_NUMBER) {
-        // Q: Why not use atoi() to extend value?
-        // A: Subtracting '0' converts this digit byte to its integer value.
-        // Multiplying first preserves the place value of the earlier digits.
+        /*
+         * Q: Why not use atoi() to extend value?
+         * A: atoi() converts a string from the beginning; it cannot extend an
+         * existing value with one byte. Subtracting '0' converts this digit,
+         * and multiplying by 10 preserves the earlier decimal places.
+         */
         value = value * 10 + c - '0';
       }
     } else {
@@ -95,25 +111,31 @@ sixfive(int fd, char *name)
 int
 main(int argc, char *argv[])
 {
-  // Q: Why not initialize fd and i to -1?
-  // A: open() assigns fd before it is tested or used, and the for initializer
-  // assigns i before its first comparison. Neither variable needs a sentinel.
+  /*
+   * Q: Why not initialize fd and i to -1?
+   * A: open() assigns fd before it is tested or used, and the for initializer
+   * assigns i before its first comparison. Neither variable needs a sentinel.
+   */
   int fd, i;
 
-  // Q: Why read descriptor 0 instead of reporting a usage error?
-  // A: The handout defines no-argument invocation as reading standard input,
-  // which the shell has already connected to a pipe or the terminal. cat.c and
-  // wc.c take the same branch, and wc() passes an empty name because there is
-  // no filename to report in a diagnostic.
+  /*
+   * Q: Why read descriptor 0 instead of reporting a usage error?
+   * A: The handout defines no-argument invocation as reading standard input,
+   * which the shell has already connected to a pipe or the terminal. cat.c and
+   * wc.c take the same branch, and wc() passes an empty name because there is
+   * no filename to report in a diagnostic.
+   */
   if (argc < 2) {
     fprintf(2, "Usage: sixfive FILE1 [FILE2 ...]\n");
     sixfive(0, "");
     return 0;
   }
 
-  // Q: Why not declare int i in the for initializer?
-  // A: C99 permits that. Declaring locals at the function top follows the
-  // style used by wc.c and the rest of xv6.
+  /*
+   * Q: Why not declare int i in the for initializer?
+   * A: C99 permits that and limits i's scope to the loop. The existing form
+   * follows wc.c's style; it does not change how this loop executes.
+   */
   for (i = 1; i < argc; i++) {
     // open() returns the lowest unused descriptor, normally 3 in this process.
     if ((fd = open(argv[i], O_RDONLY)) < 0) {

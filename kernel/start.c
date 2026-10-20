@@ -20,8 +20,10 @@ start()
   x |= MSTATUS_MPP_S;
   w_mstatus(x);
 
-  // set M Exception Program Counter to main, for mret.
-  // requires gcc -mcmodel=medany
+  /*
+   * set M Exception Program Counter to main, for mret.
+   * requires gcc -mcmodel=medany
+   */
   w_mepc((uint64)main);
 
   // disable paging for now.
@@ -32,8 +34,10 @@ start()
   w_mideleg(0xffff);
   w_sie(r_sie() | SIE_SEIE | SIE_STIE);
 
-  // configure Physical Memory Protection to give supervisor mode
-  // access to all of physical memory.
+  /*
+   * configure Physical Memory Protection to give supervisor mode
+   * access to all of physical memory.
+   */
   w_pmpaddr0(0x3fffffffffffffull);
   w_pmpcfg0(0xf);
 

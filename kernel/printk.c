@@ -1,6 +1,8 @@
-//
-// formatted console output -- printk, panic.
-//
+/*
+ *
+ * formatted console output -- printk, panic.
+ *
+ */
 
 #include <stdarg.h>
 

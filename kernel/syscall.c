@@ -20,8 +20,10 @@ fetchaddr(uint64 addr, uint64 *ip)
   return 0;
 }
 
-// Fetch the nul-terminated string at addr from the current process.
-// Returns length of string, not including nul, or -1 for error.
+/*
+ * Fetch the nul-terminated string at addr from the current process.
+ * Returns length of string, not including nul, or -1 for error.
+ */
 int
 fetchstr(uint64 addr, char *buf, int max)
 {
@@ -60,18 +62,22 @@ argint(int n, int *ip)
   *ip = argraw(n);
 }
 
-// Retrieve an argument as a pointer.
-// Doesn't check for legality, since
-// copyin/copyout will do that.
+/*
+ * Retrieve an argument as a pointer.
+ * Doesn't check for legality, since
+ * copyin/copyout will do that.
+ */
 void
 argaddr(int n, uint64 *ip)
 {
   *ip = argraw(n);
 }
 
-// Fetch the nth word-sized system call argument as a null-terminated string.
-// Copies into buf, at most max.
-// Returns string length if OK (not including nul), -1 if error.
+/*
+ * Fetch the nth word-sized system call argument as a null-terminated string.
+ * Copies into buf, at most max.
+ * Returns string length if OK (not including nul), -1 if error.
+ */
 int
 argstr(int n, char *buf, int max)
 {
@@ -104,8 +110,10 @@ extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
 extern uint64 sys_sync(void);
 
-// An array mapping syscall numbers from syscall.h
-// to the function that handles the system call.
+/*
+ * An array mapping syscall numbers from syscall.h
+ * to the function that handles the system call.
+ */
 static uint64 (*syscalls[])(void) = {
   // clang-format off
   [SYS_fork]    = sys_fork,
@@ -141,8 +149,10 @@ syscall(void)
 
   num = p->trapframe->a7;
   if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    // Use num to lookup the system call function for num, call it,
-    // and store its return value in p->trapframe->a0
+    /*
+     * Use num to lookup the system call function for num, call it,
+     * and store its return value in p->trapframe->a0
+     */
     p->trapframe->a0 = syscalls[num]();
   } else {
     printk("%d %s: unknown sys call %d\n", p->pid, p->name, num);

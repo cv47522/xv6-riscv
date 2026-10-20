@@ -1,22 +1,29 @@
-#include "kernel/types.h"
 #include "user/user.h"
 
-// Ref: /home/wahsieh/personal/c-programming/notes/src/main/cli_argument/cli_arg_basic.c
+/*
+ * Ref: sibling c-programming repository, under notes/src/main/
+ * fundamentals/command_line_arguments/cli_arg_basic.c
+ */
 int
 main(int argc, char *argv[])
 {
-  int ticks;
-
-  // user/sh.c builds argv; kernel/exec.c passes argc and argv to main.
-  // argv[0] names sleep; argv[1] carries the requested tick count.
+  /*
+   * user/sh.c builds argv; kernel/exec.c passes argc and argv to main.
+   * argv[0] names sleep; argv[1] carries the requested tick count.
+   */
   if (argc != 2) {
     fprintf(2, "Usage: sleep TICKS\n");
     return 1;
   }
 
-  // atoi() cannot distinguish "0" from invalid text; this lab requires only
-  // the missing-argument diagnostic. See docs/labs/01-util-sleep.md.
-  ticks = atoi(argv[1]);
+  /*
+   * Q: Why can't atoi() distinguish "0" from invalid text? Give examples.
+   * A: user/ulib.c starts at 0 and reports no conversion status: "0", "abc",
+   * and "" all yield 0; "3x" yields 3. A zero result alone cannot validate
+   * input. See "atoi is conversion, not validation" in
+   * docs/05-syscall-reference.md.
+   */
+  int ticks = atoi(argv[1]);
   pause(ticks);
   return 0;
 }

@@ -105,8 +105,8 @@ The proof is short enough to run. Exactly three files in the operating system in
 
 ```bash
 $ grep -rn '#include <' kernel/ user/
-kernel/console.c:12:#include <stdarg.h>
-kernel/printk.c:5:#include <stdarg.h>
+kernel/console.c:14:#include <stdarg.h>
+kernel/printk.c:7:#include <stdarg.h>
 user/printf.c:5:#include <stdarg.h>
 ```
 
@@ -151,7 +151,7 @@ Nothing, on purpose. It is worth being blunt about this, because "Unix-like" inv
 | **EOF**                   | **E**nd **o**f **f**ile. A `read()` with a positive requested length that returns 0 to signal that no bytes remain from the current input endpoint. For a regular file, this is the current inode end; for a pipe, it occurs after the pipe is drained and all writers close; on the console, `Ctrl-d` produces it at an empty position. A later file growth or console input can make a later read produce bytes.                                                                                                                                                                                                                                      |
 | **filter**                | A program that reads FD 0 and writes FD 1 without adding output of its own, so it composes in a pipeline. `user/ex1copy.c` is the minimal example; `user/wc.c` and `user/grep.c` are real ones.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **trap**                  | Any transfer to the kernel: system call, exception, or interrupt. `kernel/trap.c`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **panic**                 | The kernel's assert: `panic("message")` in `kernel/printk.c:138`, called when an invariant breaks and there is no defined way to continue. It prints `panic: ` and the message, sets `panicked` so every other hart parks forever in `uartputc_sync` rather than overwriting the message, and then spins — declared `__attribute__((noreturn))`, it never returns or reboots. 62 call sites across 13 kernel files. A panic stops the whole machine; the user-space equivalent, a process fault, only kills the one process. See [What a panic is, and what it prints](06-build-artifacts.md#what-a-panic-is-and-what-it-prints).                       |
+| **panic**                 | The kernel's assert: `panic("message")` in `kernel/printk.c`, called when an invariant breaks and there is no defined way to continue. It prints `panic: ` and the message, sets `panicked` so every other hart parks forever in `uartputc_sync` rather than overwriting the message, and then spins — declared `__attribute__((noreturn))`, it never returns or reboots. 62 call sites across 13 kernel files. A panic stops the whole machine; the user-space equivalent, a process fault, only kills the one process. See [What a panic is, and what it prints](06-build-artifacts.md#what-a-panic-is-and-what-it-prints).                           |
 | **trampoline**            | A page mapped at the same virtual address in every address space, so the switch between user and kernel page tables can happen without the mapping vanishing mid-instruction. `kernel/trampoline.S`.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **trapframe**             | Per-process saved register state at trap time.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | **context switch**        | Swapping one process's registers for another's. `kernel/swtch.S`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -230,8 +230,8 @@ Size stays a separate question throughout, which is the whole point about "funct
 | Thing                                     | Granularity | Role           |
 | ----------------------------------------- | ----------- | -------------- |
 | `sys_sbrk` in `user/usys.S`               | function    | **stub**       |
-| `sbrk` in `user/ulib.c:153`               | function    | wrapper        |
-| `strlen` in `user/ulib.c:40`              | function    | implementation |
+| `sbrk` in `user/ulib.c`                   | function    | wrapper        |
+| `strlen` in `user/ulib.c`                 | function    | implementation |
 | QEMU's gdb stub                           | module      | **stub**       |
 | `docs/book/ch13-summary.md`, all 21 lines | file        | **stub**       |
 
@@ -241,8 +241,8 @@ The `sbrk` chain is the sharpest case, because all three roles sit in one call p
 
 ```c
 sys_sbrk:  li a7, SYS_sbrk; ecall; ret          // usys.S      — stub: names the call, does nothing
-sbrk(n)    { return sys_sbrk(n, SBRK_EAGER); }  // ulib.c:153  — wrapper: supplies an argument
-strlen(s)  { ... }                              // ulib.c:40   — implementation: does the work
+sbrk(n)    { return sys_sbrk(n, SBRK_EAGER); }  // ulib.c      — wrapper: supplies an argument
+strlen(s)  { ... }                              // ulib.c      — implementation: does the work
 ```
 
 All three are functions, so calling them that is true and says nothing. Calling the middle one a stub is simply wrong: it makes a decision — which eager/lazy mode to request — and deciding anything is exactly what a stub does not do. That distinction is why `user/usys.pl` special-cases this one entry, emitting the stub as `sys_sbrk` so the plain name stays free for the wrapper.
@@ -263,6 +263,6 @@ The word is standard across several fields with the same sense: **RPC** has clie
 Small things that cause confusion the first time:
 
 - **`printk` vs `printf`** — the kernel's is `printk` (`kernel/printk.c`), user space has its own `printf` (`user/printf.c`). Upstream renamed the kernel one from `printf.c`, which is why the remaining 2025 lab branches still refer to the old name while `labs/util` and `labs/riscv`, now MIT's 2026 publications, already use `printk.c`.
-- **The `_` prefix** — `user/_ls` is the linked executable, `user/ls.o` the object file, and `mkfs` strips the underscore so that inside xv6 the program is just `ls`. The reason is written in `mkfs/mkfs.c:147`: the binaries are named `_rm`, `_cat`, and so on "to keep the build operating system from trying to execute them in place of system binaries like `rm` and `cat`". The prefix protects **your host**, not xv6.
+- **The `_` prefix** — `user/_ls` is the linked executable, `user/ls.o` the object file, and `mkfs` strips the underscore so that inside xv6 the program is just `ls`. The reason is written in `mkfs/mkfs.c`: the binaries are named `_rm`, `_cat`, and so on "to keep the build operating system from trying to execute them in place of system binaries like `rm` and `cat`". The prefix protects **your host**, not xv6.
 - **`v6` in "xv6"** — refers to Unix Version 6, the 1975 system it re-implements, not a version of xv6 itself.
 - **"virt"** — QEMU's generic board name, not related to virtio, though the virt board is where the virtio devices live.

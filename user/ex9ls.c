@@ -1,86 +1,88 @@
-// ex9ls.c: list directory entries by reading the directory.
-//
-// Based on MIT 6.1810 Lecture 1's ex9.c:
-// https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex9.c.
-// Host contrast: man 3 opendir; man 3 readdir; man 2 getdents.
-//
-// ---------------------------------------------------------------------------
-//  PREREQUISITES
-// ---------------------------------------------------------------------------
-//
-//  <OS> means the sibling repository at ../operating-system.
-//
-//   Kind  Read first
-//   ----  ------------------------------------------------------------------
-//   note  <OS>/The_Process_Abstraction.md  (FD terminology)
-//   code  <OS>/codes/src/main/virtualization/cpu-process-api/
-//           pipe_family/pipe_three_closes.c  (opendir/readdir example)
-//
-// ---------------------------------------------------------------------------
-//  RUNNING IT  (inside xv6, not on the host)
-// ---------------------------------------------------------------------------
-//
-//    % make qemu
-//    $ ex9ls               list the current directory
-//    $ ex9ls . /           list two named directories with headings
-//    $ ex9ls README        reject a path that is not a directory
-//
-// ---------------------------------------------------------------------------
-//  A DIRECTORY IS A FILE OF FIXED-SIZE RECORDS
-// ---------------------------------------------------------------------------
-//
-//  xv6 needs no opendir() or readdir(). open() and read() expose the directory
-//  as an array of records defined in kernel/fs.h:
-//
-//    struct dirent {
-//      ushort inum;          inode number; 0 means an unused slot
-//      char name[DIRSIZ];    exactly 14 bytes; may have no trailing NUL
-//    };
-//
-//    open(".", O_RDONLY)
-//      |
-//      v
-//    +----------+----------+----------+----------+----------+
-//    | inum  1  | inum  1  | inum  2  | inum  0  | inum  3  |
-//    | "."      | ".."     | "README" | <free>   | "cat"    |
-//    +----------+----------+----------+----------+----------+
-//     16 bytes    16 bytes   16 bytes   16 bytes   16 bytes
-//                                       ^
-//                                       skipped: inum 0 means the slot was
-//                                       freed by unlink() and reused later
-//
-//   Rule                       Why
-//   -------------------------  ---------------------------------------------
-//   read sizeof(struct dirent) consume exactly one on-disk record
-//   skip inum == 0             unlink leaves reusable holes in the array
-//   copy exactly DIRSIZ bytes  a full-length name has no NUL terminator
-//   append a NUL in name[]     printf("%s") requires a C string
-//
-//  "." and ".." are real directory entries. With no argument, "." resolves
-//  against p->cwd in kernel/proc.h, the process's current directory.
-//
-// ---------------------------------------------------------------------------
-//  WHERE EACH PIECE LIVES IN THIS TREE
-// ---------------------------------------------------------------------------
-//
-//   Idea                        File
-//   --------------------------  -------------------------------------------
-//   struct dirent and DIRSIZ    kernel/fs.h
-//   struct stat and T_DIR       kernel/stat.h
-//   directory reads             kernel/fs.c  (readi())
-//   path lookup                 kernel/fs.c  (namei(), dirlookup())
-//   "." and ".." creation       kernel/sysfile.c  (create())
-//   full ls implementation      user/ls.c
-//   exercise details            docs/07-exercises.md
-//
-// ---------------------------------------------------------------------------
-//  THREE THINGS WORTH KEEPING
-// ---------------------------------------------------------------------------
-//
-//  * Listing needs no new xv6 syscall: directories use open(), read(), and
-//    known record layout.
-//  * On-disk names are fixed-width byte fields, not automatically C strings.
-//  * The kernel owns directory writes so dirents and inode links stay valid.
+/*
+ * ex9ls.c: list directory entries by reading the directory.
+ *
+ * Based on MIT 6.1810 Lecture 1's ex9.c:
+ * https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex9.c.
+ * Host contrast: man 3 opendir; man 3 readdir; man 2 getdents.
+ *
+ * ---------------------------------------------------------------------------
+ *  PREREQUISITES
+ * ---------------------------------------------------------------------------
+ *
+ *  <OS> means the sibling repository at ../operating-system.
+ *
+ *   Kind  Read first
+ *   ----  ------------------------------------------------------------------
+ *   note  <OS>/The_Process_Abstraction.md  (FD terminology)
+ *   code  <OS>/codes/src/main/virtualization/cpu-process-api/
+ *           pipe_family/pipe_three_closes.c  (opendir/readdir example)
+ *
+ * ---------------------------------------------------------------------------
+ *  RUNNING IT  (inside xv6, not on the host)
+ * ---------------------------------------------------------------------------
+ *
+ *    % make qemu
+ *    $ ex9ls               list the current directory
+ *    $ ex9ls . /           list two named directories with headings
+ *    $ ex9ls README        reject a path that is not a directory
+ *
+ * ---------------------------------------------------------------------------
+ *  A DIRECTORY IS A FILE OF FIXED-SIZE RECORDS
+ * ---------------------------------------------------------------------------
+ *
+ *  xv6 needs no opendir() or readdir(). open() and read() expose the directory
+ *  as an array of records defined in kernel/fs.h:
+ *
+ *    struct dirent {
+ *      ushort inum;          inode number; 0 means an unused slot
+ *      char name[DIRSIZ];    exactly 14 bytes; may have no trailing NUL
+ *    };
+ *
+ *    open(".", O_RDONLY)
+ *      |
+ *      v
+ *    +----------+----------+----------+----------+----------+
+ *    | inum  1  | inum  1  | inum  2  | inum  0  | inum  3  |
+ *    | "."      | ".."     | "README" | <free>   | "cat"    |
+ *    +----------+----------+----------+----------+----------+
+ *     16 bytes    16 bytes   16 bytes   16 bytes   16 bytes
+ *                                       ^
+ *                                       skipped: inum 0 means the slot was
+ *                                       freed by unlink() and reused later
+ *
+ *   Rule                       Why
+ *   -------------------------  ---------------------------------------------
+ *   read sizeof(struct dirent) consume exactly one on-disk record
+ *   skip inum == 0             unlink leaves reusable holes in the array
+ *   copy exactly DIRSIZ bytes  a full-length name has no NUL terminator
+ *   append a NUL in name[]     printf("%s") requires a C string
+ *
+ *  "." and ".." are real directory entries. With no argument, "." resolves
+ *  against p->cwd in kernel/proc.h, the process's current directory.
+ *
+ * ---------------------------------------------------------------------------
+ *  WHERE EACH PIECE LIVES IN THIS TREE
+ * ---------------------------------------------------------------------------
+ *
+ *   Idea                        File
+ *   --------------------------  -------------------------------------------
+ *   struct dirent and DIRSIZ    kernel/fs.h
+ *   struct stat and T_DIR       kernel/stat.h
+ *   directory reads             kernel/fs.c  (readi())
+ *   path lookup                 kernel/fs.c  (namei(), dirlookup())
+ *   "." and ".." creation       kernel/sysfile.c  (create())
+ *   full ls implementation      user/ls.c
+ *   exercise details            docs/07-exercises.md
+ *
+ * ---------------------------------------------------------------------------
+ *  THREE THINGS WORTH KEEPING
+ * ---------------------------------------------------------------------------
+ *
+ *  * Listing needs no new xv6 syscall: directories use open(), read(), and
+ *    known record layout.
+ *  * On-disk names are fixed-width byte fields, not automatically C strings.
+ *  * The kernel owns directory writes so dirents and inode links stay valid.
+ */
 
 #include "kernel/types.h"
 #include "kernel/stat.h"

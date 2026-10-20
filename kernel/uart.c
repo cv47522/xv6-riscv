@@ -1,6 +1,8 @@
-//
-// low-level driver for 16550a UART.
-//
+/*
+ *
+ * low-level driver for 16550a UART.
+ *
+ */
 
 #include "types.h"
 #include "param.h"
@@ -11,19 +13,25 @@
 #include "proc.h"
 #include "defs.h"
 
-// the UART control registers are memory-mapped
-// at address UART0. this macro returns the
-// address of one of the registers.
+/*
+ * the UART control registers are memory-mapped
+ * at address UART0. this macro returns the
+ * address of one of the registers.
+ */
 #define Reg(reg) ((volatile unsigned char *)(UART0 + (reg)))
 
 #define ReadReg(reg)     (*(Reg(reg)))
 #define WriteReg(reg, v) (*(Reg(reg)) = (v))
 
-// the UART control registers.
-// some have different meanings for read vs write.
-// see http://byterunner.com/16550.html
+/*
+ * the UART control registers.
+ * some have different meanings for read vs write.
+ * see http://byterunner.com/16550.html
+ */
 #define RHR             0        // receive holding register (for input bytes)
-#define THR             0        // transmit holding register (for output bytes)
+
+// transmit holding register (for output bytes)
+#define THR             0
 #define IER             1        // interrupt enable register
 #define IER_RX_ENABLE   (1 << 0) // receiver interrupts
 #define IER_TX_ENABLE   (1 << 1) // transmit interrupts
@@ -60,8 +68,10 @@ uartinit(void)
   // MSB for baud rate of 38.4K.
   WriteReg(1, 0x00);
 
-  // leave set-baud mode,
-  // and set word length to 8 bits, no parity.
+  /*
+   * leave set-baud mode,
+   * and set word length to 8 bits, no parity.
+   */
   WriteReg(LCR, LCR_EIGHT_BITS);
 
   // reset and enable FIFOs.
@@ -73,9 +83,11 @@ uartinit(void)
   initsleeplock(&tx_lock, "uart");
 }
 
-// transmit buf[] to the uart. it blocks if the
-// uart is busy, so it cannot be called from
-// interrupts, only from write() system calls.
+/*
+ * transmit buf[] to the uart. it blocks if the
+ * uart is busy, so it cannot be called from
+ * interrupts, only from write() system calls.
+ */
 void
 uartwrite(char buf[], int n)
 {
@@ -95,10 +107,12 @@ uartwrite(char buf[], int n)
   releasesleep(&tx_lock);
 }
 
-// write a byte to the uart without using
-// interrupts, for use by kernel printk() and
-// to echo characters. it spins waiting for the uart's
-// output register to be empty.
+/*
+ * write a byte to the uart without using
+ * interrupts, for use by kernel printk() and
+ * to echo characters. it spins waiting for the uart's
+ * output register to be empty.
+ */
 void
 uartputc_sync(int c)
 {
@@ -119,8 +133,10 @@ uartputc_sync(int c)
     pop_off();
 }
 
-// try to read one input character from the UART.
-// return -1 if none is waiting.
+/*
+ * try to read one input character from the UART.
+ * return -1 if none is waiting.
+ */
 static int
 uartgetc(void)
 {
@@ -132,9 +148,11 @@ uartgetc(void)
   }
 }
 
-// handle a uart interrupt, raised because input has
-// arrived, or the uart is ready for more output, or
-// both. called from devintr().
+/*
+ * handle a uart interrupt, raised because input has
+ * arrived, or the uart is ready for more output, or
+ * both. called from devintr().
+ */
 void
 uartintr(void)
 {

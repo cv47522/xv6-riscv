@@ -195,7 +195,7 @@ Not everything in a `.S` file is an instruction. These are the rest:
 
 Because `a0` through `a5` are already spoken for, and `a7` is the argument register left over.
 
-RISC-V passes the first eight integer arguments in `a0`–`a7` and returns values in `a0`. xv6's kernel reads system call arguments straight out of the saved trapframe, and `argraw()` in [`kernel/syscall.c:35`](../kernel/syscall.c) maps argument 0 through argument 5 onto `a0` through `a5`:
+RISC-V passes the first eight integer arguments in `a0`–`a7` and returns values in `a0`. xv6's kernel reads system call arguments straight out of the saved trapframe, and `argraw()` in [`kernel/syscall.c`](../kernel/syscall.c) maps argument 0 through argument 5 onto `a0` through `a5`:
 
 ```c
 case 0: return p->trapframe->a0;
@@ -205,7 +205,7 @@ case 5: return p->trapframe->a5;
 
 So the six lowest argument registers _are_ the argument channel. A stub that used one of them for the call number would first have to shuffle the caller's arguments out of the way, and `write(1, buf, n)` would stop being three instructions. That leaves `a6` and `a7`; `a7` is the choice, matching what Linux's RISC-V ABI does, so the convention is one thing rather than two.
 
-The dispatch side, in `syscall()` at [`kernel/syscall.c:142`](../kernel/syscall.c), is the mirror image:
+The dispatch side, in `syscall()` at [`kernel/syscall.c`](../kernel/syscall.c), is the mirror image:
 
 ```c
 num = p->trapframe->a7;
@@ -330,7 +330,7 @@ Both are produced from the same ELF on every link, both are pure output, and the
 
 ### What a panic is, and what it prints
 
-**`panic()`** is the kernel's assert. It is what the kernel calls when it detects a condition it has no defined way to continue from — a buffer cache with no free buffers, a log write outside a transaction, a trap it cannot attribute to any device. All of [`kernel/printk.c:138`](../kernel/printk.c):
+**`panic()`** is the kernel's assert. It is what the kernel calls when it detects a condition it has no defined way to continue from — a buffer cache with no free buffers, a log write outside a transaction, a trap it cannot attribute to any device. All of [`kernel/printk.c`](../kernel/printk.c):
 
 ```c
 void
@@ -348,18 +348,18 @@ panic(char *s)
 | It does                                                                                                                                                      | It does not                                                                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | Print `panic: ` followed by one fixed message                                                                                                                | Print an address, a register dump, or a backtrace                                                       |
-| Set `panicked`, which parks every _other_ hart forever inside `uartputc_sync` ([`kernel/uart.c:108`](../kernel/uart.c)) so nothing can overwrite the message | Reboot, unwind, or return — it is `__attribute__((noreturn))` in `kernel/defs.h` and ends in `for(;;);` |
+| Set `panicked`, which parks every _other_ hart forever inside `uartputc_sync` ([`kernel/uart.c`](../kernel/uart.c)) so nothing can overwrite the message | Reboot, unwind, or return — it is `__attribute__((noreturn))` in `kernel/defs.h` and ends in `for(;;);` |
 | Stop the machine dead while leaving QEMU running, so gdb can still attach                                                                                    | Kill only the faulting process. A panic is the entire kernel giving up                                  |
 
 There are 62 `panic()` call sites across 13 files in `kernel/`, and the string is always a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
 
 ```bash
 $ grep -rn 'panic("bget: no buffers")' kernel/
-kernel/bio.c:87:  panic("bget: no buffers");
+kernel/bio.c:95:  panic("bget: no buffers");
 ```
 
 > [!IMPORTANT]
-> `panic()` never prints an address. When a panic on your console _is_ accompanied by one, that line came from the caller immediately before it. The usual source is `kerneltrap()` at [`kernel/trap.c:150`](../kernel/trap.c), which takes a trap it cannot attribute to a device and dumps the trap CSRs before giving up:
+> `panic()` never prints an address. When a panic on your console _is_ accompanied by one, that line came from the caller immediately before it. The usual source is `kerneltrap()` at [`kernel/trap.c`](../kernel/trap.c), which takes a trap it cannot attribute to a device and dumps the trap CSRs before giving up:
 >
 > ```c
 > printk("scause=0x%lx sepc=0x%lx stval=0x%lx\n", scause, r_sepc(), r_stval());
@@ -384,7 +384,7 @@ The three values in that first line are CSRs, read at the moment of the trap:
 | **`stval`**  | **S**upervisor **T**rap **VAL**ue                    | For a page fault, the address the code was trying to reach — usually the bad pointer itself                          |
 
 > [!NOTE]
-> The same fault in _user_ space is not a panic. `usertrap()` at [`kernel/trap.c:76`](../kernel/trap.c) prints `usertrap(): unexpected scause ... pid=...`, calls `setkilled(p)`, and the shell prompt comes back. One process dies and the machine lives. Only the kernel faulting on its own behalf stops everything, which is the whole reason a kernel bug is worse than a user-space one.
+> The same fault in _user_ space is not a panic. `usertrap()` at [`kernel/trap.c`](../kernel/trap.c) prints `usertrap(): unexpected scause ... pid=...`, calls `setkilled(p)`, and the shell prompt comes back. One process dies and the machine lives. Only the kernel faulting on its own behalf stops everything, which is the whole reason a kernel bug is worse than a user-space one.
 
 ### Turning that address into a line of C
 
@@ -764,13 +764,15 @@ The combined make-and-populate behaviour does exist on Linux, just off the defau
 
 ### `_name`: they are `/bin`, but xv6 has no `/bin`
 
-The underscore is stripped on the way into the image, and the reason is written in `mkfs/mkfs.c:147`:
+The underscore is stripped on the way into the image, and the reason is written in [`mkfs/mkfs.c`](../mkfs/mkfs.c):
 
 ```c
-// Skip leading _ in name when writing to file system.
-// The binaries are named _rm, _cat, etc. to keep the
-// build operating system from trying to execute them
-// in place of system binaries like rm and cat.
+/*
+ * Skip leading _ in name when writing to file system.
+ * The binaries are named _rm, _cat, etc. to keep the
+ * build operating system from trying to execute them
+ * in place of system binaries like rm and cat.
+ */
 ```
 
 So the prefix protects **your host**, not xv6. Without it, `user/rm` and `user/cat` would be RISC-V binaries carrying the names of real commands, sitting in a directory you are about to run shell commands in.
@@ -780,7 +782,7 @@ Where they end up is the part that does not match Linux at all:
 |                             | Linux                                                               | xv6                                                                                    |
 | --------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | **Where binaries live**     | `/bin`, `/usr/bin`, `/sbin` — nowadays all symlinks into `/usr/bin` | The root directory, `/`. There is no `bin` directory                                   |
-| **How the shell finds one** | `$PATH` lookup                                                      | No `$PATH` exists. `user/sh.c:79` passes the typed word straight to `exec()` as a path |
+| **How the shell finds one** | `$PATH` lookup                                                      | No `$PATH` exists. `user/sh.c` `runcmd()` passes the typed word straight to `exec()` as a path |
 | **Configuration**           | `/etc`                                                              | **Nothing.** xv6 has no configuration file of any kind                                 |
 | **Device nodes**            | `/dev`, populated by devtmpfs and udev                              | One node, `/console`, created by `user/init.c` calling `mknod("console", CONSOLE, 0)`  |
 | **Home directories**        | `/home/you`                                                         | None. There are no users, no login, and no uid                                         |

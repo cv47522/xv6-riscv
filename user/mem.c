@@ -60,15 +60,19 @@ main(int argc, char *argv[])
     memcpy(str2, "abcdefg", 7);
     memdump("S", str2, 7);
   } else if (argc == 2) {
-    // format in argv[1], up to 512 bytes of data from standard input.
-    // Capacity rationale: docs/labs/03-util-memdump.md#why-512-bytes
+    /*
+     * format in argv[1], up to 512 bytes of data from standard input.
+     * Capacity rationale: docs/labs/03-util-memdump.md#why-512-bytes
+     */
     char data[512];
     int n = 0;
     memset(data, '\0', sizeof(data));
     while (n < sizeof(data)) {
-      // read() returns what one call could deliver, not what was asked for:
-      // a pipe hands over whatever the writer has flushed so far. Loop until
-      // it reports 0 (EOF) so a split write still arrives whole.
+      /*
+       * read() returns what one call could deliver, not what was asked for:
+       * a pipe hands over whatever the writer has flushed so far. Loop until
+       * it reports 0 (EOF) so a split write still arrives whole.
+       */
       int nn = read(0, data + n, sizeof(data) - n); // Read FD 0 (stdin)
       if (nn <= 0)
         break;
@@ -155,8 +159,15 @@ memdump(char *fmt, char *data, int len)
         printf("%s\n", *(char **)curr);
         break;
       case 'S':
-        // printf("%s\n", curr); // Q: Why not use printf("%s", curr) as `$ echo a | mem S` still works?
-        // write(1, curr, remaining); // Ignore null terminator, print all remaining bytes
+        /*
+         * Q: Why does echo a | mem S seem to work with printf("%s", curr)?
+         * A: main() zero-fills data, so this short input happens to have NUL
+         * just beyond n. %s in user/printf.c ignores remaining and reads that
+         * byte; full or nonterminated regions can overread. Omitting \n also
+         * removes the output line ending, not the bounds problem. See
+         * "Why a short echo can hide an overread" in
+         * docs/labs/03-util-memdump.md.
+         */
         width = print_and_get_string_width(curr, remaining);
         break;
     }

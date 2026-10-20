@@ -1,8 +1,10 @@
-//
-// File-system system calls.
-// Mostly argument checking, since we don't trust
-// user code, and calls into file.c and fs.c.
-//
+/*
+ *
+ * File-system system calls.
+ * Mostly argument checking, since we don't trust
+ * user code, and calls into file.c and fs.c.
+ *
+ */
 
 #include "types.h"
 #include "riscv.h"
@@ -16,8 +18,10 @@
 #include "file.h"
 #include "fcntl.h"
 
-// Fetch the nth word-sized system call argument as a file descriptor
-// and return both the descriptor and the corresponding struct file.
+/*
+ * Fetch the nth word-sized system call argument as a file descriptor
+ * and return both the descriptor and the corresponding struct file.
+ */
 static int
 argfd(int n, int *pfd, struct file **pf)
 {
@@ -34,8 +38,10 @@ argfd(int n, int *pfd, struct file **pf)
   return 0;
 }
 
-// Allocate a file descriptor for the given file.
-// Takes over file reference from caller on success.
+/*
+ * Allocate a file descriptor for the given file.
+ * Takes over file reference from caller on success.
+ */
 static int
 fdalloc(struct file *f)
 {
@@ -155,9 +161,11 @@ sys_link(void)
   if ((dp = nameiparent(new, name)) == 0)
     goto bad;
   ilock(dp);
-  // dp may have been unlinked while we resolved it; linking into an
-  // orphaned directory leaks ip (itrunc discards the record without
-  // dropping ip->nlink).  create() has the same guard.
+  /*
+   * dp may have been unlinked while we resolved it; linking into an
+   * orphaned directory leaks ip (itrunc discards the record without
+   * dropping ip->nlink).  create() has the same guard.
+   */
   if (dp->nlink == 0) {
     iunlockput(dp);
     goto bad;
@@ -297,8 +305,10 @@ create(char *path, short type, short major, short minor)
   ip->nlink = 1;
   iupdate(ip);
 
-  if (type == T_DIR) { // Create . and .. entries.
-    // No ip->nlink++ for ".": avoid cyclic ref count.
+  if (type == T_DIR) { /*
+   * Create . and .. entries.
+   * No ip->nlink++ for ".": avoid cyclic ref count.
+   */
     if (dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
       goto fail;
   }

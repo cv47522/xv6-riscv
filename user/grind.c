@@ -1,6 +1,8 @@
-//
-// run random system calls in parallel forever.
-//
+/*
+ *
+ * run random system calls in parallel forever.
+ *
+ */
 
 #include "kernel/param.h"
 #include "kernel/types.h"
@@ -26,14 +28,14 @@ do_rand(unsigned long *ctx)
    */
   long hi, lo, x;
 
-  /* Transform to [1, 0x7ffffffe] range. */
+  // Transform to [1, 0x7ffffffe] range.
   x = (*ctx % 0x7ffffffe) + 1;
   hi = x / 127773;
   lo = x % 127773;
   x = 16807 * lo - 2836 * hi;
   if (x < 0)
     x += 0x7fffffff;
-  /* Transform to [0, 0x7ffffffd] range. */
+  // Transform to [0, 0x7ffffffd] range.
   x--;
   *ctx = x;
   return (x);
@@ -194,8 +196,10 @@ go(int which_child)
       wait(0);
     } else if (what == 21) {
       unlink("c");
-      // should always succeed. check that there are free i-nodes,
-      // file descriptors, blocks.
+      /*
+       * should always succeed. check that there are free i-nodes,
+       * file descriptors, blocks.
+       */
       int fd1 = open("c", O_CREATE | O_RDWR);
       if (fd1 < 0) {
         printf("grind: create c failed\n");

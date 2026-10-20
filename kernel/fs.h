@@ -1,15 +1,19 @@
-// On-disk file system format.
-// Both the kernel and user programs use this header file.
+/*
+ * On-disk file system format.
+ * Both the kernel and user programs use this header file.
+ */
 
 #define ROOTINO 1    // root i-number
 #define BSIZE   1024 // block size
 
-// Disk layout:
-// [ boot block | super block | log | inode blocks |
-//                                          free bit map | data blocks]
-//
-// mkfs computes the super block and builds an initial file system. The
-// super block describes the disk layout:
+/*
+ * Disk layout:
+ * [ boot block | super block | log | inode blocks |
+ *                                          free bit map | data blocks]
+ *
+ * mkfs computes the super block and builds an initial file system. The
+ * super block describes the disk layout:
+ */
 struct superblock {
   uint magic;      // Must be FSMAGIC
   uint size;       // Size of file system image (blocks)
@@ -53,8 +57,10 @@ struct dinode {
 // Directory is a file containing a sequence of dirent structures.
 #define DIRSIZ 14
 
-// The name field may have DIRSIZ characters and not end in a NUL
-// character.
+/*
+ * The name field may have DIRSIZ characters and not end in a NUL
+ * character.
+ */
 struct dirent {
   ushort inum;
   char name[DIRSIZ] __attribute__((nonstring));

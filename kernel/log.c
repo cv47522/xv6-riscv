@@ -7,31 +7,35 @@
 #include "fs.h"
 #include "buf.h"
 
-// Simple logging that allows concurrent FS system calls.
-//
-// A log transaction contains the updates of multiple FS system
-// calls. The logging system only commits when there are
-// no FS system calls active. Thus there is never
-// any reasoning required about whether a commit might
-// write an uncommitted system call's updates to disk.
-//
-// A system call should call begin_op()/end_op() to mark
-// its start and end. Usually begin_op() just increments
-// the count of in-progress FS system calls and returns.
-// But if it thinks the log is close to running out, it
-// sleeps until the last outstanding end_op() commits.
-//
-// The log is a physical re-do log containing disk blocks.
-// The on-disk log format:
-//   header block, containing block #s for block A, B, C, ...
-//   block A
-//   block B
-//   block C
-//   ...
-// Log appends are synchronous.
+/*
+ * Simple logging that allows concurrent FS system calls.
+ *
+ * A log transaction contains the updates of multiple FS system
+ * calls. The logging system only commits when there are
+ * no FS system calls active. Thus there is never
+ * any reasoning required about whether a commit might
+ * write an uncommitted system call's updates to disk.
+ *
+ * A system call should call begin_op()/end_op() to mark
+ * its start and end. Usually begin_op() just increments
+ * the count of in-progress FS system calls and returns.
+ * But if it thinks the log is close to running out, it
+ * sleeps until the last outstanding end_op() commits.
+ *
+ * The log is a physical re-do log containing disk blocks.
+ * The on-disk log format:
+ *   header block, containing block #s for block A, B, C, ...
+ *   block A
+ *   block B
+ *   block C
+ *   ...
+ * Log appends are synchronous.
+ */
 
-// Contents of the header block, used for both the on-disk header block
-// and to keep track in memory of logged block# before commit.
+/*
+ * Contents of the header block, used for both the on-disk header block
+ * and to keep track in memory of logged block# before commit.
+ */
 struct logheader {
   int n;
   int block[LOGBLOCKS];
@@ -98,9 +102,11 @@ read_head(void)
   brelse(buf);
 }
 
-// Write in-memory log header to disk.
-// This is the true point at which the
-// current transaction commits.
+/*
+ * Write in-memory log header to disk.
+ * This is the true point at which the
+ * current transaction commits.
+ */
 static void
 write_head(void)
 {
@@ -149,8 +155,10 @@ begin_op(void)
   }
 }
 
-// called at the end of each FS system call.
-// commits if this was the last outstanding operation.
+/*
+ * called at the end of each FS system call.
+ * commits if this was the last outstanding operation.
+ */
 void
 end_op(void)
 {
@@ -164,16 +172,20 @@ end_op(void)
     do_commit = 1;
     log.committing = 1;
   } else {
-    // begin_op() may be waiting for log space,
-    // and decrementing log.outstanding has decreased
-    // the amount of reserved space.
+    /*
+     * begin_op() may be waiting for log space,
+     * and decrementing log.outstanding has decreased
+     * the amount of reserved space.
+     */
     wakeup(&log);
   }
   release(&log.lock);
 
   if (do_commit) {
-    // call commit w/o holding locks, since not allowed
-    // to sleep with locks.
+    /*
+     * call commit w/o holding locks, since not allowed
+     * to sleep with locks.
+     */
     commit();
     acquire(&log.lock);
     log.committing = 0;
@@ -211,15 +223,17 @@ commit()
   }
 }
 
-// Caller has modified b->data and is done with the buffer.
-// Record the block number and pin in the cache by increasing refcnt.
-// commit()/write_log() will do the disk write.
-//
-// log_write() replaces bwrite(); a typical use is:
-//   bp = bread(...)
-//   modify bp->data[]
-//   log_write(bp)
-//   brelse(bp)
+/*
+ * Caller has modified b->data and is done with the buffer.
+ * Record the block number and pin in the cache by increasing refcnt.
+ * commit()/write_log() will do the disk write.
+ *
+ * log_write() replaces bwrite(); a typical use is:
+ *   bp = bread(...)
+ *   modify bp->data[]
+ *   log_write(bp)
+ *   brelse(bp)
+ */
 void
 log_write(struct buf *b)
 {

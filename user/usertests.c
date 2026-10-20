@@ -8,27 +8,33 @@
 #include "kernel/memlayout.h"
 #include "kernel/riscv.h"
 
-//
-// Tests xv6 system calls.  usertests without arguments runs them all
-// and usertests <name> runs <name> test. The test runner creates for
-// each test a process and based on the exit status of the process,
-// the test runner reports "OK" or "FAILED".  Some tests result in
-// kernel printing usertrap messages, which can be ignored if test
-// prints "OK".
-//
+/*
+ *
+ * Tests xv6 system calls.  usertests without arguments runs them all
+ * and usertests <name> runs <name> test. The test runner creates for
+ * each test a process and based on the exit status of the process,
+ * the test runner reports "OK" or "FAILED".  Some tests result in
+ * kernel printing usertrap messages, which can be ignored if test
+ * prints "OK".
+ *
+ */
 
 #define BUFSZ ((MAXOPBLOCKS + 2) * BSIZE)
 
 char buf[BUFSZ];
 
-//
-// Section with tests that run fairly quickly.  Use -q if you want to
-// run just those.  Without -q usertests also runs the ones that take a
-// fair amount of time.
-//
+/*
+ *
+ * Section with tests that run fairly quickly.  Use -q if you want to
+ * run just those.  Without -q usertests also runs the ones that take a
+ * fair amount of time.
+ *
+ */
 
-// what if you pass ridiculous pointers to system calls
-// that read user memory with copyin?
+/*
+ * what if you pass ridiculous pointers to system calls
+ * that read user memory with copyin?
+ */
 void
 copyin(char *s)
 {
@@ -73,8 +79,10 @@ copyin(char *s)
   }
 }
 
-// what if you pass ridiculous pointers to system calls
-// that write user memory with copyout?
+/*
+ * what if you pass ridiculous pointers to system calls
+ * that write user memory with copyout?
+ */
 void
 copyout(char *s)
 {
@@ -135,9 +143,11 @@ copyinstr1(char *s)
   }
 }
 
-// what if a string system call argument is exactly the size
-// of the kernel buffer it is copied into, so that the null
-// would fall just beyond the end of the kernel buffer?
+/*
+ * what if a string system call argument is exactly the size
+ * of the kernel buffer it is copied into, so that the null
+ * would fall just beyond the end of the kernel buffer?
+ */
 void
 copyinstr2(char *s)
 {
@@ -243,8 +253,10 @@ copyinstr3(char *s)
   }
 }
 
-// See if the kernel refuses to read/write user memory that the
-// application doesn't have anymore, because it returned it.
+/*
+ * See if the kernel refuses to read/write user memory that the
+ * application doesn't have anymore, because it returned it.
+ */
 void
 rwsbrk(char *s)
 {
@@ -346,10 +358,12 @@ truncate1(char *s)
   close(fd3);
 }
 
-// write to an open FD whose file has just been truncated.
-// this causes a write at an offset beyond the end of the file.
-// such writes fail on xv6 (unlike POSIX) but at least
-// they don't crash.
+/*
+ * write to an open FD whose file has just been truncated.
+ * this causes a write at an offset beyond the end of the file.
+ * such writes fail on xv6 (unlike POSIX) but at least
+ * they don't crash.
+ */
 void
 truncate2(char *s)
 {
@@ -476,17 +490,19 @@ exitiputtest(char *s)
   exit(xstatus);
 }
 
-// does the error path in open() for attempt to write a
-// directory call iput() in a transaction?
-// needs a hacked kernel that pauses just after the namei()
-// call in sys_open():
-//    if((ip = namei(path)) == 0)
-//      return -1;
-//    {
-//      int i;
-//      for(i = 0; i < 10000; i++)
-//        yield();
-//    }
+/*
+ * does the error path in open() for attempt to write a
+ * directory call iput() in a transaction?
+ * needs a hacked kernel that pauses just after the namei()
+ * call in sys_open():
+ *    if((ip = namei(path)) == 0)
+ *      return -1;
+ *    {
+ *      int i;
+ *      for(i = 0; i < 10000; i++)
+ *        yield();
+ *    }
+ */
 void
 openiputtest(char *s)
 {
@@ -935,9 +951,11 @@ exitwait(char *s)
   }
 }
 
-// try to find races in the reparenting
-// code that handles a parent exiting
-// when it still has live children.
+/*
+ * try to find races in the reparenting
+ * code that handles a parent exiting
+ * when it still has live children.
+ */
 void
 reparent(char *s)
 {
@@ -1060,11 +1078,13 @@ forkforkfork(char *s)
   pause(10); // one second
 }
 
-// regression test. does reparent() violate the parent-then-child
-// locking order when giving away a child to init, so that exit()
-// deadlocks against init's wait()? also used to trigger a "panic:
-// release" due to exit() releasing a different p->parent->lock than
-// it acquired.
+/*
+ * regression test. does reparent() violate the parent-then-child
+ * locking order when giving away a child to init, so that exit()
+ * deadlocks against init's wait()? also used to trigger a "panic:
+ * release" due to exit() releasing a different p->parent->lock than
+ * it acquired.
+ */
 void
 reparent2(char *s)
 {
@@ -1114,8 +1134,10 @@ mem(char *s)
     int xstatus;
     wait(&xstatus);
     if (xstatus == -1) {
-      // probably page fault, so might be lazy lab,
-      // so OK.
+      /*
+       * probably page fault, so might be lazy lab,
+       * so OK.
+       */
       exit(0);
     }
     exit(xstatus);
@@ -1124,8 +1146,10 @@ mem(char *s)
 
 // More file system tests
 
-// two processes write to the same file descriptor
-// is the offset shared? does inode locking work?
+/*
+ * two processes write to the same file descriptor
+ * is the offset shared? does inode locking work?
+ */
 void
 sharedfd(char *s)
 {
@@ -1181,8 +1205,10 @@ sharedfd(char *s)
   }
 }
 
-// four processes write different files at the same
-// time, to test block allocation.
+/*
+ * four processes write different files at the same
+ * time, to test block allocation.
+ */
 void
 fourfiles(char *s)
 {
@@ -1521,8 +1547,10 @@ concreate(char *s)
   }
 }
 
-// another concurrent link/unlink/create test,
-// to look for deadlocks.
+/*
+ * another concurrent link/unlink/create test,
+ * to look for deadlocks.
+ */
 void
 linkunlink(char *s)
 {
@@ -1950,8 +1978,10 @@ dirfile(char *s)
   close(fd);
 }
 
-// test that iput() is called at the end of _namei().
-// also tests empty file names.
+/*
+ * test that iput() is called at the end of _namei().
+ * also tests empty file names.
+ */
 void
 iref(char *s)
 {
@@ -1987,9 +2017,11 @@ iref(char *s)
   chdir("/");
 }
 
-// test that fork fails gracefully
-// the forktest binary also does this, but it runs out of proc entries first.
-// inside the bigger usertests binary, we run out of memory first.
+/*
+ * test that fork fails gracefully
+ * the forktest binary also does this, but it runs out of proc entries first.
+ * inside the bigger usertests binary, we run out of memory first.
+ */
 void
 forktest(char *s)
 {
@@ -2051,9 +2083,11 @@ sbrkbasic(char *s)
       *b = 99;
     }
 
-    // we should not get here! either sbrk(TOOMUCH)
-    // should have failed, or (with lazy allocation)
-    // a pagefault should have killed this process.
+    /*
+     * we should not get here! either sbrk(TOOMUCH)
+     * should have failed, or (with lazy allocation)
+     * a pagefault should have killed this process.
+     */
     exit(1);
   }
 
@@ -2196,8 +2230,10 @@ MAXVAplus(char *s)
   }
 }
 
-// if we run the system out of memory, does it clean up the last
-// failed allocation?
+/*
+ * if we run the system out of memory, does it clean up the last
+ * failed allocation?
+ */
 void
 sbrkfail(char *s)
 {
@@ -2236,8 +2272,10 @@ sbrkfail(char *s)
     printf("%s: no allocation failed; allocate more?\n", s);
   }
 
-  // if those failed allocations freed up the pages they did allocate,
-  // we'll be able to allocate here
+  /*
+   * if those failed allocations freed up the pages they did allocate,
+   * we'll be able to allocate here
+   */
   c = sbrk(PGSIZE);
   for (i = 0; i < sizeof(pids) / sizeof(pids[0]); i++) {
     if (pids[i] == -1)
@@ -2329,9 +2367,11 @@ bsstest(char *s)
   }
 }
 
-// does exec return an error if the arguments
-// are larger than a page? or does it write
-// below the stack and wreck the instructions/data?
+/*
+ * does exec return an error if the arguments
+ * are larger than a page? or does it write
+ * below the stack and wreck the instructions/data?
+ */
 void
 bigargtest(char *s)
 {
@@ -2348,8 +2388,10 @@ bigargtest(char *s)
     for (i = 0; i < MAXARG - 1; i++)
       args[i] = big;
     args[MAXARG - 1] = 0;
-    // this exec() should fail (and return) because the
-    // arguments are too large.
+    /*
+     * this exec() should fail (and return) because the
+     * arguments are too large.
+     */
     exec("echo", args);
     fd = open("bigarg-ok", O_CREATE);
     close(fd);
@@ -2370,8 +2412,10 @@ bigargtest(char *s)
   close(fd);
 }
 
-// what happens when the file system runs out of blocks?
-// answer: balloc panics, so this test is not useful.
+/*
+ * what happens when the file system runs out of blocks?
+ * answer: balloc panics, so this test is not useful.
+ */
 void
 fsfull()
 {
@@ -2436,8 +2480,10 @@ argptest(char *s)
   close(fd);
 }
 
-// check that there's an invalid page beneath
-// the user stack, to catch stack overflow.
+/*
+ * check that there's an invalid page beneath
+ * the user stack, to catch stack overflow.
+ */
 void
 stacktest(char *s)
 {
@@ -2462,8 +2508,10 @@ stacktest(char *s)
     exit(xstatus);
 }
 
-// check that writes to a few forbidden addresses
-// cause a fault, e.g. process's text and TRAMPOLINE.
+/*
+ * check that writes to a few forbidden addresses
+ * cause a fault, e.g. process's text and TRAMPOLINE.
+ */
 void
 nowrite(char *s)
 {
@@ -2496,9 +2544,11 @@ nowrite(char *s)
   exit(0);
 }
 
-// regression test. copyin(), copyout(), and copyinstr() used to cast
-// the virtual page address to uint, which (with certain wild system
-// call arguments) resulted in a kernel page faults.
+/*
+ * regression test. copyin(), copyout(), and copyinstr() used to cast
+ * the virtual page address to uint, which (with certain wild system
+ * call arguments) resulted in a kernel page faults.
+ */
 void *big = (void *)0xeaeb0b5b00002f5e;
 void
 pgbug(char *s)
@@ -2511,9 +2561,11 @@ pgbug(char *s)
   exit(0);
 }
 
-// regression test. does the kernel panic if a process sbrk()s its
-// size to be less than a page, or zero, or reduces the break by an
-// amount too small to cause a page to be freed?
+/*
+ * regression test. does the kernel panic if a process sbrk()s its
+ * size to be less than a page, or zero, or reduces the break by an
+ * amount too small to cause a page to be freed?
+ */
 void
 sbrkbugs(char *s)
 {
@@ -2524,9 +2576,11 @@ sbrkbugs(char *s)
   }
   if (pid == 0) {
     int sz = (uint64)sbrk(0);
-    // free all user memory; there used to be a bug that
-    // would not adjust p->sz correctly in this case,
-    // causing exit() to panic.
+    /*
+     * free all user memory; there used to be a bug that
+     * would not adjust p->sz correctly in this case,
+     * causing exit() to panic.
+     */
     sbrk(-sz);
     // user page fault here.
     exit(0);
@@ -2540,9 +2594,11 @@ sbrkbugs(char *s)
   }
   if (pid == 0) {
     int sz = (uint64)sbrk(0);
-    // set the break to somewhere in the very first
-    // page; there used to be a bug that would incorrectly
-    // free the first page.
+    /*
+     * set the break to somewhere in the very first
+     * page; there used to be a bug that would incorrectly
+     * free the first page.
+     */
     sbrk(-(sz - 3500));
     exit(0);
   }
@@ -2557,9 +2613,11 @@ sbrkbugs(char *s)
     // set the break in the middle of a page.
     sbrk((10 * PGSIZE + 2048) - (uint64)sbrk(0));
 
-    // reduce the break a bit, but not enough to
-    // cause a page to be freed. this used to cause
-    // a panic.
+    /*
+     * reduce the break a bit, but not enough to
+     * cause a page to be freed. this used to cause
+     * a panic.
+     */
     sbrk(-10);
 
     exit(0);
@@ -2569,9 +2627,11 @@ sbrkbugs(char *s)
   exit(0);
 }
 
-// if process size was somewhat more than a page boundary, and then
-// shrunk to be somewhat less than that page boundary, can the kernel
-// still copyin() from addresses in the last page?
+/*
+ * if process size was somewhat more than a page boundary, and then
+ * shrunk to be somewhat less than that page boundary, can the kernel
+ * still copyin() from addresses in the last page?
+ */
 void
 sbrklast(char *s)
 {
@@ -2595,8 +2655,10 @@ sbrklast(char *s)
     exit(1);
 }
 
-// does sbrk handle signed int32 wrap-around with
-// negative arguments?
+/*
+ * does sbrk handle signed int32 wrap-around with
+ * negative arguments?
+ */
 void
 sbrk8000(char *s)
 {
@@ -2605,8 +2667,10 @@ sbrk8000(char *s)
   *(top - 1) = *(top - 1) + 1;
 }
 
-// regression test. test whether exec() leaks memory if one of the
-// arguments is invalid. the test passes if the kernel doesn't panic.
+/*
+ * regression test. test whether exec() leaks memory if one of the
+ * arguments is invalid. the test passes if the kernel doesn't panic.
+ */
 void
 badarg(char *s)
 {
@@ -2622,8 +2686,10 @@ badarg(char *s)
 
 #define REGION_SZ (1024 * 1024 * 1024)
 
-// Touch a page every 64 pages, which with lazy allocation
-// causes one page to be allocated.
+/*
+ * Touch a page every 64 pages, which with lazy allocation
+ * causes one page to be allocated.
+ */
 void
 lazy_alloc(char *s)
 {
@@ -2649,9 +2715,11 @@ lazy_alloc(char *s)
   exit(0);
 }
 
-// Touch a page every 64 pages in region, which with lazy allocation
-// causes one page to be allocated. Check that freeing the region
-// frees the allocated pages.
+/*
+ * Touch a page every 64 pages in region, which with lazy allocation
+ * causes one page to be allocated. Check that freeing the region
+ * frees the allocated pages.
+ */
 void
 lazy_unmap(char *s)
 {
@@ -2828,12 +2896,15 @@ lazy_sbrk(char *s)
 void
 partial_write(char *s)
 {
-  // Create testfile containing "A".
-  // write() 2 bytes that span page boundary: first is "X", second is unmapped.
-  // Potential problem: write errors, forgets to log the updated first byte.
-  // read() from file returns "X".
-  // Flush buffer cache with some large writes.
-  // read() from file should still return "X" (but might return "A" due to bug).
+  /*
+   * Create testfile containing "A".
+   * write() 2 bytes that span page boundary: first is "X", second is unmapped.
+   * Potential problem: write errors, forgets to log the updated first byte.
+   * read() from file returns "X".
+   * Flush buffer cache with some large writes.
+   * read() from file should still return "X" (but might return "A" due to
+   * bug).
+   */
 
   unlink("testfile");
   int fd = open("testfile", O_CREATE | O_RDWR);
@@ -3036,9 +3107,11 @@ struct test {
   {0, 0},
 };
 
-//
-// Section with tests that take a fair bit of time
-//
+/*
+ *
+ * Section with tests that take a fair bit of time
+ *
+ */
 
 // directory that uses indirect blocks
 void
@@ -3081,8 +3154,10 @@ bigdir(char *s)
   }
 }
 
-// concurrent writes to try to provoke deadlock in the virtio disk
-// driver.
+/*
+ * concurrent writes to try to provoke deadlock in the virtio disk
+ * driver.
+ */
 void
 manywrites(char *s)
 {
@@ -3135,11 +3210,13 @@ manywrites(char *s)
   exit(0);
 }
 
-// regression test. does write() with an invalid buffer pointer cause
-// a block to be allocated for a file that is then not freed when the
-// file is deleted? if the kernel has this bug, it will panic: balloc:
-// out of blocks. assumed_free may need to be raised to be more than
-// the number of free blocks. this test takes a long time.
+/*
+ * regression test. does write() with an invalid buffer pointer cause
+ * a block to be allocated for a file that is then not freed when the
+ * file is deleted? if the kernel has this bug, it will panic: balloc:
+ * out of blocks. assumed_free may need to be raised to be more than
+ * the number of free blocks. this test takes a long time.
+ */
 void
 badwrite(char *s)
 {
@@ -3172,9 +3249,11 @@ badwrite(char *s)
   exit(0);
 }
 
-// test the exec() code that cleans up if it runs out
-// of memory. it's really a test that such a condition
-// doesn't cause a panic.
+/*
+ * test the exec() code that cleans up if it runs out
+ * of memory. it's really a test that such a condition
+ * doesn't cause a panic.
+ */
 void
 execout(char *s)
 {
@@ -3192,8 +3271,10 @@ execout(char *s)
         *(a + PGSIZE - 1) = 1;
       }
 
-      // free a few pages, in order to let exec() make some
-      // progress.
+      /*
+       * free a few pages, in order to let exec() make some
+       * progress.
+       */
       for (int i = 0; i < avail; i++)
         sbrk(-PGSIZE);
 
@@ -3244,10 +3325,12 @@ diskfull(char *s)
     close(fd);
   }
 
-  // now that there are no free blocks, test that dirlink()
-  // merely fails (doesn't panic) if it can't extend
-  // directory content. one of these file creations
-  // is expected to fail.
+  /*
+   * now that there are no free blocks, test that dirlink()
+   * merely fails (doesn't panic) if it can't extend
+   * directory content. one of these file creations
+   * is expected to fail.
+   */
   int nzz = 128;
   for (int i = 0; i < nzz; i++) {
     char name[32];
@@ -3403,12 +3486,16 @@ struct test slowtests[] = {
   {0, 0},
 };
 
-//
-// drive tests
-//
+/*
+ *
+ * drive tests
+ *
+ */
 
-// run each test in its own process. run returns 1 if child's exit()
-// indicates success.
+/*
+ * run each test in its own process. run returns 1 if child's exit()
+ * indicates success.
+ */
 int
 run(void f(char *), char *s)
 {

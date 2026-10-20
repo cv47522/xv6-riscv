@@ -29,11 +29,13 @@ trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
-//
-// handle an interrupt, exception, or system call from user space.
-// called from, and returns to, trampoline.S
-// return value is user satp for trampoline.S to switch to.
-//
+/*
+ *
+ * handle an interrupt, exception, or system call from user space.
+ * called from, and returns to, trampoline.S
+ * return value is user satp for trampoline.S to switch to.
+ *
+ */
 uint64
 usertrap(void)
 {
@@ -42,8 +44,10 @@ usertrap(void)
   if ((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
 
-  // send interrupts and exceptions to kerneltrap(),
-  // since we're now in the kernel.
+  /*
+   * send interrupts and exceptions to kerneltrap(),
+   * since we're now in the kernel.
+   */
   w_stvec((uint64)kernelvec); //DOC: kernelvec
 
   struct proc *p = myproc();
@@ -57,12 +61,16 @@ usertrap(void)
     if (killed(p))
       kexit(-1);
 
-    // sepc points to the ecall instruction,
-    // but we want to return to the next instruction.
+    /*
+     * sepc points to the ecall instruction,
+     * but we want to return to the next instruction.
+     */
     p->trapframe->epc += 4;
 
-    // an interrupt will change sepc, scause, and sstatus,
-    // so enable only now that we're done with those registers.
+    /*
+     * an interrupt will change sepc, scause, and sstatus,
+     * so enable only now that we're done with those registers.
+     */
     intr_on();
 
     syscall();
@@ -94,32 +102,40 @@ usertrap(void)
   return satp;
 }
 
-//
-// set up trapframe and control registers for a return to user space
-//
+/*
+ *
+ * set up trapframe and control registers for a return to user space
+ *
+ */
 void
 prepare_return(void)
 {
   struct proc *p = myproc();
 
-  // we're about to switch the destination of traps from
-  // kerneltrap() to usertrap(). because a trap from kernel
-  // code to usertrap would be a disaster, turn off interrupts.
+  /*
+   * we're about to switch the destination of traps from
+   * kerneltrap() to usertrap(). because a trap from kernel
+   * code to usertrap would be a disaster, turn off interrupts.
+   */
   intr_off();
 
   // send syscalls, interrupts, and exceptions to uservec in trampoline.S
   uint64 trampoline_uservec = TRAMPOLINE + (uservec - trampoline);
   w_stvec(trampoline_uservec);
 
-  // set up trapframe values that uservec will need when
-  // the process next traps into the kernel.
+  /*
+   * set up trapframe values that uservec will need when
+   * the process next traps into the kernel.
+   */
   p->trapframe->kernel_satp = r_satp();         // kernel page table
   p->trapframe->kernel_sp = p->kstack + PGSIZE; // process's kernel stack
   p->trapframe->kernel_trap = (uint64)usertrap;
   p->trapframe->kernel_hartid = r_tp(); // hartid for cpuid()
 
-  // set up the registers that trampoline.S's sret will use
-  // to get to user space.
+  /*
+   * set up the registers that trampoline.S's sret will use
+   * to get to user space.
+   */
 
   // set S Previous Privilege mode to User.
   unsigned long x = r_sstatus();
@@ -131,8 +147,10 @@ prepare_return(void)
   w_sepc(p->trapframe->epc);
 }
 
-// interrupts and exceptions from kernel code go here via kernelvec,
-// on whatever the current kernel stack is.
+/*
+ * interrupts and exceptions from kernel code go here via kernelvec,
+ * on whatever the current kernel stack is.
+ */
 void
 kerneltrap()
 {
@@ -157,8 +175,10 @@ kerneltrap()
   if (which_dev == 2 && myproc() != 0)
     yield();
 
-  // the yield() may have caused some traps to occur,
-  // so restore trap registers for use by kernelvec.S's sepc instruction.
+  /*
+   * the yield() may have caused some traps to occur,
+   * so restore trap registers for use by kernelvec.S's sepc instruction.
+   */
   w_sepc(sepc);
   w_sstatus(sstatus);
 }
@@ -173,17 +193,21 @@ clockintr()
     release(&tickslock);
   }
 
-  // ask for the next timer interrupt. this also clears
-  // the interrupt request. 1000000 is about a tenth
-  // of a second.
+  /*
+   * ask for the next timer interrupt. this also clears
+   * the interrupt request. 1000000 is about a tenth
+   * of a second.
+   */
   w_stimecmp(r_time() + 1000000);
 }
 
-// check if it's an external interrupt or software interrupt,
-// and handle it.
-// returns 2 if timer interrupt,
-// 1 if other device,
-// 0 if not recognized.
+/*
+ * check if it's an external interrupt or software interrupt,
+ * and handle it.
+ * returns 2 if timer interrupt,
+ * 1 if other device,
+ * 0 if not recognized.
+ */
 int
 devintr()
 {
@@ -203,9 +227,11 @@ devintr()
       printk("unexpected interrupt irq=%d\n", irq);
     }
 
-    // the PLIC allows each device to raise at most one
-    // interrupt at a time; tell the PLIC the device is
-    // now allowed to interrupt again.
+    /*
+     * the PLIC allows each device to raise at most one
+     * interrupt at a time; tell the PLIC the device is
+     * now allowed to interrupt again.
+     */
     if (irq)
       plic_complete(irq);
 

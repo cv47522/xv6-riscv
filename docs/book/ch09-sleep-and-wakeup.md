@@ -18,14 +18,12 @@ The book's figure is TikZ, so it is redrawn here ([fig/README.md](fig/README.md#
 piperead() {
   acquire(&pipe->lock);            // ┐ holding pipe->lock
   while(no data in pipe->buffer) { // │
-    sleep(&pipe, &pipe->lock) {    // │
-      // in sleep()                // │
+    sleep(&pipe, &pipe->lock) {    // │ in sleep()
       acquire(&p->lock)            // │ ┐ holding p->lock
       release(&pipe->lock)         // ┘ │
       p->state = SLEEPING          //   │
       ...                          //   │
-      swtch() {                    //   │
-        // in scheduler()          //   │
+      swtch() {                    //   │ in scheduler()
         release(&p->lock)          //   ┘
 ```
 

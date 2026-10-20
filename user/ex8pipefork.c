@@ -1,84 +1,86 @@
-// ex8pipefork.c: pass bytes from a child to its parent through a pipe.
-//
-// Based on MIT 6.1810 Lecture 1's ex8.c:
-// https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex8.c.
-// Host references: man 2 pipe; man 2 fork; man 7 pipe.
-//
-// ---------------------------------------------------------------------------
-//  PREREQUISITES
-// ---------------------------------------------------------------------------
-//
-//   Kind  Read first
-//   ----  ------------------------------------------------------------------
-//   note  ../operating-system/The_Process_Abstraction.md  (sections 7.6, 7.8)
-//   code  ../operating-system/codes/src/main/virtualization/cpu-process-api/
-//           pipe_family/pipe_three_closes.c
-//   code  ../operating-system/codes/src/main/virtualization/cpu-process-api/
-//           homework/
-//           08_parent_child_print_pipe.c
-//
-// ---------------------------------------------------------------------------
-//  RUNNING IT  (inside xv6, not on the host)
-// ---------------------------------------------------------------------------
-//
-//    % make qemu
-//    $ ex8pipefork
-//    ex8pipefork: parent read 17 bytes: hello from child
-//
-// ---------------------------------------------------------------------------
-//  CREATE THE PIPE BEFORE fork()
-// ---------------------------------------------------------------------------
-//
-//  A pipe has no name, so inheritance shares it. Creating it before fork()
-//  makes both descriptor tables refer to one kernel buffer.
-//
-//   Process  Read-end copy   Write-end copy   Role after unused-end close
-//   -------  --------------  ---------------  -----------------------------
-//   parent   fds[0]          fds[1]           keeps fds[0], reads
-//   child    fds[0]          fds[1]           keeps fds[1], writes
-//
-//    child                        shared pipe                    parent
-//      |                              |                           |
-//      | close(fds[0])               |            close(fds[1]) |
-//      | write(fds[1], msg) -------->|------------------------->| read(fds[0])
-//      | close(fds[1])               |                           |
-//      v                              v                           v
-//    exits                    last writer closes              wait() reaps
-//
-// ---------------------------------------------------------------------------
-//  WHY UNUSED ENDS MUST CLOSE
-// ---------------------------------------------------------------------------
-//
-//  piperead() treats an empty buffer in two different ways:
-//
-//   Writers left  Result
-//   ------------  ----------------------------------------------------------
-//   one or more   sleep: a holder could still write later
-//   none          return 0: EOF
-//
-//  A reader retaining a write-end copy can prevent its own EOF. This fixed
-//  read does not need EOF, but streaming pipelines do.
-//
-// ---------------------------------------------------------------------------
-//  WHERE EACH PIECE LIVES IN THIS TREE
-// ---------------------------------------------------------------------------
-//
-//   Idea                        File
-//   --------------------------  -------------------------------------------
-//   pipe/fork/read/write        user/usys.S
-//   inherited FD references    kernel/proc.c  (kfork(), filedup())
-//   buffer, EOF, wakeups        kernel/pipe.c
-//   descriptor close           kernel/sysfile.c
-//   shell pipelines             user/sh.c  (runcmd(), PIPE)
-//   exercise details            docs/07-exercises.md
-//
-// ---------------------------------------------------------------------------
-//  KEY POINTS
-// ---------------------------------------------------------------------------
-//
-//  * pipe() before fork() gives isolated processes one controlled channel.
-//  * fork() makes four descriptor references onto the one shared buffer.
-//  * Close unused ends so reference counts can express end-of-stream.
+/*
+ * ex8pipefork.c: pass bytes from a child to its parent through a pipe.
+ *
+ * Based on MIT 6.1810 Lecture 1's ex8.c:
+ * https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex8.c.
+ * Host references: man 2 pipe; man 2 fork; man 7 pipe.
+ *
+ * ---------------------------------------------------------------------------
+ *  PREREQUISITES
+ * ---------------------------------------------------------------------------
+ *
+ *   Kind  Read first
+ *   ----  ------------------------------------------------------------------
+ *   note  ../operating-system/The_Process_Abstraction.md  (sections 7.6, 7.8)
+ *   code  ../operating-system/codes/src/main/virtualization/cpu-process-api/
+ *           pipe_family/pipe_three_closes.c
+ *   code  ../operating-system/codes/src/main/virtualization/cpu-process-api/
+ *           homework/
+ *           08_parent_child_print_pipe.c
+ *
+ * ---------------------------------------------------------------------------
+ *  RUNNING IT  (inside xv6, not on the host)
+ * ---------------------------------------------------------------------------
+ *
+ *    % make qemu
+ *    $ ex8pipefork
+ *    ex8pipefork: parent read 17 bytes: hello from child
+ *
+ * ---------------------------------------------------------------------------
+ *  CREATE THE PIPE BEFORE fork()
+ * ---------------------------------------------------------------------------
+ *
+ *  A pipe has no name, so inheritance shares it. Creating it before fork()
+ *  makes both descriptor tables refer to one kernel buffer.
+ *
+ *   Process  Read-end copy   Write-end copy   Role after unused-end close
+ *   -------  --------------  ---------------  -----------------------------
+ *   parent   fds[0]          fds[1]           keeps fds[0], reads
+ *   child    fds[0]          fds[1]           keeps fds[1], writes
+ *
+ *    child                        shared pipe                    parent
+ *      |                              |                           |
+ *      | close(fds[0])               |            close(fds[1]) |
+ *      | write(fds[1], msg) -------->|------------------------->| read(fds[0])
+ *      | close(fds[1])               |                           |
+ *      v                              v                           v
+ *    exits                    last writer closes              wait() reaps
+ *
+ * ---------------------------------------------------------------------------
+ *  WHY UNUSED ENDS MUST CLOSE
+ * ---------------------------------------------------------------------------
+ *
+ *  piperead() treats an empty buffer in two different ways:
+ *
+ *   Writers left  Result
+ *   ------------  ----------------------------------------------------------
+ *   one or more   sleep: a holder could still write later
+ *   none          return 0: EOF
+ *
+ *  A reader retaining a write-end copy can prevent its own EOF. This fixed
+ *  read does not need EOF, but streaming pipelines do.
+ *
+ * ---------------------------------------------------------------------------
+ *  WHERE EACH PIECE LIVES IN THIS TREE
+ * ---------------------------------------------------------------------------
+ *
+ *   Idea                        File
+ *   --------------------------  -------------------------------------------
+ *   pipe/fork/read/write        user/usys.S
+ *   inherited FD references    kernel/proc.c  (kfork(), filedup())
+ *   buffer, EOF, wakeups        kernel/pipe.c
+ *   descriptor close           kernel/sysfile.c
+ *   shell pipelines             user/sh.c  (runcmd(), PIPE)
+ *   exercise details            docs/07-exercises.md
+ *
+ * ---------------------------------------------------------------------------
+ *  KEY POINTS
+ * ---------------------------------------------------------------------------
+ *
+ *  * pipe() before fork() gives isolated processes one controlled channel.
+ *  * fork() makes four descriptor references onto the one shared buffer.
+ *  * Close unused ends so reference counts can express end-of-stream.
+ */
 
 #include "kernel/types.h"
 #include "user/user.h"
@@ -102,8 +104,10 @@ main(void)
     return 1;
   }
 
-  // The roles may swap if their close() calls swap too. Here the child writes,
-  // and the surviving parent reads, reports the result, and reaps the child.
+  /*
+   * The roles may swap if their close() calls swap too. Here the child writes,
+   * and the surviving parent reads, reports the result, and reaps the child.
+   */
   if (pid == 0) {
     // The child writes only; it must not retain an unused read reference.
     close(fds[0]);
@@ -141,12 +145,14 @@ main(void)
 
   close(fds[0]);
 
-  // Read before wait(). A write over PIPESIZE (512 in kernel/pipe.c) blocks
-  // until a reader drains the buffer; waiting first could deadlock:
-  //
-  //    child:  write(fds[1], ...)  -- asleep in pipewrite(), buffer full
-  //    parent: wait()              -- asleep until the child exits
-  //            (nobody reads, so neither wakes)
+  /*
+   * Read before wait(). A write over PIPESIZE (512 in kernel/pipe.c) blocks
+   * until a reader drains the buffer; waiting first could deadlock:
+   *
+   *    child:  write(fds[1], ...)  -- asleep in pipewrite(), buffer full
+   *    parent: wait()              -- asleep until the child exits
+   *            (nobody reads, so neither wakes)
+   */
   wait((int *)0);
   return 0;
 }

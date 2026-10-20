@@ -21,9 +21,11 @@ flags2perm(int flags)
   return perm;
 }
 
-//
-// the implementation of the exec() system call
-//
+/*
+ *
+ * the implementation of the exec() system call
+ *
+ */
 int
 kexec(char *path, char **argv)
 {
@@ -83,9 +85,11 @@ kexec(char *path, char **argv)
   p = myproc();
   uint64 oldsz = p->sz;
 
-  // Allocate some pages at the next page boundary.
-  // Make the first inaccessible as a stack guard.
-  // Use the rest as the user stack.
+  /*
+   * Allocate some pages at the next page boundary.
+   * Make the first inaccessible as a stack guard.
+   * Use the rest as the user stack.
+   */
   sz = PGROUNDUP(sz);
   uint64 sz1;
   if ((sz1 = uvmalloc(pagetable, sz, sz + (USERSTACK + 1) * PGSIZE, PTE_W)) ==
@@ -96,8 +100,10 @@ kexec(char *path, char **argv)
   sp = sz;
   stackbase = sp - USERSTACK * PGSIZE;
 
-  // Copy argument strings into new stack, remember their
-  // addresses in ustack[].
+  /*
+   * Copy argument strings into new stack, remember their
+   * addresses in ustack[].
+   */
   for (argc = 0; argv[argc]; argc++) {
     sp -= strlen(argv[argc]) + 1;
     sp -= sp % 16; // riscv sp must be 16-byte aligned
@@ -118,9 +124,11 @@ kexec(char *path, char **argv)
       0)
     goto bad;
 
-  // a0 and a1 contain arguments to user main(argc, argv)
-  // argc is returned via the system call return
-  // value, which goes in a0.
+  /*
+   * a0 and a1 contain arguments to user main(argc, argv)
+   * argc is returned via the system call return
+   * value, which goes in a0.
+   */
   p->trapframe->a1 = sp;
 
   // Save program name for debugging.
@@ -149,10 +157,12 @@ bad:
   return -1;
 }
 
-// Load an ELF program segment into pagetable at virtual address va.
-// va must be page-aligned
-// and the pages from va to va+sz must already be mapped.
-// Returns 0 on success, -1 on failure.
+/*
+ * Load an ELF program segment into pagetable at virtual address va.
+ * va must be page-aligned
+ * and the pages from va to va+sz must already be mapped.
+ * Returns 0 on success, -1 on failure.
+ */
 static int
 loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset,
         uint sz)
