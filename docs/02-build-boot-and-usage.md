@@ -246,7 +246,7 @@ Adding a tenth or a fiftieth exercise does not justify `user/exercises/`, and th
 | **`clean`'s `*/*.o */*.d */*.asm */*.sym`** | The same single level.                                                             | `make clean` leaves the nested objects behind, and the next build silently links them. |
 | **The `_%: %.o` rule and its `$*` stem**    | The stem is the source path, which is how `.asm` and `.sym` land next to the `.c`. | Disassembly appears somewhere other than where you look for it.                        |
 
-The `mkfs` row is worth seeing fail, because it is the one that saves you. `mkfs/mkfs.c:137` strips a single leading `user/`, and `mkfs/mkfs.c:142` then asserts that nothing else in the name is a slash:
+The `mkfs` row is worth seeing fail, because it is the one that saves you. `main()` in `mkfs/mkfs.c` strips a single leading `user/`, and then asserts that nothing else in the name is a slash:
 
 ```bash
 $ mkfs/mkfs test.img user/exercises/_ex1copy
@@ -268,18 +268,30 @@ For what each of these extensions actually is — and why this tree needs `.S`, 
 
 The conventions below are enforced by tooling or by the absence of a C library, not by preference, so a program that ignores them either gets rewritten or does not compile.
 
-| Convention                                                | Why it is not a matter of taste                                                                                                                                                                                                                                   |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`int` on its own line, then `main(void)`, then `{`**    | `.clang-format` sets `BreakAfterReturnType: TopLevelDefinitions` and `BraceWrapping.AfterFunction: true`, and `make fmt` runs clang-format over `user/*.c`. A hand-written `int main(void) {` is rewritten on the next run and lands in someone's unrelated diff. |
-| **`return 0` and `return 1`, or `exit(0)` and `exit(1)`** | Both are correct here. `start()` in `user/ulib.c` is the real entry point and does `exit(main(argc, argv))`, so a returned value reaches the `exit` system call unchanged.                                                                                        |
-| **No `EXIT_SUCCESS`, no `<stdlib.h>`**                    | There is no host C library to take them from. The Makefile compiles with `-ffreestanding -nostdlib`, and `user/user.h` is the complete set of functions available.                                                                                                |
-| **`return 1` means failure**                              | Non-zero is a failure status by convention and is what `user/sh.c` and the graders read. It is never a stand-in for success.                                                                                                                                      |
+| Convention                                                | Why it is not a matter of taste                                                                                                                                                                                                                                          |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`int` on its own line, then `main(void)`, then `{`**    | `.clang-format` sets `BreakAfterReturnType: TopLevelDefinitions` and `BraceWrapping.AfterFunction: true`, and `make fmt` runs clang-format over `user/*.c`. A hand-written `int main(void) {` is rewritten on the next run and lands in someone's unrelated diff.        |
+| **`return 0` and `return 1`, or `exit(0)` and `exit(1)`** | Both are correct here. `start()` in `user/ulib.c` is the real entry point and does `exit(main(argc, argv))`, so a returned value reaches the `exit` system call unchanged.                                                                                               |
+| **No `EXIT_SUCCESS`, no `<stdlib.h>`**                    | There is no host C library to take them from. The Makefile compiles with `-ffreestanding -nostdlib`, and `user/user.h` is the complete set of functions available.                                                                                                       |
+| **`/* ... */` for multiline comments; `//` for one line** | Use separate block-delimiter lines and ` *` body prefixes for teaching headers and Q/A blocks. Keep comments ASCII and at most 79 columns, preserve aligned tables and diagrams, and follow [the complete source-comment rules](../AGENTS.md#source-comment-formatting). |
+| **`return 1` means failure**                              | Non-zero is a failure status by convention and is what `user/sh.c` and the graders read. It is never a stand-in for success.                                                                                                                                             |
 
 > [!NOTE]
 > Most programs under `user/` end with `exit(0)` rather than `return 0`, and there is no need to change them — `exit` is declared `__attribute__((noreturn))` in `user/user.h`, which is genuinely useful on error paths. `user/ex1copy.c` uses `return` instead because it is a teaching program and the point is that `main`'s return value _is_ the exit status.
 
 > [!WARNING]
 > Do not run `make fmt` to fix one file. It reformats every source in `kernel/`, `user/`, and `mkfs/`, and a whole-tree reformat makes the next lab merge conflict on nearly every file. Match the surrounding style by hand instead.
+
+### C reading pitfalls
+
+| Question when reading existing code             | What the C expression means                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Does `*s++` increment the character?**        | No. Postfix `++` binds more tightly than unary `*`, so it means `*(s++)`: read through the old pointer, then advance the pointer by one element. `atoi()` in [`user/ulib.c`](../user/ulib.c) uses this form.                                                                                                   |
+| **What would `(*s)++` do?**                     | Increment the character at the same address, leaving the pointer unchanged. It is invalid through `atoi()`'s `const char *s`; `const` protects the pointed-to character, while the local pointer itself can advance.                                                                                           |
+| **Must every local start at `-1`?**             | Initialize before the first read of its value. In [`wc()`](../user/wc.c), `read()` assigns `n` before it is tested, and a loop assigns `i` before comparison. Counters and accumulators need their algorithm's starting value; a sentinel is useful only when later code actually distinguishes that sentinel. |
+| **Must declarations be at the function's top?** | That is the style of `wc.c`, not a C requirement. Declaration with initialization is valid, and declaring `int i` in a `for` initializer limits its scope to that loop. Match surrounding code without confusing style with correctness.                                                                       |
+
+The parentheses change which object is modified, not merely presentation. In `atoi()`'s `n * 10 + *s++ - '0'`, multiplying preserves the earlier decimal places, subtracting `'0'` converts the current digit's character code to its numeric value, and pointer advancement prepares the next loop test. This explains conversion mechanics; the helper's [input and error-reporting limits](05-syscall-reference.md#atoi-is-conversion-not-validation) are a separate contract.
 
 ## Debugging
 

@@ -5,9 +5,11 @@
 #include "kernel/vm.h"
 #include "user/user.h"
 
-//
-// wrapper so that it's OK if main() does not call exit().
-//
+/*
+ *
+ * wrapper so that it's OK if main() does not call exit().
+ *
+ */
 void
 start(int argc, char **argv)
 {
@@ -102,9 +104,14 @@ stat(const char *n, struct stat *st)
 int
 atoi(const char *s)
 {
-  int n;
-
-  n = 0;
+  int n = 0;
+  /*
+   * Q: Is *s++ the same as (*s)++?
+   * A: No. *s++ is *(s++): read the old pointee and advance the pointer.
+   * (*s)++ would modify the character and leave s unchanged; const char *
+   * forbids that write. See "C reading pitfalls" in
+   * docs/02-build-boot-and-usage.md.
+   */
   while ('0' <= *s && *s <= '9')
     n = n * 10 + *s++ - '0';
   return n;

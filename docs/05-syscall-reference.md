@@ -182,6 +182,17 @@ Everything below `// ulib.c` in `user/user.h` runs entirely in user space. It ma
 | **`printf`**, **`fprintf`**                             | `user/printf.c`  | `fprintf` takes a descriptor, not a `FILE *`. Both are `__attribute__((format(printf, ...)))`. No `puts`, `putchar`, `putc`, or `sprintf` — `putc` is `static` inside `user/printf.c`. |
 | **`malloc`**, **`free`**                                | `user/umalloc.c` | A free list over `sbrk`. No `calloc`, no `realloc`.                                                                                                                                    |
 
+### `atoi` is conversion, not validation
+
+| Input to the local `atoi()` | Result | Why |
+| --- | --- | --- |
+| `"0"` or `"00"` | `0` | Decimal digits were consumed, but their value is zero. |
+| `""` or `"abc"` | `0` | No digits were consumed; the initial accumulator is returned unchanged. |
+| `"3x"` | `3` | Conversion stops at the first nondigit without reporting trailing text. |
+| `" 3"`, `"+3"`, or `"-3"` | `0` | This implementation skips neither whitespace nor a leading sign. |
+
+[`atoi()` in `user/ulib.c`](../user/ulib.c) consumes the initial decimal-digit run and returns only an `int`; it supplies no success flag, end pointer, or overflow check. Neither a zero result nor a nonzero result proves that the entire input was valid. Signed `int` overflow is undefined in C, so an out-of-range input has no reliable conversion result. Callers that require validation need a separate full-input and range policy. [C reading pitfalls](02-build-boot-and-usage.md#c-reading-pitfalls) explains its pointer increment and digit arithmetic.
+
 ## Divergences from POSIX
 
 These are the places where habits from Linux produce code that compiles and then misbehaves, or does not compile at all.

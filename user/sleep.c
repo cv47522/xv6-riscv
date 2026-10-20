@@ -1,3 +1,4 @@
+#include "kernel/types.h" // defines uint, which user/user.h uses
 #include "user/user.h"
 
 /*
