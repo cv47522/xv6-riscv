@@ -7,16 +7,22 @@ int
 main(int argc, char *argv[])
 {
   if (argc == 1) {
-    // Layout: docs/labs/03-util-memdump.md#the-five-starter-layouts
     printf("Example 1:\n");
+    memdump("ii", "abcdefgh", sizeof("abcdefgh"));
+
+    printf("Example 2:\n");
+    memdump("ii", "a", sizeof("a")); // 2 bytes: first 'i' is already short
+
+    // Layout: docs/labs/03-util-memdump.md#the-five-starter-layouts
+    printf("Example 3:\n");
     int a[2] = {61810, 2026};
     // Byte-view rationale: docs/labs/03-util-memdump.md#why-char-data
     memdump("ii", (char *)a, sizeof(a));
 
-    printf("Example 2:\n");
+    printf("Example 4:\n");
     memdump("S", "a string", sizeof("a string"));
 
-    printf("Example 3:\n");
+    printf("Example 5:\n");
     char *s = "another";
     // Pointer-slot rationale: docs/labs/03-util-memdump.md#why-s-needs-s
     memdump("s", (char *)&s, sizeof(s));
@@ -37,10 +43,10 @@ main(int argc, char *argv[])
     example.byte = 'z';
     strcpy(example.bytes, "xyzzy");
 
-    printf("Example 4:\n");
+    printf("Example 6:\n");
     memdump("pihcS", (char *)&example, sizeof(example));
 
-    printf("Example 5:\n");
+    printf("Example 7:\n");
     memdump("sccccc", (char *)&example, sizeof(example));
 
     /*
@@ -61,8 +67,9 @@ main(int argc, char *argv[])
      */
     memmove(no_term, "abcdefgh", 8);
     /*
-     * Describable extent is 8, but the bytes beyond it are non-zero, so a scan
-     * that trusts a terminator instead of `len` runs on into the filler.
+     * 8, not 16: the 'X' bytes stand for memory just past the region. They
+     * must exist and be non-zero so a scan that ignores len prints them;
+     * passing 16 would make them valid data and the probe would test nothing.
      */
     memdump("S", no_term, 8);
 
@@ -105,28 +112,31 @@ main(int argc, char *argv[])
      * format in argv[1], up to 512 bytes of data from standard input.
      * Capacity rationale: docs/labs/03-util-memdump.md#why-512-bytes
      */
-    char data[512];
+    char buf[512] = {0};
     /*
      * Capacity as a signed count, because every other quantity here is one.
      * Comparing `n` against sizeof()'s unsigned type would convert `n`
      * instead.
+     *
+     * One read() returns what the pipe holds at that moment: user/echo.c
+     * writes its argument and "\n" separately. Input beyond 512 bytes is
+     * left unread and ignored.
      */
-    int cap = sizeof(data);
-    int n = 0;
-    memset(data, '\0', sizeof(data));
-    while (n < cap) {
+    int cap = sizeof(buf);
+    int total = 0;
+    while (total < cap) {
       /*
        * read() returns what one call could deliver, not what was asked for:
        * a pipe hands over whatever the writer has flushed so far. Loop until
        * it reports 0 (EOF) so a split write still arrives whole.
        */
-      int nn = read(0, data + n, cap - n); // Read FD 0 (stdin)
-      if (nn <= 0)
+      int n = read(0, buf + total, cap - total); // Read FD 0 (stdin), Advance cursor in buffer for next read w/ `buf + total`
+      if (n <= 0)
         break;
-      n += nn;
+      total += n;
     }
-    // n, not sizeof(data): capacity is not content length.
-    memdump(argv[1], data, n);
+    // total, not sizeof(buf): capacity is not content length.
+    memdump(argv[1], buf, total);
   } else {
     printf("Usage: memdump [format]\n");
     exit(1);
@@ -277,38 +287,40 @@ memdump(char *fmt, char *data, int len)
     }
 
     switch (fmt[i]) {
-    case 'i':
-      printf("%d\n", *(int *)curr);
-      break;
-    case 'h':
-      printf("%d\n", *(short *)curr);
-      break;
-    case 'c':
-      printf("%c\n", *curr);
-      break;
-    case 'p':
-      /*
-       * %lx, not %x: user/printf.c reads %x as a uint32 and would drop the
-       * high four bytes of the value.
-       */
-      printf("%lx\n", *(uint64 *)curr);
-      break;
-    case 's':
-      /*
-       * One hop. The cursor names the slot; the slot holds the address.
-       * `len` covers the slot, not the string it reaches: the target lies
-       * outside the region entirely, so this is the one row whose output is
-       * unbounded. Following the pointer is what `s` means.
-       */
-      printf("%s\n", *(char **)curr);
-      break;
-    case 'S':
-      /*
-       * The only row whose width is not known until the bytes are examined,
-       * so the helper reports it. Rejected alternatives: see the banner.
-       */
-      width = dump_string(curr, remaining);
-      break;
+      case 'i':
+        printf("%d\n", *(int *)curr); // Prints: "1684234849", "1751606885"
+        // printf("%c\n", *(data + byte_counter)); // Prints: "a", "e"
+        // printf("%d\n", *(data + byte_counter)); // Prints: "97 (a)", "101 (e)"
+        break;
+      case 'h':
+        printf("%d\n", *(short *)curr);
+        break;
+      case 'c':
+        printf("%c\n", *curr);
+        break;
+      case 'p':
+        /*
+        * %lx, not %x: user/printf.c reads %x as a uint32 and would drop the
+        * high four bytes of the value.
+        */
+        printf("%lx\n", *(uint64 *)curr);
+        break;
+      case 's':
+        /*
+        * One hop. The cursor names the slot; the slot holds the address.
+        * `len` covers the slot, not the string it reaches: the target lies
+        * outside the region entirely, so this is the one row whose output is
+        * unbounded. Following the pointer is what `s` means.
+        */
+        printf("%s\n", *(char **)curr);
+        break;
+      case 'S':
+        /*
+        * The only row whose width is not known until the bytes are examined,
+        * so the helper reports it. Rejected alternatives: see the banner.
+        */
+        width = dump_string(curr, remaining);
+        break;
     }
 
     curr += width;
