@@ -138,6 +138,20 @@ main(void)
    *   a pipe         returns -1      --          no
    *
    * The hint goes to fd 2, so it cannot contaminate redirected output.
+   *
+   * Q: What's this check for? Same as user/find.c?
+   * A: It asks "is a person typing?" so the hint appears only on the
+   * console. Same call and same st.type field, but a different job:
+   *
+   *               ex1copy.c                  user/find.c
+   *   ----------  -------------------------  ---------------------------
+   *   fd checked  0, inherited from sh.c     the one find() just opened
+   *   -1 means    a pipe: normal, no hint    a failure: report, close
+   *   type gates  an optional hint           whether read() yields dirents
+   *   wrong type  copy anyway                refuse: bytes, not records
+   *
+   * Here the && short-circuits, so st.type is read only after fstat()
+   * filled st; find.c gets the same guarantee from its early return.
    */
   if (fstat(0, &st) == 0 && st.type == T_DEVICE) {
     fprintf(2, "ex1copy: copying standard input to standard output.\n");

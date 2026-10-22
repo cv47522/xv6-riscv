@@ -13,6 +13,8 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 
 ## What the exercise asks for
 
+### Contract
+
 | Contract        | Required behavior                                                                                        |
 | --------------- | -------------------------------------------------------------------------------------------------------- |
 | **Input**       | A starting directory and a name to find, as in `find . b`.                                               |
@@ -22,30 +24,39 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 | **Termination** | Do not descend through the special `.` and `..` entries.                                                 |
 | **Build**       | Put the source directly in `user/find.c` and register `$U/_find` in `UPROGS`; this tree has neither yet. |
 
-The 2026 handout gives no difficulty label for this exercise. The relevant tests in [`grade-lab-util`](../../grade-lab-util) total 40 points. The regex checks inspect console lines; they are narrower than a full specification of ordering, errors, or every pathname shape.
+### What the grader checks
 
-| Test                                                       | Points | Exact checks                                                                                                                                                                                                                                    | What they leave open                                                                                                        |
-| ---------------------------------------------------------- | -----: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **`find, in current directory`**                           |     10 | Creates a random file in `.`; requires a line beginning with the regex `./<name>` and forbids lines beginning `./README` or `README`.                                                                                                           | `.` is an unescaped regex wildcard, and the expected name is not end-anchored; this does not verify a unique or exact line. |
-| **`find, in sub-directory`**                               |     10 | Creates the same random basename in `.` and a new subdirectory; searches from that subdirectory; requires a line beginning `<dir>/<name>` and forbids a line beginning `./<name>`.                                                              | It checks the requested start point, not all possible sibling paths or output order.                                        |
-| **`find, recursive`**                                      |     10 | Places one matching basename at three paths, including a grandchild; requires a line beginning with each expected path.                                                                                                                         | It does not count duplicates or reject extra lines.                                                                         |
-| **`find, missing target, no duplicates, directory match`** |     10 | Counts one output line beginning `./` and containing the present random name, zero containing an absent random name, and one containing a matching directory name; then requires `DONE` and forbids lines beginning `path too long` or `panic`. | The regexes are not end-anchored; the test does not define diagnostics for bad arguments or failed I/O.                     |
+The four tests in [`grade-lab-util`](../../grade-lab-util) total **40 points**; none installs a breakpoint. `NAME`, `DIR`, and the numbered paths below stand for freshly generated names, not literal input text.
 
-The grader's [`assert_lines_match()`](../../gradelib.py) applies `re.match()` to each line, while the corner test uses `re.findall()` on the whole transcript. Thus a passing test proves its stated observations, not an unstated choice about traversal order or error messages.
+| Test                                                       | Points | Setup and search                                                              | Required matches                                                     | Forbidden matches                 |
+| ---------------------------------------------------------- | ------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------- |
+| **`find, in current directory`**                           | 10     | Create `NAME` in `.`; run `find . NAME`.                                      | Prefix `./NAME`                                                      | Prefixes `./README`, `README`     |
+| **`find, in sub-directory`**                               | 10     | Create the same basename in `.` and `DIR`; run `find DIR NAME`.               | Prefix `DIR/NAME`                                                    | Prefix `./NAME`                   |
+| **`find, recursive`**                                      | 10     | Put `NAME` in a child, its grandchild, and another child; run `find . NAME`.  | Prefixes for all three paths                                         | None                              |
+| **`find, missing target, no duplicates, directory match`** | 10     | Search for a present file, absent name, and directory name; then `echo DONE`. | Respectively 1, 0, and 1 lines matching `^\./.*NAME`; exact `^DONE$` | Prefixes `path too long`, `panic` |
+
+### What the grader does not prove
+
+The first three tests use [`re.match()` through `assert_lines_match()`](../../gradelib.py): their dots are unescaped wildcards and their path patterns have no end anchor. The recursive test does not count duplicate or extra lines. The corner test instead uses multiline `re.findall()` with a literal `./` prefix and exact counts; its names are still not end-anchored.
+
+The subdirectory case observes the requested start point and rejects the root-level duplicate basename. None of these assertions establishes an output order, every pathname shape, a general cycle-detection strategy, argument diagnostics, or failure handling for `open`, `fstat`, and `stat`. A passing score establishes the listed observations, not those missing policies.
 
 ## Prerequisites
 
-| When                | Read                                                                                                                                                  | Ownership                                                                                                                                                              |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Read first**      | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)                                                      | User-program location, arguments, xv6 C style, `UPROGS`, and image creation.                                                                                           |
-| **Read first**      | [`C_String.md`](../../../c-programming/C_String.md)                                                                                                   | The sibling study note introduces terminated strings and comparison; [`user/ulib.c`](../../user/ulib.c) supplies this tree's actual `strcmp`, `strlen`, and `memmove`. |
-| **Read first**      | [`07-exercises.md`'s `ex9ls`](../07-exercises.md#ex9ls--a-directory-is-a-file) and [`user/ex9ls.c`](../../user/ex9ls.c)                               | A smaller directory reader before the fuller `user/ls.c` walkthrough below.                                                                                            |
-| **Use when needed** | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) and its [path limits](../05-syscall-reference.md#directories-and-paths) | `open`, `read`, `fstat`, `stat`, `close`, and pathname limits.                                                                                                         |
-| **Use when needed** | [`book/ch10-file-system.md`](../book/ch10-file-system.md) and the book's [`fs.tex`](../../../xv6-riscv-book/fs.tex)                                   | The xv6 directory and pathname mechanisms; the chapter note is still a placeholder, so the narrow record-format explanation below is held here temporarily.            |
-| **Use when needed** | [`03-lab-workflow.md`](../03-lab-workflow.md) and [`06-build-artifacts.md`](../06-build-artifacts.md)                                                 | Lab grading and generated system-call stubs; neither mechanism needs repeating here.                                                                                   |
+| When                | Read                                                                                                                                                                                                                                                                                                        | Ownership                                                                                                                                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Read first**      | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)                                                                                                                                                                                                            | User-program location, arguments, xv6 C style, `UPROGS`, and image creation.                                                                                                                                                     |
+| **Read first**      | [`C_String.md`](../../../c-programming/C_String.md)                                                                                                                                                                                                                                                         | The sibling study note introduces terminated strings and comparison; [`user/ulib.c`](../../user/ulib.c) supplies this tree's actual `strcmp`, `strlen`, and `memmove`.                                                           |
+| **Read first**      | [`fixed_width_name_field.c`](../../../c-programming/notes/src/main/arrays_and_strings/strings/fixed_width_name_field.c) and its [`.excalidraw`](../../../c-programming/notes/src/main/arrays_and_strings/strings/fixed_width_name_field.excalidraw)                                                         | A hosted demo of a 14-byte name field: detecting a missing `\0`, bounded printing, the `DIRSIZ + 1` copy, `strcmp` versus `==`, and budgeting a joined path. The drawing opens in Excalidraw and shows each buffer byte by byte. |
+| **Read first**      | [`dir_dot_entries.c`](../../../operating-system/codes/src/main/persistence/file-intro/dir_dot_entries.c) and [`dir-dot-entries-loop.svg`](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg) ([source](../../../operating-system/images/file-systems/dir-dot-entries-loop.excalidraw)) | A Linux demo that proves `.` and `..` name the current and parent inodes, and contrasts Linux's `readdir()` with xv6's raw `read()` of `struct dirent`. The figure shows which records lead down and which lead back.            |
+| **Read first**      | [`07-exercises.md`'s `ex9ls`](../07-exercises.md#ex9ls--a-directory-is-a-file) and [`user/ex9ls.c`](../../user/ex9ls.c)                                                                                                                                                                                     | A smaller directory reader before the fuller `user/ls.c` walkthrough below.                                                                                                                                                      |
+| **Use when needed** | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) and its [path limits](../05-syscall-reference.md#directories-and-paths)                                                                                                                                                       | `open`, `read`, `fstat`, `stat`, `close`, and pathname limits.                                                                                                                                                                   |
+| **Use when needed** | [`book/ch10-file-system.md`](../book/ch10-file-system.md) and the book's [`fs.tex`](../../../xv6-riscv-book/fs.tex)                                                                                                                                                                                         | The xv6 directory and pathname mechanisms; the chapter note is still a placeholder, so the narrow record-format explanation below is held here temporarily.                                                                      |
+| **Use when needed** | [`03-lab-workflow.md`](../03-lab-workflow.md) and [`06-build-artifacts.md`](../06-build-artifacts.md)                                                                                                                                                                                                       | Lab grading and generated system-call stubs; neither mechanism needs repeating here.                                                                                                                                             |
+| **Use when needed** | [`fd_per_open_level.c`](../../../operating-system/codes/src/main/persistence/file-intro/fd_per_open_level.c)                                                                                                                                                                                                | A Linux demo of one descriptor per open nesting level, then `EMFILE` after lowering `RLIMIT_NOFILE` to xv6's `NOFILE` of 16.                                                                                                     |
 
 > [!NOTE]
-> The sibling C note teaches hosted C concepts, not xv6's callable API. [`user/user.h`](../../user/user.h) is the complete user interface here; `opendir()` and `readdir()` are not available.
+> The sibling C note and the three sibling demos teach hosted C and Linux concepts, not xv6's callable API. [`user/user.h`](../../user/user.h) is the complete user interface here; `opendir()` and `readdir()` are not available.
 
 ## The code to read first
 
@@ -58,6 +69,39 @@ The grader's [`assert_lines_match()`](../../gradelib.py) applies `re.match()` to
 | [`kernel/fs.c`](../../kernel/fs.c)                                            | `namex()` resolves path components, and `dirlookup()` resolves one name in a directory.                        | No `find` operation; the new program must choose which paths to visit. |
 
 ## `ls()` line by line
+
+A `dirent` is one fixed-size directory-entry record from [`kernel/fs.h`](../../kernel/fs.h). The diagram follows only existing `ls()`'s directory branch after successful `open()` and `fstat()`; it adds neither recursion nor the target's name filter.
+
+```mermaid
+flowchart TD
+    subgraph L["ls() reads directory entries in user/ls.c."]
+        A{"Does the child path fit<br/>in the local buffer?"}
+        A -->|No| X["ls() reports that the path is too long."]
+        X --> Z["ls() closes the directory descriptor."]
+        A -->|Yes| B{"Did read() return<br/>one complete dirent?"}
+        B -->|No| Z
+        B -->|Yes| C{"Is de.inum equal to 0?"}
+        C -->|"Yes: the slot is unused."| B
+        C -->|No| D["ls() builds the child path<br/>and terminates its copied name."]
+        D --> E{"Did stat() obtain<br/>the child's metadata?"}
+        E -->|No| F["ls() reports the metadata failure."]
+        E -->|Yes| G["ls() prints the child's name<br/>and metadata."]
+        F --> B
+        G --> B
+    end
+    classDef routing fill:#f0f0ff,stroke:#66c,color:#111
+    classDef processing fill:#fffff0,stroke:#cc6,color:#111
+    classDef commit fill:#f0ffff,stroke:#6cc,color:#111
+    classDef failure fill:#ffd9d9,stroke:#c66,color:#111
+    class A,B,C,E routing
+    class D,G processing
+    class Z commit
+    class X,F failure
+```
+
+_Blue marks decisions, yellow processes names, cyan closes the descriptor, and red reports failures._
+
+A directory contains records rather than complete child paths. `ls()` supplies the parent-path prefix and a NUL-terminated copy of the record name before calling `stat()`. Its source distinguishes an unused slot from a failed metadata lookup: both skip output, but only the latter prints an error.
 
 This is the complete, unchanged `ls()` function from [`user/ls.c`](../../user/ls.c). It is existing source, not a template for the target file.
 
@@ -136,13 +180,15 @@ ls(char *path)
 > [!IMPORTANT]
 > A directory entry names an inode inside one parent. A displayed path is a separate string assembled from the starting path and successive names; `struct dirent` does not store that path.
 
-The book's [`fs.tex`](../../../xv6-riscv-book/fs.tex) and this tree's [`kernel/fs.c`](../../kernel/fs.c) describe `namex()` resolving paths from `/` or the process's current directory, then looking up each component. The current directory aliases `.` and `..` are real entries created by [`create()` in `kernel/sysfile.c`](../../kernel/sysfile.c). They are harmless to list, but following them repeatedly would revisit the same directories. The missing-target test and duplicate count expose that failure without proving a general cycle-detection strategy.
+The book's [`fs.tex`](../../../xv6-riscv-book/fs.tex) and this tree's [`kernel/fs.c`](../../kernel/fs.c) describe `namex()` resolving paths from `/` or the process's current directory, then looking up each component. The current directory aliases `.` and `..` are real entries created by [`create()` in `kernel/sysfile.c`](../../kernel/sysfile.c). They are harmless to list, but following them repeatedly would revisit the same directories. See the [grader limits](#what-the-grader-does-not-prove) when interpreting the missing-target and duplicate checks.
 
 `strcmp()` in [`user/ulib.c`](../../user/ulib.c) compares terminated strings; `==` compares pointer values. The 14-byte record field therefore needs a safe conversion before string comparison. `ls()` shows one such boundary. Its `stat()` call is a user-library wrapper, not a separate kernel primitive, and it closes the temporary descriptor it opens.
 
 ## Deriving it
 
-| Contract for `user/find.c`                 | Source-backed question to settle                                                                                                                                                                                                                                 |
+**Contract:** return to the [requirements](#contract) and [grader evidence](#what-the-grader-checks); the table below identifies decisions, not a second specification.
+
+| Decision for `user/find.c`                 | Source-backed question to settle                                                                                                                                                                                                                                 |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Interpret the two operands**             | How does [`user/echo.c`](../../user/echo.c) or [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#how-command-words-reach-main-via-argcargv) distinguish `argv[0]` from the user's path and name? What is a sensible diagnostic for a missing operand? |
 | **Inspect only directory records**         | Which [`ls()`](../../user/ls.c) branch and `struct stat.type` value establish that `read()` will return directory entries?                                                                                                                                       |
@@ -161,31 +207,62 @@ The book's [`fs.tex`](../../../xv6-riscv-book/fs.tex) and this tree's [`kernel/f
 
 ## Verifying it
 
-1. Build and boot with `make qemu` after registering `$U/_find` in the Makefile; [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns that build path.
-2. In the guest, create the handout's `b`, `a/b`, and `a/aa/b` layout, then run `find . b`; also try an absent name, a directory name, and a search starting at `a`.
-3. From the host, run `./grade-lab-util find` to select the four tests whose titles contain `find`. [`03-lab-workflow.md`](../03-lab-workflow.md) owns transcript and grading mechanics.
+1. Register `$U/_find`, then build and boot using the [user-program workflow](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise):
 
-```bash
-make qemu
-```
+    ```bash
+    make qemu
+    ```
 
-```text
-find . b
-find a b
-```
+2. In a fresh guest image, create the handout's tree and check plain search, a restricted starting directory, a missing name, and a directory match:
 
-```bash
-./grade-lab-util find
-```
+    ```text
+    echo > b
+    mkdir a
+    echo > a/b
+    mkdir a/aa
+    echo > a/aa/b
+    find . b
+    find a b
+    find . absent-name
+    find . aa
+    ```
 
-`make qemu` rebuilds the filesystem image, so guest files from the previous image disappear; `make qemu-fs` boots the existing image when preserving them matters. The commands above are checks to run after implementing the exercise, not a claimed transcript from this unfinished tree.
+3. Quit QEMU with `Ctrl-a x`, then select the four tests whose titles contain `find`:
+
+    ```bash
+    ./grade-lab-util find
+    ```
+
+These are commands for the implementation to verify, not a transcript claiming a completed `user/find.c`. Interpret results using [the evidence limits](#what-the-grader-does-not-prove). [Docs 03](../03-lab-workflow.md#grading) owns failure transcripts; this set saves `xv6.out.find_curdir`, `xv6.out.find_subdir`, `xv6.out.find_recursive`, and `xv6.out.find_corner`.
+
+`make qemu` rebuilds the image, removing files created in the earlier guest; `make qemu-fs` preserves that image when needed. [Docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns those mechanics. Neither the user-space directory reader nor its future recursion needs a kernel-debugger recipe.
 
 ## Questions
 
 1. Why does [`ls()`](../../user/ls.c) call `fstat(fd, &st)` before treating reads as `struct dirent` records?
+
+    **A:** `read()` returns raw bytes from any inode; only `st.type == T_DIR` guarantees those bytes are 16-byte `struct dirent` slots. A file's or the console's bytes would be misread as inode numbers and names. Until `fstat()` succeeds, `st` is also uninitialized, so the type test would branch on stack garbage.
+
 2. What are the bytes of a full-length directory name in [`kernel/fs.h`](../../kernel/fs.h), and where does `ls()` add the terminator needed by C string functions?
+
+    **A:** Two bytes of `inum`, then 14 name bytes with no `\0` among them. `ls()` copies the field with `memmove(p, de.name, DIRSIZ)` and writes `p[DIRSIZ] = 0` inside `buf`; its length check reserves that byte through the final `+ 1`.
+
 3. Why does [`user/ls.c`](../../user/ls.c) tolerate `.` and `..`, while a traversal cannot follow them as ordinary children?
+
+    **A:** `ls()` lists one directory and never follows a record, so `.` and `..` are only two more output lines. A traversal that follows every record naming a directory reaches the current inode through `.` and the parent through `..`, which lists the current directory again. It then repeats output until a path or descriptor limit stops it; see [`dir-dot-entries-loop.svg`](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg).
+
 4. If `open(path, O_RDONLY)` fails, which branch in [`ls()`](../../user/ls.c) runs, and which descriptor cleanup is unnecessary?
+
+    **A:** The first `if` prints `ls: cannot open ...` on fd 2 and returns. No `close()` is needed because a failed `open()` allocated no descriptor; `close(-1)` would itself fail in `argfd()` in [`kernel/sysfile.c`](../../kernel/sysfile.c).
+
 5. If `stat(buf, &st)` fails for one entry, what does [`ls()`](../../user/ls.c) do with the rest of that directory?
+
+    **A:** It prints `ls: cannot stat ...` with `printf`, so on fd 1 rather than fd 2, and `continue`s with the next record. The directory descriptor stays open, and the final `close(fd)` still runs after the loop.
+
 6. What does the corner test in [`grade-lab-util`](../../grade-lab-util) prove about missing names, duplicate output, and directories that match?
+
+    **A:** Exactly one line matches `^\./.*PRESENT`, so the file is not reported again through `.` or `..`. No line matches the absent name, one line matches the directory name, and neither `path too long` nor `panic` appears before `DONE`. Because the names are not end-anchored, the test does not prove that a matched line ends at the name; see [what the grader does not prove](#what-the-grader-does-not-prove).
+
 7. Why can a 512-byte buffer in [`ls()`](../../user/ls.c) still be rejected by `MAXPATH` in [`kernel/param.h`](../../kernel/param.h)?
+
+    **A:** The buffer size is only `ls()`'s own limit. `sys_open()` in [`kernel/sysfile.c`](../../kernel/sysfile.c) copies the pathname into `char path[MAXPATH]` through `argstr()`, which fails when no `\0` appears within 128 bytes. `stat()` calls `open()`, so a 200-byte path fits `buf` but still fails there.

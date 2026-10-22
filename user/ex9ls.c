@@ -23,7 +23,7 @@
  *
  *    % make qemu
  *    $ ex9ls               list the current directory
- *    $ ex9ls . /           list two named directories with headings
+ *    $ ex9ls . /           list two filenamed directories with headings
  *    $ ex9ls README        reject a path that is not a directory
  *
  * ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@
  *
  *    struct dirent {
  *      ushort inum;          inode number; 0 means an unused slot
- *      char name[DIRSIZ];    exactly 14 bytes; may have no trailing NUL
+ *      char filename[DIRSIZ];    exactly 14 bytes; may have no trailing NUL
  *    };
  *
  *    open(".", O_RDONLY)
@@ -54,8 +54,8 @@
  *   -------------------------  ---------------------------------------------
  *   read sizeof(struct dirent) consume exactly one on-disk record
  *   skip inum == 0             unlink leaves reusable holes in the array
- *   copy exactly DIRSIZ bytes  a full-length name has no NUL terminator
- *   append a NUL in name[]     printf("%s") requires a C string
+ *   copy exactly DIRSIZ bytes  a full-length filename has no NUL terminator
+ *   append a NUL in filename[]     printf("%s") requires a C string
  *
  *  "." and ".." are real directory entries. With no argument, "." resolves
  *  against p->cwd in kernel/proc.h, the process's current directory.
@@ -69,7 +69,7 @@
  *   struct dirent and DIRSIZ    kernel/fs.h
  *   struct stat and T_DIR       kernel/stat.h
  *   directory reads             kernel/fs.c  (readi())
- *   path lookup                 kernel/fs.c  (namei(), dirlookup())
+ *   path lookup                 kernel/fs.c  (filenamei(), dirlookup())
  *   "." and ".." creation       kernel/sysfile.c  (create())
  *   full ls implementation      user/ls.c
  *   exercise details            docs/07-exercises.md
@@ -80,7 +80,7 @@
  *
  *  * Listing needs no new xv6 syscall: directories use open(), read(), and
  *    known record layout.
- *  * On-disk names are fixed-width byte fields, not automatically C strings.
+ *  * On-disk filenames are fixed-width byte fields, not automatically C strings.
  *  * The kernel owns directory writes so dirents and inode links stay valid.
  */
 
@@ -100,15 +100,22 @@ list(const char *path)
   int fd = open(path, O_RDONLY);
   if (fd < 0) {
     fprintf(2, "ex9ls: cannot open %s\n", path);
+    /*
+     * Q: Why not close(fd)?
+     * A: A failed open() allocated no descriptor, so there is nothing to
+     * release. fd holds -1, and close(-1) would itself fail: argfd() in
+     * kernel/sysfile.c rejects fd < 0 before touching p->ofile[].
+     */
     return -1;
   }
 
-  // Do not interpret an ordinary file as an array of directory records.
   if (fstat(fd, &st) < 0) {
     fprintf(2, "ex9ls: cannot stat %s\n", path);
     close(fd);
     return -1;
   }
+
+  // Do not interpret an ordinary file as an array of directory records.
   if (st.type != T_DIR) {
     fprintf(2, "ex9ls: %s is not a directory\n", path);
     close(fd);
@@ -116,17 +123,17 @@ list(const char *path)
   }
 
   // One extra byte holds the NUL missing from a full DIRSIZ on-disk name.
-  char name[DIRSIZ + 1];
+  char filename[DIRSIZ + 1];
 
   while (read(fd, &de, sizeof(de)) == sizeof(de)) {
     if (de.inum == 0) // A zero inode marks a free directory slot.
       continue;
 
     // memmove uses the record width; strcpy could scan beyond de.name.
-    memmove(name, de.name, DIRSIZ);
-    name[DIRSIZ] = '\0';
+    memmove(filename, de.name, DIRSIZ);
+    filename[DIRSIZ] = '\0';
 
-    printf("%s\n", name);
+    printf("%s\n", filename);
   }
 
   close(fd);
@@ -138,15 +145,15 @@ main(int argc, char *argv[])
 {
   // "." is a real entry naming this process's current directory.
   if (argc < 2)
-    return list(".") < 0 ? 1 : 0;
+    exit(list(".") < 0 ? 1 : 0);
 
-  int bad = 0;
+  int exit_code = 0;
   for (int i = 1; i < argc; i++) {
     if (argc > 2)
       printf("%s:\n", argv[i]);
     if (list(argv[i]) < 0)
-      bad = 1;
+      exit_code = 1;
   }
 
-  exit(bad);
+  exit(exit_code);
 }

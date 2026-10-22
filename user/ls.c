@@ -44,31 +44,31 @@ ls(char *path)
   }
 
   switch (st.type) {
-  case T_DEVICE:
-  case T_FILE:
-    printf("%s %d %d %d\n", fmtname(path), st.type, st.ino, (int)st.size);
-    break;
-
-  case T_DIR:
-    if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
-      printf("ls: path too long\n");
+    case T_DEVICE:
+    case T_FILE:
+      printf("%s %d %d %d\n", fmtname(path), st.type, st.ino, (int)st.size);
       break;
-    }
-    strcpy(buf, path);
-    p = buf + strlen(buf);
-    *p++ = '/';
-    while (read(fd, &de, sizeof(de)) == sizeof(de)) {
-      if (de.inum == 0)
-        continue;
-      memmove(p, de.name, DIRSIZ);
-      p[DIRSIZ] = 0;
-      if (stat(buf, &st) < 0) {
-        printf("ls: cannot stat %s\n", buf);
-        continue;
+
+    case T_DIR:
+      if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
+        printf("ls: path too long\n");
+        break;
       }
-      printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, (int)st.size);
-    }
-    break;
+      strcpy(buf, path);
+      p = buf + strlen(buf);
+      *p++ = '/';
+      while (read(fd, &de, sizeof(de)) == sizeof(de)) {
+        if (de.inum == 0)
+          continue;
+        memmove(p, de.name, DIRSIZ);
+        p[DIRSIZ] = 0;
+        if (stat(buf, &st) < 0) {
+          printf("ls: cannot stat %s\n", buf);
+          continue;
+        }
+        printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, (int)st.size);
+      }
+      break;
   }
   close(fd);
 }

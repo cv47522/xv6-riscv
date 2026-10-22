@@ -154,7 +154,10 @@ OBJDUMP = $(TOOLPREFIX)objdump
 #  -O                       satisfy assembly/layout assumptions; shrink code.
 #  -fno-omit-frame-pointer  preserve s0 for r_fp() and stack backtraces.
 #  -ggdb -gdwarf-2          emit course-compatible gdb information.
-CFLAGS = -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+#  -pedantic				turns off more extensions and generates more warnings
+#  -g						for Valgrind & debugging
+#  -Wextra					add extra warnings, e.g., unused parameters
+CFLAGS = -g -Wall -Werror -Wextra -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2 -pedantic
 
 # rv64gc is 64-bit RISC-V with the G extensions and compressed instructions.
 # Deterministic builds.
@@ -359,6 +362,7 @@ UPROGS=\
 	$U/_sleep\
 	$U/_sixfive\
 	$U/_memdump\
+	$U/_find\
 
 
 
