@@ -101,7 +101,7 @@ list(const char *path)
   if (fd < 0) {
     fprintf(2, "ex9ls: cannot open %s\n", path);
     /*
-     * Q: Why not close(fd)?
+     * Q: Why is there no close(fd) when open() fails?
      * A: A failed open() allocated no descriptor, so there is nothing to
      * release. fd holds -1, and close(-1) would itself fail: argfd() in
      * kernel/sysfile.c rejects fd < 0 before touching p->ofile[].

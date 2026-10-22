@@ -116,7 +116,7 @@ Each item that cannot be found is a retrieval problem: fix that section, and lea
 
 ## Step 5 - Audit the no-solution boundary
 
-Read the note as someone about to implement the exercise. Remove anything that can be copied as the answer, replace missing choices with source-anchored questions, and cut explanations already owned elsewhere. Inspect diagrams too: an ordered target algorithm is still a solution when drawn rather than written in C.
+Read the note as someone about to implement the exercise. Remove anything that can be copied as the answer, replace missing choices with source-anchored questions, and cut explanations already owned elsewhere. Inspect diagrams too: an ordered target algorithm is still a solution when drawn rather than written in C. The only exception is a final `## Solution walkthrough` section, added after the exercise passes and opened with a `[!CAUTION]` spoiler callout; audit every other section as above.
 
 Every fenced `c` block must be a contiguous, verbatim quotation from an existing non-target file and must cite that file. Inspect this manually. The following smoke check finds unmatched nonblank lines, but it cannot prove order, contiguity, or that the target solution was excluded:
 
@@ -145,4 +145,4 @@ Follow the harness when a claimed observation depends on how execution stops: di
 
 Render changed diagrams with the available renderer and inspect readability, branch labels, and contrast. Check an Excalidraw export against its editable source. If rendering is unavailable, report that limitation rather than claiming visual verification. Finish with the scan audit and the ownership/repetition audit above, and confirm that no new hard wraps were introduced into Markdown prose.
 
-Do not create nested `docs/labs/<lab>/` directories, restructure `docs/`, or add the solution after grading.
+Do not create nested `docs/labs/<lab>/` directories, restructure `docs/`, or add the solution after grading anywhere except a final spoiler-marked `## Solution walkthrough` section.

@@ -29,7 +29,7 @@ The split against the other collections:
 | **labs/** (this directory)                   | MIT lab exercises, from the handout's requirements to a checklist you can implement from. |
 
 > [!IMPORTANT]
-> **No solutions.** A lab note explains code that already exists in the tree and states the contract the new file has to satisfy; it stops at the point where writing the program begins. That boundary is deliberate — see the collaboration habit in [03-lab-workflow.md](../03-lab-workflow.md#how-to-approach-a-lab). Once an exercise is written and graded, the finished source under `user/` is its own record, and the note stays a derivation aid rather than growing into a walkthrough of the answer.
+> **No solutions.** A lab note explains code that already exists in the tree and states the contract the new file has to satisfy; it stops at the point where writing the program begins. That boundary is deliberate — see the collaboration habit in [03-lab-workflow.md](../03-lab-workflow.md#how-to-approach-a-lab). Once an exercise passes its grader tests, the note may end with one `## Solution walkthrough` section behind a `[!CAUTION]` spoiler callout, explaining the finished source under `user/` with diagrams; every section before it stays a derivation aid. See [Lab Notes in AGENTS.md](../../AGENTS.md#lab-notes).
 
 ## Writing the next one
 

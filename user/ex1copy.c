@@ -139,7 +139,8 @@ main(void)
    *
    * The hint goes to fd 2, so it cannot contaminate redirected output.
    *
-   * Q: What's this check for? Same as user/find.c?
+   * Q: What is the fstat() check on fd 0 for, and is it the same job as the
+   * fstat() check in user/find.c?
    * A: It asks "is a person typing?" so the hint appears only on the
    * console. Same call and same st.type field, but a different job:
    *
