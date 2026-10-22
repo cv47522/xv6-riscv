@@ -96,7 +96,7 @@ list(const char *path)
   struct stat st;
   struct dirent de;
 
-  // O_RDONLY is the only mode a directory can be opened in; see above.
+  // Directories can only be opened O_RDONLY.
   int fd = open(path, O_RDONLY);
   if (fd < 0) {
     fprintf(2, "ex9ls: cannot open %s\n", path);
@@ -148,5 +148,5 @@ main(int argc, char *argv[])
       bad = 1;
   }
 
-  return bad;
+  exit(bad);
 }

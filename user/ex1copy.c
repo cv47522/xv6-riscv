@@ -154,17 +154,17 @@ main(void)
     // A short write would silently lose part of the byte stream.
     if (write(1, buf, n) != n) {
       fprintf(2, "ex1copy: write error\n");
-      return 1;
+      exit(1);
     }
   }
   if (n < 0) {
     fprintf(2, "ex1copy: read error\n");
-    return 1;
+    exit(1);
   }
 
   /*
    * user/ulib.c calls exit(main(...)), so return 0 equals exit(0). xv6 is
    * freestanding; user/user.h has no host EXIT_SUCCESS.
    */
-  return 0;
+  exit(0);
 }

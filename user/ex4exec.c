@@ -124,5 +124,5 @@ main(void)
 
   // Reaching this statement proves exec() failed.
   fprintf(2, "ex4exec: exec echo failed\n");
-  return 1;
+  exit(1);
 }

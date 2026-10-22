@@ -50,9 +50,8 @@
  *  The pipe has no pathname and touches no disk. read() returns 0 only when
  *  the buffer is empty and every write-end descriptor has closed.
  *
- *  This one-process demo writes before it reads and must stay below PIPESIZE.
- *  A larger write can fill the buffer and sleep while its only reader is the
- *  same sleeping process.
+ *  This one-process demo must write less than PIPESIZE before reading: a
+ *  larger write can fill the buffer and sleep, blocking its only reader.
  *
  * ---------------------------------------------------------------------------
  *  WHERE EACH PIECE LIVES IN THIS TREE
@@ -88,7 +87,7 @@ main(void)
 
   if (pipe(fds) < 0) { // 0,1,2 are taken, so pipe() takes 3 & 4
     fprintf(2, "ex7pipe: pipe failed\n");
-    return 1;
+    exit(1);
   }
 
   printf("ex7pipe: pipe() gave read fd %d, write fd %d\n", fds[0], fds[1]);
@@ -97,22 +96,22 @@ main(void)
   int written = write(fds[1], "xyz\n", 4);
   if (written != 4) {
     fprintf(2, "ex7pipe: write failed\n");
-    return 1;
+    exit(1);
   }
 
   int n = read(fds[0], buf, sizeof(buf));
   if (n < 0) {
     fprintf(2, "ex7pipe: read failed\n");
-    return 1;
+    exit(1);
   }
 
   // Preserve the exact byte count; a pipe does not add a string terminator.
   if (write(1, buf, n) != n) { // Write to FD 1 (console)
     fprintf(2, "ex7pipe: write to stdout failed\n");
-    return 1;
+    exit(1);
   }
 
   close(fds[0]);
   close(fds[1]);
-  return 0;
+  exit(0);
 }

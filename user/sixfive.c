@@ -54,30 +54,26 @@ sixfive(int fd, char *name)
   enum token_state state;
 
   /*
-   * Q: Why not initialize c to -1?
-   * A: A positive read result overwrites c before the loop body uses it. On
-   * EOF or error, the body does not run, so a sentinel value would be unused.
+   * c needs no -1 sentinel: read() overwrites it before use, and EOF/error
+   * skips the loop body.
    */
   char c;
 
   /*
-   * Q: Why not initialize n and value to -1?
-   * A: read assigns n before the condition examines it, while decimal
-   * accumulation requires value to begin at zero rather than at -1.
+   * n needs no -1 sentinel: read() assigns it before the test. Decimal
+   * accumulation needs value to start at 0, not -1.
    */
   int n, value;
 
   state = TOKEN_BOUNDARY;
   value = 0;
   /*
-   * Q: Why not read a buffer as wc.c does?
-   * A: A buffer can work if state survives between reads and only n bytes are
-   * examined. One-byte reads follow the handout and remove buffer boundaries.
+   * Buffered reads (as in user/wc.c) work if state survives reads and only n
+   * bytes are examined. One-byte reads follow the handout and avoid buffer
+   * boundaries.
    *
-   * Q: Why can't read() receive c instead of &c?
-   * A: read() needs the address of writable storage where it can copy bytes.
-   * c is the byte value. Passing it would misinterpret that value as an
-   * address rather than as writable storage.
+   * read() needs &c, the address of writable storage. Passing c would treat
+   * the byte value as an address.
    */
   while ((n = read(fd, &c, 1)) > 0) {
     /*
@@ -130,9 +126,8 @@ int
 main(int argc, char *argv[])
 {
   /*
-   * Q: Why not initialize fd and i to -1?
-   * A: open() assigns fd before it is tested or used, and the for initializer
-   * assigns i before its first comparison. Neither variable needs a sentinel.
+   * fd and i need no -1 sentinels: open() assigns fd before use, and the for
+   * initializer assigns i before its first comparison.
    */
   int fd, i, failed;
 

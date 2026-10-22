@@ -123,7 +123,7 @@ main(void)
   int fd = open("ex2.out", O_WRONLY | O_CREATE | O_TRUNC);
   if (fd < 0) {
     fprintf(2, "ex2create: cannot create ex2.out\n");
-    return 1;
+    exit(1);
   }
 
   printf("ex2create: open() returned fd %d\n", fd);
@@ -133,9 +133,9 @@ main(void)
   if (n != 6) {
     fprintf(2, "ex2create: short write (%d of 6 bytes)\n", n);
     close(fd);
-    return 1;
+    exit(1);
   }
 
   close(fd);
-  return 0;
+  exit(0);
 }

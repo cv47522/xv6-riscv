@@ -13,8 +13,8 @@ main(int argc, char *argv[])
    * argv[0] names sleep; argv[1] carries the requested tick count.
    */
   if (argc != 2) {
-    fprintf(2, "Usage: sleep TICKS\n");
-    return 1;
+    fprintf(2, "Usage: sleep [ticks]\n");
+    exit(1);
   }
 
   /*
@@ -26,5 +26,5 @@ main(int argc, char *argv[])
    */
   int ticks = atoi(argv[1]);
   pause(ticks);
-  return 0;
+  exit(0);
 }

@@ -30,8 +30,8 @@
  *  CREATE THE PIPE BEFORE fork()
  * ---------------------------------------------------------------------------
  *
- *  A pipe has no name, so inheritance shares it. Creating it before fork()
- *  makes both descriptor tables refer to one kernel buffer.
+ *  A pipe is nameless; creating it before fork() shares one kernel buffer
+ *  through inherited descriptors.
  *
  *   Process  Read-end copy   Write-end copy   Role after unused-end close
  *   -------  --------------  ---------------  -----------------------------
@@ -94,19 +94,19 @@ main(void)
   // With fds 0-2 taken, pipe() normally returns read fd 3 and write fd 4.
   if (pipe(fds) < 0) {
     fprintf(2, "ex8pipefork: pipe failed\n");
-    return 1;
+    exit(1);
   }
 
   // Both processes inherit references to this same pipe.
   int pid = fork();
   if (pid < 0) {
     fprintf(2, "ex8pipefork: fork failed\n");
-    return 1;
+    exit(1);
   }
 
   /*
-   * The roles may swap if their close() calls swap too. Here the child writes,
-   * and the surviving parent reads, reports the result, and reaps the child.
+   * Child writes; parent reads, reports, and reaps. Swapping roles also
+   * requires swapping their close() calls.
    */
   if (pid == 0) {
     // The child writes only; it must not retain an unused read reference.
@@ -133,14 +133,14 @@ main(void)
   int n = read(fds[0], buf, sizeof(buf));
   if (n < 0) {
     fprintf(2, "ex8pipefork: read failed\n");
-    return 1;
+    exit(1);
   }
 
   printf("ex8pipefork: parent read %d bytes: ", n);
   // fd 1 remains the console.
   if (write(1, buf, n) != n) {
     fprintf(2, "ex8pipefork: write to stdout failed\n");
-    return 1;
+    exit(1);
   }
 
   close(fds[0]);
@@ -154,5 +154,5 @@ main(void)
    *            (nobody reads, so neither wakes)
    */
   wait((int *)0);
-  return 0;
+  exit(0);
 }

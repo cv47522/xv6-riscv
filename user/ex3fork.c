@@ -49,32 +49,26 @@
  *  WHY THE OUTPUT ORDER IS NOT FIXED
  * ---------------------------------------------------------------------------
  *
- *  Nothing in this program orders the two processes. There is no wait(), so
- *  both are runnable the moment fork() returns, and three effects stack up:
+ *  Without wait(), both processes are runnable after fork(), with no ordering:
  *
  *   Cause                       Effect on what reaches the console
  *   --------------------------  ----------------------------------------
- *   the scheduler chooses       either process may print first, and the
- *   freely                      choice can differ from run to run
- *   CPUS=3 by default           the two really do run at the same instant
- *                               on different harts, so it is not merely a
- *                               question of who was picked first
- *   printf() is not atomic      user/printf.c formats into a small buffer
- *                               and calls write() several times per line,
- *                               and uartputc() takes its lock per
- *                               CHARACTER -- so the streams mix mid-word
+ *   scheduler choice            either may print first; order varies by run
+ *   CPUS=3 by default           different harts can run them simultaneously
+ *   printf() is not atomic      user/printf.c buffers output but calls write()
+ *                               several times per line; uartputc() locks per
+ *                               character, allowing mid-word interleaving
  *
- *  The output is therefore not just reordered; a real run looks like this:
+ *  A real run shows interleaving, not just reordered lines:
  *
  *    (ex3fork) forke(x3for)k returned : fork() retu6r n e(dI  0  (I ama mp
  *
- *  A third process joins in. sh forked this program and is sitting in
- *  wait(), which returns as soon as ITS child -- the parent here -- exits.
- *  The child may still be running then, so the $ prompt can land mid-line.
- *  A prompt is not a promise that everything finished.
+ *  A third process, sh, waits for its child (the parent here), not the
+ *  grandchild. Once the parent exits, sh can print $ mid-line while the
+ *  grandchild still runs; the prompt does not mean everything finished.
  *
- *  `make qemu CPUS=1` usually yields whole lines. That is not a fix; it only
- *  makes the race harder to hit. Ordering needs wait(), which is ex5forkexec.
+ *  `make qemu CPUS=1` usually yields whole lines but only makes the race
+ *  harder to hit. Ordering needs wait(); see ex5forkexec.c.
  *
  * ---------------------------------------------------------------------------
  *  WHERE EACH PIECE LIVES IN THIS TREE
@@ -110,7 +104,7 @@ main(void)
 
   if (pid < 0) {
     fprintf(2, "(ex3fork) fork failed\n");
-    return 1;
+    exit(1);
   }
 
   // This statement runs once in each process after fork().
@@ -129,5 +123,5 @@ main(void)
   printf("(ex3fork) parent: x is %d\n", x);
 
   // Deliberately no wait(): init reaps an orphan if this parent exits first.
-  return 0;
+  exit(0);
 }

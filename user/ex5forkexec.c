@@ -97,7 +97,7 @@ main(void)
 
   if (pid < 0) {
     fprintf(2, "ex5forkexec: fork failed\n");
-    return 1;
+    exit(1);
   }
 
   if (pid == 0) {
@@ -116,11 +116,11 @@ main(void)
   int reaped = wait(&status);
   if (reaped < 0) {
     fprintf(2, "ex5forkexec: wait failed\n");
-    return 1;
+    exit(1);
   }
 
   printf("ex5forkexec: child %d exited with status %d\n", reaped, status);
-  return 0;
+  exit(0);
 }
 
 /*
