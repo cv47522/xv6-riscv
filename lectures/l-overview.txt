@@ -1,30 +1,28 @@
-6.1810 2025 Lecture 1: O/S overview
+6.1810 2026 Lecture 1: O/S overview
 
 Overview
 
-* What's an operating system?
-  [user/kernel diagram]
-  - h/w: CPU, RAM, disk, net, &c
-  - user applications: sh, cc, DB, &c
-  - kernel services: FS, processes, memory, network, &c
-  - system calls
+* The topic is...
+  - a layer of software
+  - below applications
+  - above hardware
 
-* What is the purpose of an O/S?
+* A set of goals that has worked out well:
   - Multiplex the hardware among many applications
   - Isolate applications for security and to contain bugs
   - Share data among cooperating applications
   - Abstract the hardware for portability, convenience
 
-* Design tensions make O/S design interesting
-  - efficient vs abstract/portable/general-purpose
-  - powerful vs simple interfaces
-  - flexible vs secure
-  - portable vs exploit new hardware and interfaces
+* O/S design is hard due to conflicting constraints:
+  - performance
+  - generality
+  - power
+  - security
 
-* You'll be glad you took this course if you...
-  * are curious about how computer systems work
-  * need to track down bugs or security problems
-  * care about high performance
+* You may want to take this course to
+  - satisfy curiousity about inner workings
+  - help you track down bugs
+  - help you understand performance
 
 Class structure
 
@@ -33,6 +31,7 @@ Class structure
     https://pdos.csail.mit.edu/6.1810/
     or search with Google -- all material is public
   Piazza -- announcements, discussion, lab help
+  Gradescope -- lab/homework submission
 
 * Lectures
   * O/S ideas
@@ -40,7 +39,7 @@ Class structure
     read the code!
   * lab help
   * O/S papers
-  * homework: answer a question about the reading, before lecture.
+  * homework: reading, answer a question about the reading, before lecture.
 
 * Labs: 
   The point: hands-on experience
@@ -51,30 +50,35 @@ Class structure
     O/S kernel extensions to xv6, e.g. network.
   For help:
     Ask+answer questions on Piazza
-    Attend TA office hours
-  Discussion is great, but please write your own code!
+    TA office hours
+  Discussion is great, but write your own code!
     Do not look at others' solutions.
+  You can use AI to help you understand ideas,
+    but please don't use AI to write lab solutions,
+    or even to help you debug.
+  Most of the learning will come from you figuring out
+    how to solve problems, and how to make your code work.
 
 * Grading:
-  50% labs, based on tests (the same tests you run).
+  65% labs: tests and check-off meetings with a TA.
   30% exams -- midterm in class, final during finals week.
-  15% lab check-off meetings: we'll ask you about randomly-selected labs.
   5% home-work questions
   Much of the course grade is from labs. Start them early!
 
-Introduction to UNIX system calls
+* A standard O/S diagram:
+  [add to diagram]
+  - "user space"
+  - "kernel"
+  - kernel services: FS, processes, memory, network, &c
+  - system calls
 
-* Applications interact with the O/S via "system calls."
-  you'll use system calls in the first lab.
-  and extend and improve them in subsequent labs.
-
-* I'll show some application examples, and run them on xv6.
-  xv6 is an O/S we created specifically for this class.
-  xv6 is patterned after UNIX, but far simpler.
-  why UNIX?
-    an ancestor of many of today's O/Ss.
-    e.g. Linux and MacOS.
-    learning about xv6 will help you understand many other O/Ss.
+* I'm going to show example uses of system calls.
+  on xv6, an O/S we created for this class.
+  a much-simplified UNIX.
+  UNIX is a family of related O/Ss
+    e.g. Linux and MacOS
+    similar system calls and internal structure
+    so xv6 will help you understand many other O/Ss.
   xv6 small enough you'll be able to read and understand all of it.
     accompanying book explains how xv6 works, and why
   xv6 has two roles in 6.1810:
@@ -83,13 +87,14 @@ Introduction to UNIX system calls
   xv6 runs on a RISC-V CPU, as in 6.1910 (6.004)
   you'll run xv6 inside the qemu machine emulator
 
-* example: ex1.c, copy input to output
+* example: ex1.c, a user program to copy input to output
   read bytes from input, write them to the output
   % make qemu
   $ ex1
+  hello
   you can find these example programs via the schedule on the web site
   ex1.c is written in C
-    C is probably the most common language for O/S kernels
+    C is a common language for O/S programming
   read() and write() are system calls
     they look like function calls, but actually jump into the kernel.
     in a way that preserves user/kernel isolation.
@@ -141,7 +146,7 @@ Introduction to UNIX system calls
 
 * I've been typing to UNIX's command-line interface, the shell.
   the shell prints the "$" prompts.
-  the shell is an ordinary user program, not part of the kernel.
+  the shell is a user program, and it acts via system calls.
   the shell lets you run UNIX command-line utilities
     useful for system management, messing with files, development, scripting
     $ ls
@@ -187,7 +192,7 @@ Introduction to UNIX system calls
   $ ex4
   exec(filename, argument-array)
     argument-array holds command-line arguments; exec passes to main()
-    cat user/echo.c
+    cat -n user/echo.c
     echo.c shows how a program looks at its command-line arguments
   exec() does not return if successful!
 
@@ -219,18 +224,16 @@ Introduction to UNIX system calls
   note: exec preserves FDs
   fork, FDs, and exec interact nicely to implement I/O redirection
     separate fork-then-exec gives child a chance to change FDs
-      before exec() gives up control
+      before giving up control with exec()
       and without disturbing parent's FDs
   FDs provide indirection
     commands just use FDs 0 and 1, don't have to know where they go
   thus: only sh knows about I/O redirection, not each program
 
-* It's worth asking "why" about design decisions:
-  Why these I/O and process abstractions? Why not something else?
-  Why provide a file system? Why not let programs use the disk their own way?
-  Why FDs? Why not pass a filename to write()?
-  Why not combine fork() and exec()?
-  UNIX works well, but there are other good designs!
+* Other designs are possible!
+  Could pass filename to read()/write() instead of having FDs.
+  Could access disk directly instead of having a file system.
+  Could combine fork() and exec().
 
 * example: ex7.c, communicate through a pipe
   how does the shell implement

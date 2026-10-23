@@ -1,0 +1,181 @@
+6.1810 2026 Lecture 10: User-level virtual memory
+
+Reading: VM primitives for user programs by Appel & Li (1991)
+
+Plan:
+  OS kernel derives much mileage from virtual memory
+    Memory isolation
+    VM tricks for better performance and programmer convenience
+  Paper argues user-level application can also benefit from VM
+    Concurrent garbage collector
+    Generation garbage collector
+    Concurrent check-pointing
+    Distributed shared memory
+    Data-compression paging
+    Persistent stores
+  Big point is VM is good for applications and still holds in 2026
+    Most OSes have mmap() and user-level pagefaults
+    Many application use virtual memory in creative ways
+    Some of the 1999 use cases are popular, some are not
+
+What VM user-level VM primitives?
+  Trap: handle page-fault traps in user mode
+  Prot1: decrease the accessibility of a page
+  ProtN: decrease the accessibility of N pages
+  Unprot: increase the accessibility of a page
+  Dirty: return a list of dirtied pages since previous calls
+  Map2: map the same physical page at two different VAs with
+    different prot levels.
+
+Xv6 supports none of them
+  One way to see the paper is that a good OS should support them
+  What about Unix today?
+
+Unix today: mmap()
+  Maps memory into the address space (many flags and options)
+  Example: mapping file
+    mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, offset)
+  Examples: anonymous memory
+    mmap(NULL, len, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
+    (preferred over sbrk)
+  [see sqrts.c for example, and `man 2 mmap` for a detailed description]
+    
+Unix today: mprotect()
+  Changes the permission of a mapping
+  Examples:
+    mprotect(addr, len, PROT_READ)
+    mprotect(addr, len, PROT_NONE)
+      results in a trap on access
+
+Unix today: munmap()
+  Removes a mapping
+  Example:
+    munmap(addr, len)
+
+Unix today: sigaction()
+  Configures a signal handler
+    (Think sigalarm() lab)
+  act.sa_sigaction = handle_sigsegv;
+  act.sa_flags = SA_SIGINFO;
+  segemptyset(&act.sa_mask)
+  sigaction(SIGSEGV, &act, NULL);
+
+Additional Linux VM calls
+  Madvise(), Mincore(), Mremap(), Msync(), Mlock(), Mbind(), Shmat(),..
+  userfaultfd(): receive pagefaults by reading an fd
+    more convenient than using a signal handler with sigaction
+    e.g., one process can serve page fault on behalf of another one
+
+Can we support user-level VM primitives?
+  Trap: sigaction and SIGSEGV
+  Prot1: mprotect()
+  ProtN: mprotect()
+  Unprot: mprotect()
+  Dirty: No, but workaround exists
+  Map2: Not directly, but shm_open/mmap
+
+Demo: large sqrt table backed by a single page
+  Application code thinks there is a pre-computed big table
+    n -> sqrt(n)
+  Application can lookup sqrt:  sqrts[n]
+    If present, very fast!
+  Table is bigger than physical memory
+  User-level VM primitives allow it to occupy only a *single* page
+
+VM Implementation
+  Address spaces consists of VMAs and page tables
+  VMA (virtual memory area)
+    contiguous range of virtual addresses
+    same permissions
+    backed by the same object (file, anonymous memory)
+  VMA helps the kernel to decide how to handle page faults
+
+Trap/sigaction implementation
+  PTE disallows load or store and results in page fault
+    CPU saves user state, jumps into kernel.
+  Kernel asks VM system what to do?
+    I.e. page in from disk? Core dump?
+    VM system looks at VMA    
+  Generate signal -- upcall into user process.
+    Lower on user stack, or on separate stack...
+    (much like the traps lab)
+  Run user handler, can do anything.
+    Probably must call UNPROT for referenced page.
+    That is, must avoid repeated fault.
+  User handler returns to kernel.
+  Kernel returns to user program.
+  Continue or re-start instruction that trapped.
+
+A use case of user-level VM today: virtual-machine/container migration
+  Goal: move a process from machine M1 to machine M2
+    E.g., a container or virtual machine
+    To free up M1 so that it can be, for example, upgraded
+  Plan: Checkpoint P, copy P to M2, restart P on M2
+    Slow: checkpoint all memory before copying and restarting may take a long time
+  Solution: use user-level VM
+    Stop P on M1
+    Make small checkpoint of P (registers and memory layout)
+      but not P's memory content
+    Start checkpoint on M2, but unmap its memory image
+      when P on M2 references a not-fetched memory, it will get a page fault
+      on fault, fetch page from M1
+  Faster because can overlap sending memory with running P
+    Needs trap, protN
+  An optimization
+    Keep P running on M1 while copying over checkpoint (incl. memory) to M2
+    Keep track of pages that P modifies before switching over to M2
+      unmap P's memory
+      on page fault record that this page must be sent
+
+Demo: remote fork (rfork)
+   demo.c:
+     rfork() forks child on a remote machine
+     rfork_wait() waits for child
+     implementation in user space using VM primitives
+     $ rforkd & ./demo
+   design:
+     rfork.c is a library linked with demo
+       sends info about all VMAs and registers to remote machine
+       forks internally to make a snapshot of the current processes
+         snapshot will be used by the client to fetch pages 
+	 COW makes making the snapshot cheap!
+       returns so that the parent can keep running
+     rforkd.c is a server running on the other machine
+       receives all VMAs from parent
+       forks itself to have its child become the parent's child
+       the rforkd child calls exec of rfork-stub
+     stub:
+       opens a userfaultfd file descriptor, which it sends to rforkd parent
+         rforkd parent will handle child's page faults
+       setups address space identical rfork parent
+     rforkd handles page faults
+       reads from uffd file descriptor 
+       kernel writes page faults to the uffd
+       rforkd fetches the page faults from source machine
+         the snapshot serves them in serve_pages()
+       rforkd hands the page to the kernel using UFFDIO_COPY ioctl
+   implementation
+     lots of real-world details
+       turn off address space randomization, etc.
+
+rfork summary
+  it is transparent that rfork child runs on a different machine than parent
+  one rfork results in 2 COW fork:
+    rfork parent forks to make a snapshot of parent and serve pages to rforkd
+    forkd forks to serve page faults for rfork child
+      both forks are fast because COW
+  user-level process handles page faults
+    Related to DSM and concurrent checkpointing in paper
+
+What has changed between 1991 and 2026?
+  Tons of changes to VM API and implementations
+    VM system evolves continuously
+    Continued research too (e.g., see SOSP 2026)
+      userfaultfd as a BPF program
+  Other primitives
+    mlock, munlock, madvise, mremap, mincore, userfaultfd...
+    give applications more control
+  Switching address space is free (tagged TLBs)
+  Extended addressibility matter less
+    2^52 bytes of virtual address space
+  

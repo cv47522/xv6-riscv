@@ -20,7 +20,7 @@ Read all four sources. Do not write from memory of Unix; xv6 diverges from POSIX
 
 | Source                                           | What to take from it                                                                       |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `docs/lectures/l-*.txt`                          | The exercise's number, the lecture's own wording for what it does, and the teaching points |
+| `lectures/l-*.txt`                               | The exercise's number, the lecture's own wording for what it does, and the teaching points |
 | `../xv6-riscv-book/*.tex` (`unix.tex` for ch. 1) | The long-form authority. Precise semantics, and the _why_ behind interface choices         |
 | The kernel source the exercise touches           | The actual implementation. Quote real identifiers and real constants                       |
 | `user/ex1copy.c`                                 | The house style you are matching                                                           |

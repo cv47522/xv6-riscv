@@ -13,7 +13,7 @@ The small programs the 6.1810 lectures hand out, one section each: what the exer
 
 ## The set
 
-Lecture 1 ([`l-overview.txt`](lectures/l-overview.txt)) walks through nine example programs. Each is named `ex<N><verb>`, where `N` is the lecture's own numbering and the verb is the lecture's own wording — so `ex5forkexec` is lecture 1's `ex5.c`, described there as "fork() a new process, exec() a program".
+Lecture 1 ([`l-overview.txt`](../lectures/l-overview.txt)) walks through nine example programs. Each is named `ex<N><verb>`, where `N` is the lecture's own numbering and the verb is the lecture's own wording — so `ex5forkexec` is lecture 1's `ex5.c`, described there as "fork() a new process, exec() a program".
 
 | Exercise                                                      | Source               | Lecture                                                                | What it introduces                                                            |
 | ------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |

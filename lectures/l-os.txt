@@ -1,4 +1,4 @@
-6.1810 2025 Lecture 3: OS design
+6.1810 2026 Lecture 3: OS design
 
 Lecture Topic:
   OS design goal: isolation
@@ -204,21 +204,30 @@ Let's look at systems calls in xv6
   qemu starts xv6's kernel/kernel (see -kernel flag)
     main() initializes the xv6 kernel and hardware
     userinit() creates a process
+      allocates an "empty" proc (see proc.h)
+    forkret()
       kernel starts process at forkret
-      forkret call exec("/init") and then "returns" to user space
-    init
+      forkret calls kexec("/init") and then "returns" to user space
+    "/init"
       top-level process
       console file descriptors, 0 and 1
       make systems calls to start shell
   how does init make a system call?
-    let's look at open(); see user/usys.S
-    ecall with some number (SYS_open); see kernel/syscall.h (15)
+    let's look at fork(); see user/usys.S
+    ecall with some number (SYS_fork); see kernel/syscall.h (1)
     observation:
-      open doesn't call directly a function in the kernel
+      fork doesn't call directly a function in the kernel
       a syscall is a number
+      convention: k<syscallname>() in kernel, e.g., kfork()
   what system calls does init/sh make? 
     modify kernel/syscall.c:syscall
     look at trace of system calls
+  let's look at fork (SYS_fork, 1)
+    HW: allocproc; what happens if out of proc's?
+    uvmcopy(); copies mem image of parent into child
+    trapframe->a0 = 0
+    shares open file descriptors
+    set to RUNNABLE
   let's look at exec (SYS_exec, 7)
     sys_exec
       fetches arguments (pathname, and argv)
@@ -232,4 +241,5 @@ Let's look at systems calls in xv6
       don't be tricked into overwriting kernel memory!
       allocate stack
       write arguments onto stack
+    HW: what if kernel is out of proc's?
 

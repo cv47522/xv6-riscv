@@ -1,8 +1,21 @@
-6.1810 2025 Lecture 2: programming xv6 in C
+6.1810 2026 Lecture 2: programming xv6 in C
+
+goal: understand what happens when we run some C code
+  many lectures will look at aspects of this question
+
+today's lecture: use of C in xv6, focused on memory
+  memory layout
+  pointers
+  arrays
+  strings
+  lists
+  bitwise operators
+  [not a general intro to C]
 
 why C?
   good for low-level programming
     easy mapping between C and RISC-V instructions
+      helpful for this class: almost no surprises in what code machine runs
     easy mapping between C types and hardware structures
       e.g.., set bit flags in hardware registers of a device
   minimal runtime
@@ -12,21 +25,12 @@ why C?
     no garbage collector
     kernel is in complete control of memory management
   efficient: compiled (no interpreter)
-    compiler compiles C  to assembly
+    compiler compiles C to assembly
   popular for building kernels, system software, etc.
     good support for C on almost any platform
   why not?
     easy to write incorrect code
     easy to write code that has security vulnerabilities
-
-today's lecture: use of C in xv6
-  memory layout
-  pointers
-  arrays
-  strings
-  lists
-  bitwise operators
-  [not a general intro to C]
 
 memory layout of a C program in xv6
   [draw figure, see fig 3.4 of text]
@@ -35,8 +39,8 @@ memory layout of a C program in xv6
   stack: function's local variables
   heap: dynamic memory allocation using sbrk, malloc/free
 
-example: compile cat.c
-  Makefile defines how
+example: cat.c
+  Makefile defines how to compile
   gcc compiles to .o
   ld links .o files into an executable
     ulib.o is xv6 minimal C library
@@ -69,14 +73,16 @@ C pointers
     so each variable can be accessed through its pointer (i.e., *i)
     a pointer can be variable (e.g., int *p)
       and thus has a memory address, etc.
+  type is a hint to help the rest of the code use this address
+    not a statement about the address or what's at the address
   pointer arithmetic
     char *c;
     int *i;
     what is the value of c+1 and i+1?
   referencing elements of a struct
     struct {
-       int a;
-       int b;
+      int a;
+      int b;
     } *p;
     p->a = 10
   [demo ptr.c]
@@ -158,4 +164,4 @@ common C bugs
 
 References:
   https://blog.regehr.org/archives/1393
-  https://pdos.csail.mit.edu/6.828/2025/readings/riscv-calling.pdf
+  https://pdos.csail.mit.edu/6.1810/2026/readings/riscv-calling.pdf

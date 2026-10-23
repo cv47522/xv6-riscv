@@ -1,0 +1,276 @@
+6.1810 2026 Lecture 5: Locking
+
+Topic: how xv6 deals with multi-core parallelism
+
+Parallelism is a big factor in kernel design
+  Most computers have multi-core CPUs
+    Can execute more than one instruction stream simultaneously
+    Since economical to build chips with 10s of billions of transistors
+    Multiple medium-size cores better than one huge core
+  Good performance requires that software keep many cores busy
+    Multiple applications at the same time
+    Or one application splitting work over many cores
+
+What does multi-core hardware look like?
+  [cores, bus, RAM]
+  each core has its own registers
+    and its own page table -- satp
+  but they all talk to the same memory system
+    so they can interact via memory
+
+Cores cache data loaded from memory
+  multiple cores may cache copies of the same data
+  what if a core modifies memory cached in other cores?
+  caches are "coherent" -- won't retain stale data
+  via "cache coherence protocol"
+    cores tell each other about stores
+  coherence is transparent to software
+    but sometimes affects performance
+
+Multi-core impact on kernel design
+  applications on multiple cores can make system calls at the same time
+  so the kernel can execute in parallel on multiple cores
+  [run user/two.c]
+  kernel maintains many data structures e.g. list of processes
+    all the cores need to read/write this shared data
+  so we want two things:
+    1. parallel execution within the kernel, for performance
+    2. correct handling of shared kernel data structures
+
+Locks: for correct parallel data handling
+
+Example shared (parallel) use of kernel data
+  kfree() and kalloc()
+  list of free physical RAM pages threaded through first 8 byte of each page
+  [freelist -> page -> page -> ...]
+  kfree() pushes, kalloc() pops
+  one freelist used by all CPUs
+  need to guard against e.g. simultaneous kalloc()s
+    
+The lock interface:
+  a lock is itself a data structure, with two methods
+  struct spinlock l
+  acquire(&l)
+    x = x + 1 -- "critical section"
+  release(&l)
+  if multiple cores call acquire(l) for the same lock l
+    only one will return right away
+    the others will wait for release(l) -- they will "block"
+
+What might go wrong without locks
+  delete acquire/release from kfree()...
+  Q: what's likely to go wrong?
+  one example: simultaneous kfree()
+  both read freelist to get current head of free list;
+  both set their page's next pointer to current head;
+  both set freelist = page
+  second cpu wins! first cpu's page is lost.
+
+Let's try it!
+  edit kalloc.c; make qemu ; usertests
+  xv6 boots and gets fairly far in usertests!
+    locking bugs depend on exact timing...
+  the panic is due to trying to use a pointer with an illegal address
+    (PTE doesn't exist or isn't PTE_V)
+  What goes wrong?
+    simultaneous calls to kfree() and kalloc()
+    CPU1                 CPU2
+    r->next = freelist
+                         kalloc()
+    freelist = r
+    so the allocated page remains on the free list!
+      will soon be double-allocated, overwritten while in use
+    (note kalloc() still locking: but not enough w/o kfree locks)
+
+restore acquire() and release() in kfree()...
+
+It's good that these locks help kfree() and kalloc() be correct
+  BUT they are not so good for performance
+  kalloc()/kfree() are called a lot
+  so cores often have to wait in acquire()
+  that's bad for performance (you'll fix in a lab!)
+
+note: lock l is not tied to data x
+  the programmer is in charge of deciding where to add locks
+
+A good rule to decide when you need to lock:
+  when code uses a memory location,
+    and it's possible for another core to use that memory at the same time,
+    and at least one core could write,
+  then the cores need to lock so they use the memory one at a time.
+  that is: lock read/write of shared data
+
+This rule isn't perfect 100% of the time:
+  sometimes too strict: program logic may sometimes rule out sharing
+  sometimes too loose: printf(); not always simple lock/data correspondence
+
+Could locking be automatic?
+  perhaps the language could associate a lock with every data object
+    and the compiler could add acquire/release around every use
+    less room for programmer to forget!
+  but hard for compiler to decide if data is shared between cores
+  and "protect individual object uses" is not a sufficient view
+    suppose kfree() said
+      acquire
+      r->next = freelist;
+      release
+      acquire
+      freelist = r;
+      release
+    every memory access is protected by a lock!
+    but the code is still broken.
+  thus the programmer often needs explicit control over
+    the region of code during which a lock is held
+    in order to hide incorrect intermediate states
+
+Ways to think about what locks achieve
+  atomic multi-step operations -- hide intermediate states
+    read-modify-write
+  avoid lost updates (x = x + 1, or list prepend)
+  maintain invariants
+    assume the invariants are true at start of operation
+    operation uses locks to hide temporary violation of invariants
+    operation restores invariants before releasing locks
+    if some function is correct w/o parallelism, can often
+      make it correct under parallelism by surrounding with locks.
+
+Problem: deadlock
+  a worry any time code holds two or more locks at the same time
+  rename(d1/x, d2/y) must hold two locks, on the two directories
+  what if:
+    core A              core B
+    rename(d1/x, d2/y)  rename(d2/a, d1/b)
+      lock d1             lock d2
+      lock d2 ...         lock d1 ...
+  solution:
+    programmer works out an order for all locks
+    all code must acquire locks in that order
+    i.e. predict locks, sort, acquire -- complex!
+
+Locks versus modularity
+  locks make it hard to hide details inside modules
+  to avoid deadlock, I need to know locks acquired by functions I call
+  and I may need to acquire them before calling, even if I don't use them
+  i.e. locks are often not the private business of individual modules
+
+Locks and parallelism
+  locks *prevent* parallel execution
+  to get parallelism, you often need to split up data and locks
+    so that each core usually uses different data and locks
+    "fine grained locks"
+  choosing best split of data/locks is a design challenge
+    whole FS; directory/file; disk block
+    whole kernel; each subsystem; each object
+  you may need to re-design code to make it work well in parallel
+    example: break single free memory list into per-core free lists
+      helps if cores were waiting a lot on lock for single free list
+    can require a lot of analysis and programming!
+
+Lock granularity advice
+  start with big locks, e.g. one lock protecting entire module
+    less deadlock since less opportunity to hold two locks
+    less reasoning about invariants/atomicity required
+  measure to see if there's a problem
+    big locks are often enough -- maybe little time spent in that module
+  re-design for fine-grained locking only if you have to
+
+How to implement locks?
+
+how about:
+    struct lock { int locked; }
+    acquire(l) {
+      while(l->locked != 0) // A
+        ;
+      l->locked = 1;        // B
+    }
+
+Let's try it (this is The Question):
+  (first restore kfree() locks...)
+  replace acquire() loop's atomic test-and-set with non-atomic
+    while(*(volatile int *) &lk->locked != 0)
+      ;
+    lk->locked = 1;
+  result: "panic: release" while booting
+  two acquire()s both saw locked == 0, both set locked = 1 (oops)
+    (one core's wakeup() vs another core's scheduler())
+  one releases, sets locked = 0
+  2nd release sees already released, panics
+
+How can we make locked == 0 atomic with locked = 1?
+
+RISC-V atomic swap instruction:
+  if you look at acquire() in kernel/kernel.asm:
+
+  a5 = 1
+  s1 = &lk->locked
+  amoswap.w.aq a5, a5, (s1)
+
+  does this in hardware:
+    lock *s1 in memory system
+    temp = *s1
+    *s1 = a5
+    a5 = temp
+    unlock *s1
+  RISC-V h/w has a notion of locking a memory location
+    via cache coherence protocol
+    so we are really pushing the problem down to the hardware
+  memory lock forces concurrent amoswap to run one at a time, not interleaved
+
+Look at xv6 spinlock implementation
+  acquire(l){
+    while (__atomic_exchange_n(&lk->locked, 1, __ATOMIC_ACQUIRE) != 0)
+      ;
+  }
+  if l->locked was already 1,
+    atomic_exchange() sets to 1 (again),
+    returns the old value 1,
+    and the loop continues to spin
+  if l->locked was 0, at most one lock_test_and_set will see the 0;
+    it will set to 1 and return 0;
+    other test_and_set will return 1
+  this is a "spin lock", since waiting cores "spin" in acquire loop
+
+what is the push_off() about?
+  why disable interrupts?
+  what if device interrupt, and interrupt handler needs the same lock?
+
+release():
+  sets lk->locked = 0
+  and re-enables interrupts
+
+Detail: memory read/write ordering
+  what's the __ATOMIC_ACQUIRE argument to __atomic_exchange_n()?
+  C code implies an order for operations, e.g. memory reads/writes.
+  but the compiler may generate machine instructions in a different order!
+  and the CPU may execute those instruction in yet another order!
+  for performance...
+  so without the __ATOMIC_ACQUIRE, this code:
+        acquire(&l)
+        x = x + 1
+        release(&l)
+      can be compiled as if it were:
+        x = x + 1
+        acquire(&l)
+        release(&l)
+      i.e. compiler may move the increment outside the critical section!
+  the compiler/cpu aren't allowed to move mem refs past __ATOMIC_ACQUIRE
+  similarly for release() and __ATOMIC_RELEASE
+
+Why *spin* locks?
+  doesn't acquire() waste CPU while waiting?
+  why not give up the CPU and switch to another process, let it run?
+  spin lock guidelines:
+    hold spin locks for very short times
+    don't yield CPU while holding a spin lock
+  systems provide "sleep" locks for longer critical sections
+    waiting code yields the CPU so other things can run
+    but overheads are typically higher
+
+Advice:
+  avoid sharing, if possible
+  start with a few coarse-grained locks
+  measure -- which locks are preventing parallelism?
+  use fine-grained locks only as needed for parallel performance
+
+Next week:
+  system call machinery
