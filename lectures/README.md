@@ -1,6 +1,6 @@
 # MIT 6.1810 lecture archive
 
-Fetched from the [2026 course schedule](https://pdos.csail.mit.edu/6.1810/2026/schedule.html) on 2026-10-23. This archive contains 81 downloaded files: 22 published lecture texts, four FAQs, example programs and their headers/build files, the 16550 UART manual, directory listings, and the raw schedule snapshot.
+Fetched from the [2026 course schedule](https://pdos.csail.mit.edu/6.1810/2026/schedule.html) on 2026-10-23. This archive contains 81 downloaded files: 22 published lecture texts, four FAQs, example programs and their headers/build files, the 16550 UART manual, directory listings, and the raw schedule snapshot. [Study progress](../STUDY-PROGRESS.md) tracks learning separately from downloading.
 
 ## Provenance and refresh
 

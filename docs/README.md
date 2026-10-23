@@ -8,6 +8,8 @@
 
 Personal notes and guides for learning [xv6-riscv](https://github.com/mit-pdos/xv6-riscv) alongside the [xv6 book](https://mit-pdos.github.io/xv6-riscv-book/) and MIT's [6.1810](https://pdos.csail.mit.edu/6.1810/2026/) labs.
 
+Use the [self-study progress tracker](../STUDY-PROGRESS.md) for the full course checklist, dated completion evidence, and links to homework, labs, and exams. The [lecture archive](../lectures/README.md) holds the published texts and original example code for later practice under `user/`.
+
 ## Reading order
 
 If you are setting this up for the first time, read these in order. Each one assumes the previous.
@@ -45,6 +47,8 @@ xv6-riscv/
   grade-lab-*      MIT grading scripts
   gradelib.py      the grading harness they run on
   docs/            these notes
+  lectures/        downloaded MIT lecture texts and original example code
+  STUDY-PROGRESS.md course checklist and completion evidence
   docs/prompts/    reusable task prompts for coding agents
   Makefile         the build, heavily commented as a teaching aid
                    (walked through in docs/08-makefile-tour.md)
