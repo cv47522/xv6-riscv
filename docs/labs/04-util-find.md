@@ -9,7 +9,7 @@
 MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find) asks for a directory-tree search in `user/find.c`. This note connects that contract to the existing directory reader in `user/ls.c`; it stops before the new program's implementation.
 
 > [!IMPORTANT]
-> This is a derivation guide, not a solution. Its C quotation is an unchanged function from `user/ls.c`, and the decisions for `user/find.c` remain questions.
+> This is a derivation guide, not a solution. Its C quotation is an unchanged function from `user/ls.c`, and the decisions for `user/find.c` remain questions. The one exception is the final [Solution walkthrough](#solution-walkthrough), a marked spoiler; stop before it if you are still deriving.
 
 ## What the exercise asks for
 
@@ -75,6 +75,7 @@ A `dirent` is one fixed-size directory-entry record from [`kernel/fs.h`](../../k
 ```mermaid
 flowchart TD
     subgraph L["ls() reads directory entries in user/ls.c."]
+        direction TB
         A{"Does the child path fit<br/>in the local buffer?"}
         A -->|No| X["ls() reports that the path is too long."]
         X --> Z["ls() closes the directory descriptor."]
@@ -182,6 +183,12 @@ ls(char *path)
 
 The book's [`fs.tex`](../../../xv6-riscv-book/fs.tex) and this tree's [`kernel/fs.c`](../../kernel/fs.c) describe `namex()` resolving paths from `/` or the process's current directory, then looking up each component. The current directory aliases `.` and `..` are real entries created by [`create()` in `kernel/sysfile.c`](../../kernel/sysfile.c). They are harmless to list, but following them repeatedly would revisit the same directories. See the [grader limits](#what-the-grader-does-not-prove) when interpreting the missing-target and duplicate checks.
 
+![Inode boxes for ROOT, ROOT/sub, and ROOT/sub/file. Green edges lead down to children; red edges labelled . and .. lead back to the same directory and its parent.](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg)
+
+_The figure comes from the sibling Linux demo [`dir_dot_entries.c`](../../../operating-system/codes/src/main/persistence/file-intro/dir_dot_entries.c); its editable source is [`dir-dot-entries-loop.excalidraw`](../../../operating-system/images/file-systems/dir-dot-entries-loop.excalidraw). Green edges are the only ones a tree walk can follow without returning to an inode it has already visited._
+
+Every directory, including the starting one, has both red edges. A walker that follows any record naming a directory therefore follows `.` back to itself and `..` back to its parent, so the same names repeat until a path or descriptor limit stops it. The inode numbers in the figure are what makes the loop visible: the record's name differs, but its `inum` is one already on the path.
+
 `strcmp()` in [`user/ulib.c`](../../user/ulib.c) compares terminated strings; `==` compares pointer values. The 14-byte record field therefore needs a safe conversion before string comparison. `ls()` shows one such boundary. Its `stat()` call is a user-library wrapper, not a separate kernel primitive, and it closes the temporary descriptor it opens.
 
 ## Deriving it
@@ -266,3 +273,83 @@ These are commands for the implementation to verify, not a transcript claiming a
 7. Why can a 512-byte buffer in [`ls()`](../../user/ls.c) still be rejected by `MAXPATH` in [`kernel/param.h`](../../kernel/param.h)?
 
     **A:** The buffer size is only `ls()`'s own limit. `sys_open()` in [`kernel/sysfile.c`](../../kernel/sysfile.c) copies the pathname into `char path[MAXPATH]` through `argstr()`, which fails when no `\0` appears within 128 bytes. `stat()` calls `open()`, so a 200-byte path fits `buf` but still fails there.
+
+## Solution walkthrough
+
+> [!CAUTION]
+> **Spoiler.** This section explains the finished [`user/find.c`](../../user/find.c), which passes all four find tests. Stop here if you are still deriving it from the sections above.
+
+The source's header comment carries the per-entry decision table and the resource table; each `Q:`/`A:` block beside the code answers one design question. This section adds the two views that need a drawing: the control flow of one call, and the memory and descriptors held across nested calls.
+
+### One call of `find()`
+
+```mermaid
+flowchart TD
+    subgraph F["find(path, name) in user/find.c"]
+        direction TB
+        A["find() opens path and calls fstat()."] --> B{"Did both succeed,<br/>and is path a T_DIR?"}
+        B -->|No| X["find() reports on fd 2,<br/>closes any fd it opened,<br/>and returns -1."]
+        B -->|Yes| C{"Do path, '/', DIRSIZ bytes,<br/>and '\0' fit in child_path?"}
+        C -->|No| X
+        C -->|Yes| D["find() copies path and '/'<br/>into child_path."]
+        D --> E{"Did read() return<br/>one whole dirent?"}
+        E -->|"No: EOF or error"| Z["find() closes fd and<br/>returns its status."]
+        E -->|Yes| G{"Is de.inum equal to 0?"}
+        G -->|"Yes: the slot is unused."| E
+        G -->|No| H["find() copies de.name to child_name<br/>and terminates it."]
+        H --> I{"Is child_name #quot;.#quot; or #quot;..#quot;?"}
+        I -->|"Yes: skip, never descend."| E
+        I -->|No| J{"Does child_name<br/>equal name?"}
+        J -->|Yes| K["find() prints child_path."]
+        J -->|No| L
+        K --> L{"Does stat(child_path)<br/>report a T_DIR?"}
+        L -->|"No, or stat() failed"| E
+        L -->|Yes| R["find() calls find(child_path, name),<br/>still holding its own fd."]
+        R -->|"The nested call returns."| E
+    end
+    classDef request fill:#fff0f0,stroke:#c66,color:#111
+    classDef routing fill:#f0f0ff,stroke:#66c,color:#111
+    classDef processing fill:#fffff0,stroke:#cc6,color:#111
+    classDef commit fill:#f0ffff,stroke:#6cc,color:#111
+    classDef failure fill:#ffd9d9,stroke:#c66,color:#111
+    class A,R request
+    class B,C,E,G,I,J,L routing
+    class D,H processing
+    class K,Z commit
+    class X failure
+```
+
+_Pink opens or descends, blue decides, yellow builds the path, cyan prints or closes, and red reports a failure. This palette matches the `ls()` diagram above, with pink added for requests._
+
+Compare it with the [`ls()` diagram](#ls-line-by-line): the loop shape is identical, and the differences are exactly the three decisions the [contract](#contract) adds. The `.`/`..` test sits before the match test, so `find . ..` prints nothing and neither entry is ever descended into. The match test reads `child_name`, the bare name, while the print reads `child_path`, the whole path; that split is what the [`find, in current directory`](#what-the-grader-checks) test's `./NAME` prefix observes. A matching directory reaches the `stat()` decision like any other entry, so it is printed and then searched, which the corner test's directory-match count requires.
+
+A `stat()` failure is reported and marks the return status, but the loop continues with the next record. One unreadable child therefore does not hide the rest of the tree, and `main()` still exits 1 at the end.
+
+### Memory and descriptors at the deepest point
+
+![Three stack frames for find(".", "b"), find("./a", "b"), and find("./a/aa", "b"). Each frame shows its child_path bytes, where child_name points, and the fd it holds. Beside them, p->ofile[] shows fds 0 to 2 for the console, fds 3 to 5 held by the three frames, and fd 6 opened briefly by stat().](fig/util-find-recursion-state.svg)
+
+_[View the SVG](fig/util-find-recursion-state.svg) or open [the editable Excalidraw drawing](fig/util-find-recursion-state.excalidraw) in Excalidraw. It shows `find . b` on the handout's tree at the moment it prints `./a/aa/b`._
+
+Each active call owns one `child_path[MAXPATH]` on the stack and one directory descriptor. Neither can be released before the nested call returns, because the caller still has records left to read and xv6 has no `lseek()` to reopen and resume. The figure's three frames hold fds 3, 4, and 5; `stat()` adds a fourth only for the instant between its own `open()` and `close()`.
+
+| Resource per active call  | Limit in this tree                                  | What hits it first                                                              |
+| ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Directory descriptor**  | `NOFILE` 16 in [`kernel/param.h`](../../kernel/param.h), 13 after fds 0–2 | About 12 nested directories, leaving one slot for `stat()`'s temporary fd.      |
+| **`child_path` on stack** | `USERSTACK` 2 pages under `LAB_UTIL`                | Not reached first: 13 frames of roughly 200 bytes fit well inside 8 KB.         |
+| **Path length**           | `MAXPATH` 128, enforced by `argstr()` in `sys_open()` | A long path is rejected by the length check before `open()` or `stat()` sees it. |
+
+Sizing `child_path` at `MAXPATH` rather than `ls()`'s 512 bytes is what keeps the stack row harmless. A 512-byte buffer would buy nothing, because the kernel rejects any path that long at `open()`.
+
+### Decisions, answered
+
+This table answers the [Deriving it](#deriving-it) checklist row by row; the source comments hold the longer reasoning.
+
+| Decision                                   | What `user/find.c` does                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Interpret the two operands**             | `main()` requires `argc == 3`, prints `Usage: find <dir> <name>` on fd 2 otherwise, and passes `argv[1]` and `argv[2]`.       |
+| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                       |
+| **Compare the requested basename exactly** | `memmove()` copies `DIRSIZ` bytes into `child_name`, a `'\0'` follows, and `strcmp(child_name, name)` decides the match.      |
+| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                                    |
+| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                               |
+| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.                   |
