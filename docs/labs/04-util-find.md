@@ -26,7 +26,9 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 
 ### What the grader checks
 
-The four tests in [`grade-lab-util`](../../grade-lab-util) total **40 points**; none installs a breakpoint. `NAME`, `DIR`, and the numbered paths below stand for freshly generated names, not literal input text.
+- **Score:** four tests in [`grade-lab-util`](../../grade-lab-util), **40 points** total.
+- **Breakpoints:** none.
+- **Notation:** `NAME`, `DIR`, and the numbered paths below stand for freshly generated names, not literal input text.
 
 | Test                                                       | Points | Setup and search                                                              | Required matches                                                     | Forbidden matches                 |
 | ---------------------------------------------------------- | ------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------- |
@@ -37,9 +39,20 @@ The four tests in [`grade-lab-util`](../../grade-lab-util) total **40 points**; 
 
 ### What the grader does not prove
 
-The first three tests use [`re.match()` through `assert_lines_match()`](../../gradelib.py): their dots are unescaped wildcards and their path patterns have no end anchor. The recursive test does not count duplicate or extra lines. The corner test instead uses multiline `re.findall()` with a literal `./` prefix and exact counts; its names are still not end-anchored.
+| Test group      | Matching mechanism                                               | Limit                                                           |
+| --------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| **First three** | [`re.match()` through `assert_lines_match()`](../../gradelib.py) | Dots are unescaped wildcards; path patterns have no end anchor. |
+| **Recursive**   | The same prefix assertions                                       | Duplicate or extra lines are not counted.                       |
+| **Corner**      | Multiline `re.findall()`, literal `./` prefix, exact counts      | Names still have no end anchor.                                 |
 
-The subdirectory case observes the requested start point and rejects the root-level duplicate basename. None of these assertions establishes an output order, every pathname shape, a general cycle-detection strategy, argument diagnostics, or failure handling for `open`, `fstat`, and `stat`. A passing score establishes the listed observations, not those missing policies.
+The subdirectory case observes the requested start point and rejects the root-level duplicate basename. A passing score establishes only the [listed observations](#what-the-grader-checks).
+
+**Unproven policies:**
+
+- Output order and every pathname shape.
+- A general cycle-detection strategy.
+- Argument diagnostics.
+- Failure handling for `open`, `fstat`, and `stat`.
 
 ## Prerequisites
 
@@ -70,7 +83,8 @@ The subdirectory case observes the requested start point and rejects the root-le
 
 ## `ls()` line by line
 
-A `dirent` is one fixed-size directory-entry record from [`kernel/fs.h`](../../kernel/fs.h). The diagram follows only existing `ls()`'s directory branch after successful `open()` and `fstat()`; it adds neither recursion nor the target's name filter.
+- **Record:** a `dirent` is one fixed-size directory entry from [`kernel/fs.h`](../../kernel/fs.h).
+- **Diagram scope:** existing `ls()`'s directory branch after successful `open()` and `fstat()`; no recursion or requested-name filter.
 
 ```mermaid
 flowchart TD
@@ -102,7 +116,12 @@ flowchart TD
 
 _Blue marks decisions, yellow processes names, cyan closes the descriptor, and red reports failures._
 
-A directory contains records rather than complete child paths. `ls()` supplies the parent-path prefix and a NUL-terminated copy of the record name before calling `stat()`. Its source distinguishes an unused slot from a failed metadata lookup: both skip output, but only the latter prints an error.
+A directory stores records, not complete child paths. Before `stat()`, `ls()` supplies the parent prefix and a NUL-terminated copy of the record name.
+
+| Record outcome             | Normal output | Diagnostic    |
+| -------------------------- | ------------- | ------------- |
+| **Unused slot**            | Skipped       | None          |
+| **Failed metadata lookup** | Skipped       | Error printed |
 
 This is the complete, unchanged `ls()` function from [`user/ls.c`](../../user/ls.c). It is existing source, not a template for the target file.
 
@@ -127,31 +146,31 @@ ls(char *path)
   }
 
   switch (st.type) {
-  case T_DEVICE:
-  case T_FILE:
-    printf("%s %d %d %d\n", fmtname(path), st.type, st.ino, (int)st.size);
-    break;
-
-  case T_DIR:
-    if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
-      printf("ls: path too long\n");
+    case T_DEVICE:
+    case T_FILE:
+      printf("%s %d %d %d\n", fmtname(path), st.type, st.ino, (int)st.size);
       break;
-    }
-    strcpy(buf, path);
-    p = buf + strlen(buf);
-    *p++ = '/';
-    while (read(fd, &de, sizeof(de)) == sizeof(de)) {
-      if (de.inum == 0)
-        continue;
-      memmove(p, de.name, DIRSIZ);
-      p[DIRSIZ] = 0;
-      if (stat(buf, &st) < 0) {
-        printf("ls: cannot stat %s\n", buf);
-        continue;
+
+    case T_DIR:
+      if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
+        printf("ls: path too long\n");
+        break;
       }
-      printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, (int)st.size);
-    }
-    break;
+      strcpy(buf, path);
+      p = buf + strlen(buf);
+      *p++ = '/';
+      while (read(fd, &de, sizeof(de)) == sizeof(de)) {
+        if (de.inum == 0)
+          continue;
+        memmove(p, de.name, DIRSIZ);
+        p[DIRSIZ] = 0;
+        if (stat(buf, &st) < 0) {
+          printf("ls: cannot stat %s\n", buf);
+          continue;
+        }
+        printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, (int)st.size);
+      }
+      break;
   }
   close(fd);
 }
@@ -181,15 +200,40 @@ ls(char *path)
 > [!IMPORTANT]
 > A directory entry names an inode inside one parent. A displayed path is a separate string assembled from the starting path and successive names; `struct dirent` does not store that path.
 
-The book's [`fs.tex`](../../../xv6-riscv-book/fs.tex) and this tree's [`kernel/fs.c`](../../kernel/fs.c) describe `namex()` resolving paths from `/` or the process's current directory, then looking up each component. The current directory aliases `.` and `..` are real entries created by [`create()` in `kernel/sysfile.c`](../../kernel/sysfile.c). They are harmless to list, but following them repeatedly would revisit the same directories. See the [grader limits](#what-the-grader-does-not-prove) when interpreting the missing-target and duplicate checks.
+### Path lookup and directory aliases
+
+**Path lookup:** `namex()` starts at `/` or the process's current directory, then looks up each path component. Sources: the book's [`fs.tex`](../../../xv6-riscv-book/fs.tex) and this tree's [`kernel/fs.c`](../../kernel/fs.c).
+
+| Entry | Names which inode?    | Effect when followed           |
+| ----- | --------------------- | ------------------------------ |
+| `.`   | The current directory | Returns to the same directory. |
+| `..`  | The parent directory  | Returns to the parent.         |
+
+Both are real entries created by [`create()` in `kernel/sysfile.c`](../../kernel/sysfile.c), including in the starting directory. They are harmless to list; repeatedly following them revisits directories.
 
 ![Inode boxes for ROOT, ROOT/sub, and ROOT/sub/file. Green edges lead down to children; red edges labelled . and .. lead back to the same directory and its parent.](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg)
 
-_The figure comes from the sibling Linux demo [`dir_dot_entries.c`](../../../operating-system/codes/src/main/persistence/file-intro/dir_dot_entries.c); its editable source is [`dir-dot-entries-loop.excalidraw`](../../../operating-system/images/file-systems/dir-dot-entries-loop.excalidraw). Green edges are the only ones a tree walk can follow without returning to an inode it has already visited._
+_From the sibling Linux demo [`dir_dot_entries.c`](../../../operating-system/codes/src/main/persistence/file-intro/dir_dot_entries.c); open the [editable source](../../../operating-system/images/file-systems/dir-dot-entries-loop.excalidraw) in Excalidraw._
 
-Every directory, including the starting one, has both red edges. A walker that follows any record naming a directory therefore follows `.` back to itself and `..` back to its parent, so the same names repeat until a path or descriptor limit stops it. The inode numbers in the figure are what makes the loop visible: the record's name differs, but its `inum` is one already on the path.
+- **Green edges:** descend to children; only these avoid returning to an inode already visited in this tree.
+- **Red edges:** every directory has both aliases, including the starting one.
+- **Loop evidence:** a different record name has an `inum` already on the path.
 
-`strcmp()` in [`user/ulib.c`](../../user/ulib.c) compares terminated strings; `==` compares pointer values. The 14-byte record field therefore needs a safe conversion before string comparison. `ls()` shows one such boundary. Its `stat()` call is a user-library wrapper, not a separate kernel primitive, and it closes the temporary descriptor it opens.
+Following every directory record repeats the same names until a path or descriptor limit stops the walk. Interpret the missing-target and duplicate checks using the [grader limits](#what-the-grader-does-not-prove).
+
+### Record names versus C strings
+
+| Operation                                        | What it compares           |
+| ------------------------------------------------ | -------------------------- |
+| `strcmp()` in [`user/ulib.c`](../../user/ulib.c) | Terminated string contents |
+| `==` on pointers                                 | Pointer values             |
+
+The 14-byte record field needs a safe conversion before string comparison. [`ls()`](#ls-line-by-line) demonstrates that boundary.
+
+### Metadata and temporary descriptors
+
+- **`stat()` implementation:** a user-library wrapper in [`user/ulib.c`](../../user/ulib.c), rather than a separate kernel primitive.
+- **Descriptor lifetime:** it closes the temporary descriptor it opens; `ls()`'s call does not retain that descriptor.
 
 ## Deriving it
 
@@ -204,13 +248,17 @@ Every directory, including the starting one, has both red edges. A walker that f
 | **Descend without revisiting ancestors**   | Which real entries in [`kernel/sysfile.c`](../../kernel/sysfile.c) and [`user/ls.c`](../../user/ls.c) must a recursive reader recognize, and why?                                                                                                                |
 | **Respect path and resource limits**       | What do [`ls()`'s buffer check](../../user/ls.c), `MAXPATH`, and `NOFILE` in [`kernel/param.h`](../../kernel/param.h) imply for long paths and open descriptors?                                                                                                 |
 
-| Trap                                                            | Observable consequence                                                                   | Source to inspect                                                                                             |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Treat `de.name` as an ordinary C string**                     | A 14-byte name can make `strcmp` or printing read beyond the field.                      | [`kernel/fs.h`](../../kernel/fs.h), [`user/ls.c`](../../user/ls.c)                                            |
-| **Descend into `.` or `..`**                                    | The same entry can be reported repeatedly, or traversal may reach a path-length failure. | [`kernel/sysfile.c`](../../kernel/sysfile.c), corner test in [`grade-lab-util`](../../grade-lab-util)         |
-| **Print only the basename**                                     | The current-directory and nested-path checks cannot recognize the full path.             | [`grade-lab-util`](../../grade-lab-util)                                                                      |
-| **Treat a failed `open`, `fstat`, or `stat` as valid metadata** | An invalid descriptor or uninitialized type can misdirect the search.                    | [`user/ls.c`](../../user/ls.c), [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) |
-| **Keep every ancestor descriptor open**                         | Deep searches can exhaust the per-process descriptor table.                              | `NOFILE` in [`kernel/param.h`](../../kernel/param.h), [`kernel/proc.h`](../../kernel/proc.h)                  |
+| Trap                                                            | Observable consequence                                                                                               | Source to inspect                                                                                             |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Treat `de.name` as an ordinary C string**                     | A 14-byte name can make `strcmp` or printing read beyond the field.                                                  | [`kernel/fs.h`](../../kernel/fs.h), [`user/ls.c`](../../user/ls.c)                                            |
+| **Descend into `.` or `..`**                                    | The same entry can be reported repeatedly, or traversal may reach a path-length failure.                             | [`kernel/sysfile.c`](../../kernel/sysfile.c), corner test in [`grade-lab-util`](../../grade-lab-util)         |
+| **Print only the basename**                                     | The current-directory and nested-path checks cannot recognize the full path.                                         | [`grade-lab-util`](../../grade-lab-util)                                                                      |
+| **Treat a failed `open`, `fstat`, or `stat` as valid metadata** | An invalid descriptor or uninitialized type can misdirect the search.                                                | [`user/ls.c`](../../user/ls.c), [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) |
+| **Keep every ancestor descriptor open**                         | Deep searches can exhaust the per-process descriptor table.                                                          | `NOFILE` in [`kernel/param.h`](../../kernel/param.h), [`kernel/proc.h`](../../kernel/proc.h)                  |
+| **Read `DIRSIZ` bytes instead of `sizeof(de)`**                 | `read()` returns 14, never 16, so a `== sizeof(de)` loop never runs; later reads would also start mid-record.        | `struct dirent` in [`kernel/fs.h`](../../kernel/fs.h), `readi()` in [`kernel/fs.c`](../../kernel/fs.c)        |
+| **Test `strcmp()`'s result as a boolean**                       | `strcmp()` returns 0 on equality, so `if (strcmp(s, ".."))` is true for every other name.                            | `strcmp()` in [`user/ulib.c`](../../user/ulib.c)                                                              |
+| **Compare the dots against the parent or the full path**        | The parent path is the same for every record, and `"path/."` never equals `"."`, so `.` and `..` are still followed. | `ls()`'s `buf` and `p` in [`user/ls.c`](../../user/ls.c)                                                      |
+| **Return from inside the record loop**                          | Returning on a child's result or on one failed `stat()` skips its remaining siblings and leaks the directory fd.     | `ls()`'s `continue` and final `close(fd)` in [`user/ls.c`](../../user/ls.c)                                   |
 
 ## Verifying it
 
@@ -240,46 +288,67 @@ Every directory, including the starting one, has both red edges. A walker that f
     ./grade-lab-util find
     ```
 
-These are commands for the implementation to verify, not a transcript claiming a completed `user/find.c`. Interpret results using [the evidence limits](#what-the-grader-does-not-prove). [Docs 03](../03-lab-workflow.md#grading) owns failure transcripts; this set saves `xv6.out.find_curdir`, `xv6.out.find_subdir`, `xv6.out.find_recursive`, and `xv6.out.find_corner`.
+**Evidence:** the commands above are verification steps, not a transcript claiming a completed `user/find.c`. Interpret results using [the evidence limits](#what-the-grader-does-not-prove).
 
-`make qemu` rebuilds the image, removing files created in the earlier guest; `make qemu-fs` preserves that image when needed. [Docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns those mechanics. Neither the user-space directory reader nor its future recursion needs a kernel-debugger recipe.
+**Saved failure transcripts** ([Docs 03](../03-lab-workflow.md#grading) owns the mechanics):
+
+- `xv6.out.find_curdir`
+- `xv6.out.find_subdir`
+- `xv6.out.find_recursive`
+- `xv6.out.find_corner`
+
+| Command        | Guest-image behavior                                             |
+| -------------- | ---------------------------------------------------------------- |
+| `make qemu`    | Rebuilds the image, removing files created in the earlier guest. |
+| `make qemu-fs` | Preserves the existing image.                                    |
+
+[Docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns image mechanics. Neither the user-space directory reader nor its future recursion needs a kernel-debugger recipe.
 
 ## Questions
 
 1. Why does [`ls()`](../../user/ls.c) call `fstat(fd, &st)` before treating reads as `struct dirent` records?
-
-    **A:** `read()` returns raw bytes from any inode; only `st.type == T_DIR` guarantees those bytes are 16-byte `struct dirent` slots. A file's or the console's bytes would be misread as inode numbers and names. Until `fstat()` succeeds, `st` is also uninitialized, so the type test would branch on stack garbage.
+    - **Format:** `read()` returns raw bytes from any inode. Only `st.type == T_DIR` guarantees 16-byte `struct dirent` slots; file or console bytes would be misread as inode numbers and names.
+    - **Validity:** until `fstat()` succeeds, `st` is uninitialized. Testing its type would branch on stack garbage.
 
 2. What are the bytes of a full-length directory name in [`kernel/fs.h`](../../kernel/fs.h), and where does `ls()` add the terminator needed by C string functions?
-
-    **A:** Two bytes of `inum`, then 14 name bytes with no `\0` among them. `ls()` copies the field with `memmove(p, de.name, DIRSIZ)` and writes `p[DIRSIZ] = 0` inside `buf`; its length check reserves that byte through the final `+ 1`.
+    - **Record:** two bytes of `inum`, then 14 name bytes with no `\0` among them.
+    - **Copy:** `memmove(p, de.name, DIRSIZ)` copies the field; `p[DIRSIZ] = 0` terminates it inside `buf`.
+    - **Budget:** the length check's final `+ 1` reserves that terminator byte.
 
 3. Why does [`user/ls.c`](../../user/ls.c) tolerate `.` and `..`, while a traversal cannot follow them as ordinary children?
+    - **Listing:** `ls()` never follows a record; `.` and `..` are just two more output lines.
+    - **Traversal:** `.` reaches the current inode; `..` reaches the parent, which lists the current directory again.
 
-    **A:** `ls()` lists one directory and never follows a record, so `.` and `..` are only two more output lines. A traversal that follows every record naming a directory reaches the current inode through `.` and the parent through `..`, which lists the current directory again. It then repeats output until a path or descriptor limit stops it; see [`dir-dot-entries-loop.svg`](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg).
+    Following every directory record therefore repeats output until a path or descriptor limit stops it; see [`dir-dot-entries-loop.svg`](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg).
 
 4. If `open(path, O_RDONLY)` fails, which branch in [`ls()`](../../user/ls.c) runs, and which descriptor cleanup is unnecessary?
-
-    **A:** The first `if` prints `ls: cannot open ...` on fd 2 and returns. No `close()` is needed because a failed `open()` allocated no descriptor; `close(-1)` would itself fail in `argfd()` in [`kernel/sysfile.c`](../../kernel/sysfile.c).
+    - **Branch:** the first `if` prints `ls: cannot open ...` on fd 2 and returns.
+    - **Cleanup:** none; failed `open()` allocated no descriptor. `close(-1)` would itself fail in `argfd()` in [`kernel/sysfile.c`](../../kernel/sysfile.c).
 
 5. If `stat(buf, &st)` fails for one entry, what does [`ls()`](../../user/ls.c) do with the rest of that directory?
-
-    **A:** It prints `ls: cannot stat ...` with `printf`, so on fd 1 rather than fd 2, and `continue`s with the next record. The directory descriptor stays open, and the final `close(fd)` still runs after the loop.
+    - **Diagnostic:** `printf` prints `ls: cannot stat ...` on fd 1, rather than fd 2.
+    - **Next step:** `continue` reads the next record; the directory descriptor stays open.
+    - **Cleanup:** the final `close(fd)` still runs after the loop.
 
 6. What does the corner test in [`grade-lab-util`](../../grade-lab-util) prove about missing names, duplicate output, and directories that match?
-
-    **A:** Exactly one line matches `^\./.*PRESENT`, so the file is not reported again through `.` or `..`. No line matches the absent name, one line matches the directory name, and neither `path too long` nor `panic` appears before `DONE`. Because the names are not end-anchored, the test does not prove that a matched line ends at the name; see [what the grader does not prove](#what-the-grader-does-not-prove).
+    - **Present file:** exactly one line matches `^\./.*PRESENT`; it is not reported again through `.` or `..`.
+    - **Absent name / directory name:** zero / one matching lines, respectively.
+    - **Completion:** neither `path too long` nor `panic` appears before `DONE`.
+    - **Limit:** names have no end anchor, so a matched line need not end at the name. See [what the grader does not prove](#what-the-grader-does-not-prove).
 
 7. Why can a 512-byte buffer in [`ls()`](../../user/ls.c) still be rejected by `MAXPATH` in [`kernel/param.h`](../../kernel/param.h)?
-
-    **A:** The buffer size is only `ls()`'s own limit. `sys_open()` in [`kernel/sysfile.c`](../../kernel/sysfile.c) copies the pathname into `char path[MAXPATH]` through `argstr()`, which fails when no `\0` appears within 128 bytes. `stat()` calls `open()`, so a 200-byte path fits `buf` but still fails there.
+    - **Local limit:** 512 bytes is only `ls()`'s buffer size.
+    - **Kernel limit:** `sys_open()` in [`kernel/sysfile.c`](../../kernel/sysfile.c) copies into `char path[MAXPATH]` through `argstr()`. It fails if no `\0` appears within 128 bytes.
+    - **Example:** a 200-byte path fits `buf` but fails at `open()`; `stat()` calls `open()` too.
 
 ## Solution walkthrough
 
 > [!CAUTION]
 > **Spoiler.** This section explains the finished [`user/find.c`](../../user/find.c), which passes all four find tests. Stop here if you are still deriving it from the sections above.
 
-The source's header comment carries the per-entry decision table and the resource table; each `Q:`/`A:` block beside the code answers one design question. This section adds the two views that need a drawing: the control flow of one call, and the memory and descriptors held across nested calls.
+- **Source header:** per-entry decision and resource tables.
+- **Source `Q:`/`A:` blocks:** one design question answered beside the relevant code.
+- **Drawings below:** one call's control flow, then memory and descriptors across nested calls.
 
 ### One call of `find()`
 
@@ -321,7 +390,11 @@ flowchart TD
 
 _Pink opens or descends, blue decides, yellow builds the path, cyan prints or closes, and red reports a failure. This palette matches the `ls()` diagram above, with pink added for requests._
 
-Compare it with the [`ls()` diagram](#ls-line-by-line): the loop shape is identical, and the differences are exactly the three decisions the [contract](#contract) adds. The `.`/`..` test sits before the match test, so `find . ..` prints nothing and neither entry is ever descended into. The match test reads `child_name`, the bare name, while the print reads `child_path`, the whole path; that split is what the [`find, in current directory`](#what-the-grader-checks) test's `./NAME` prefix observes. A matching directory reaches the `stat()` decision like any other entry, so it is printed and then searched, which the corner test's directory-match count requires.
+The loop shape matches the [`ls()` diagram](#ls-line-by-line). Three decisions implement the added [contract](#contract):
+
+- **Skip aliases before matching:** `find . ..` prints nothing; neither `.` nor `..` is descended into.
+- **Match the name, print the path:** compare bare `child_name`, print whole `child_path`. The [current-directory test](#what-the-grader-checks) observes the `./NAME` prefix.
+- **Continue after a directory match:** a matching directory still reaches `stat()`, so it is printed and then searched. The corner test requires the directory-match count.
 
 A `stat()` failure is reported and marks the return status, but the loop continues with the next record. One unreadable child therefore does not hide the rest of the tree, and `main()` still exits 1 at the end.
 
@@ -331,13 +404,16 @@ A `stat()` failure is reported and marks the return status, but the loop continu
 
 _[View the SVG](fig/util-find-recursion-state.svg) or open [the editable Excalidraw drawing](fig/util-find-recursion-state.excalidraw) in Excalidraw. It shows `find . b` on the handout's tree at the moment it prints `./a/aa/b`._
 
-Each active call owns one `child_path[MAXPATH]` on the stack and one directory descriptor. Neither can be released before the nested call returns, because the caller still has records left to read and xv6 has no `lseek()` to reopen and resume. The figure's three frames hold fds 3, 4, and 5; `stat()` adds a fourth only for the instant between its own `open()` and `close()`.
+- **Per active call:** one stack buffer, `child_path[MAXPATH]`, and one directory descriptor.
+- **In the figure:** three frames hold fds 3, 4, and 5; `stat()` briefly adds a fourth descriptor between its own `open()` and `close()`.
 
-| Resource per active call  | Limit in this tree                                  | What hits it first                                                              |
-| ------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Directory descriptor**  | `NOFILE` 16 in [`kernel/param.h`](../../kernel/param.h), 13 after fds 0–2 | About 12 nested directories, leaving one slot for `stat()`'s temporary fd.      |
-| **`child_path` on stack** | `USERSTACK` 2 pages under `LAB_UTIL`                | Not reached first: 13 frames of roughly 200 bytes fit well inside 8 KB.         |
-| **Path length**           | `MAXPATH` 128, enforced by `argstr()` in `sys_open()` | A long path is rejected by the length check before `open()` or `stat()` sees it. |
+Both resources stay live until the nested call returns: the caller still has records to read, and xv6 has no `lseek()` to reopen and resume.
+
+| Resource per active call  | Limit in this tree                                                        | What hits it first                                                               |
+| ------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Directory descriptor**  | `NOFILE` 16 in [`kernel/param.h`](../../kernel/param.h), 13 after fds 0–2 | About 12 nested directories, leaving one slot for `stat()`'s temporary fd.       |
+| **`child_path` on stack** | `USERSTACK` 2 pages under `LAB_UTIL`                                      | Not reached first: 13 frames of roughly 200 bytes fit well inside 8 KB.          |
+| **Path length**           | `MAXPATH` 128, enforced by `argstr()` in `sys_open()`                     | A long path is rejected by the length check before `open()` or `stat()` sees it. |
 
 Sizing `child_path` at `MAXPATH` rather than `ls()`'s 512 bytes is what keeps the stack row harmless. A 512-byte buffer would buy nothing, because the kernel rejects any path that long at `open()`.
 
@@ -345,11 +421,11 @@ Sizing `child_path` at `MAXPATH` rather than `ls()`'s 512 bytes is what keeps th
 
 This table answers the [Deriving it](#deriving-it) checklist row by row; the source comments hold the longer reasoning.
 
-| Decision                                   | What `user/find.c` does                                                                                                       |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| **Interpret the two operands**             | `main()` requires `argc == 3`, prints `Usage: find <dir> <name>` on fd 2 otherwise, and passes `argv[1]` and `argv[2]`.       |
-| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                       |
-| **Compare the requested basename exactly** | `memmove()` copies `DIRSIZ` bytes into `child_name`, a `'\0'` follows, and `strcmp(child_name, name)` decides the match.      |
-| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                                    |
-| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                               |
-| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.                   |
+| Decision                                   | What `user/find.c` does                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **Interpret the two operands**             | `main()` requires `argc == 3`, prints `Usage: find <dir> <name>` on fd 2 otherwise, and passes `argv[1]` and `argv[2]`.  |
+| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                  |
+| **Compare the requested basename exactly** | `memmove()` copies `DIRSIZ` bytes into `child_name`, a `'\0'` follows, and `strcmp(child_name, name)` decides the match. |
+| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                               |
+| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                          |
+| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.              |
