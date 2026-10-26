@@ -154,10 +154,16 @@ OBJDUMP = $(TOOLPREFIX)objdump
 #  -O                       satisfy assembly/layout assumptions; shrink code.
 #  -fno-omit-frame-pointer  preserve s0 for r_fp() and stack backtraces.
 #  -ggdb -gdwarf-2          emit course-compatible gdb information.
-#  -pedantic				turns off more extensions and generates more warnings
-#  -g						for Valgrind & debugging
-#  -Wextra					add extra warnings, e.g., unused parameters
-CFLAGS = -g -Wall -Werror -Wextra -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2 -pedantic
+#  -g                       emit debugging information.
+CFLAGS = -g -Wall -Werror -Wno-unknown-attributes -O -fno-omit-frame-pointer -ggdb -gdwarf-2
+
+#  STRICT_CFLAGS applies only to objects authored in this tree. Upstream
+#  files keep upstream flags so lab merges stay conflict-free. Attach it to
+#  the .o, never to a _prog target: target-specific variables propagate to
+#  prerequisites and would reach ulib.o and printf.o.
+#  -Wextra                  add extra warnings, e.g., unused parameters.
+#  -pedantic                reject non-ISO extensions beyond -std=gnu99.
+STRICT_CFLAGS = -Wextra -pedantic
 
 # rv64gc is 64-bit RISC-V with the G extensions and compressed instructions.
 # Deterministic builds.
@@ -329,6 +335,22 @@ mkfs/mkfs: mkfs/mkfs.c $K/fs.h $K/param.h
 # ---------------------------------------------------------------------------
 #  Each entry is built by `_%` and copied into fs.img. Unlisted programs do not
 #  appear in xv6, so the shell reports "exec ... failed".
+LAB_PRACTICE_PROGS = \
+	ex1copy\
+	ex2create\
+	ex3fork\
+	ex4exec\
+	ex5forkexec\
+	ex6redirect\
+	ex7pipe\
+	ex8pipefork\
+	ex9ls\
+	sleep\
+	sixfive\
+	memdump\
+	find_basic\
+	find\
+
 UPROGS=\
 	$U/_cat\
 	$U/_echo\
@@ -350,20 +372,11 @@ UPROGS=\
 	$U/_forphan\
 	$U/_dorphan\
 	$U/_sync\
-	$U/_ex1copy\
-	$U/_ex2create\
-	$U/_ex3fork\
-	$U/_ex4exec\
-	$U/_ex5forkexec\
-	$U/_ex6redirect\
-	$U/_ex7pipe\
-	$U/_ex8pipefork\
-	$U/_ex9ls\
-	$U/_sleep\
-	$U/_sixfive\
-	$U/_memdump\
-	$U/_find\
+	$(addprefix $U/_,$(LAB_PRACTICE_PROGS))
 
+# Programs authored here, plus lab exercise targets, build with STRICT_CFLAGS.
+STRICT_OBJS = $(patsubst %,$U/%.o,$(LAB_PRACTICE_PROGS)) $U/find.o
+$(STRICT_OBJS): CFLAGS += $(STRICT_CFLAGS)
 
 
 ifeq ($(LAB),syscall)

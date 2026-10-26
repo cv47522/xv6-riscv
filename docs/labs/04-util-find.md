@@ -24,6 +24,9 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 | **Termination** | Do not descend through the special `.` and `..` entries.                                                 |
 | **Build**       | Put the source directly in `user/find.c` and register `$U/_find` in `UPROGS`; this tree has neither yet. |
 
+> [!WARNING]
+> `find` matches names, not files. A directory whose name equals the requested name is a match too, and its path is printed just like a file's: with `a/b` a directory holding a file `b`, `find . b` prints both `./a/b` and `./a/b/b`. The grader's directory-match case asserts exactly one such line. A program that matches only `T_FILE` entries misses it.
+
 ### What the grader checks
 
 - **Score:** four tests in [`grade-lab-util`](../../grade-lab-util), **40 points** total.
@@ -252,6 +255,7 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Treat `de.name` as an ordinary C string**                     | A 14-byte name can make `strcmp` or printing read beyond the field.                                                  | [`kernel/fs.h`](../../kernel/fs.h), [`user/ls.c`](../../user/ls.c)                                            |
 | **Descend into `.` or `..`**                                    | The same entry can be reported repeatedly, or traversal may reach a path-length failure.                             | [`kernel/sysfile.c`](../../kernel/sysfile.c), corner test in [`grade-lab-util`](../../grade-lab-util)         |
+| **Match only files, not directories**                           | A directory named like the target is never printed, so the corner test's directory-match count is 0, not 1.          | corner test in [`grade-lab-util`](../../grade-lab-util)                                                       |
 | **Print only the basename**                                     | The current-directory and nested-path checks cannot recognize the full path.                                         | [`grade-lab-util`](../../grade-lab-util)                                                                      |
 | **Treat a failed `open`, `fstat`, or `stat` as valid metadata** | An invalid descriptor or uninitialized type can misdirect the search.                                                | [`user/ls.c`](../../user/ls.c), [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) |
 | **Keep every ancestor descriptor open**                         | Deep searches can exhaust the per-process descriptor table.                                                          | `NOFILE` in [`kernel/param.h`](../../kernel/param.h), [`kernel/proc.h`](../../kernel/proc.h)                  |
