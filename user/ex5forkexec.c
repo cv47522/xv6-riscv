@@ -50,12 +50,20 @@
  *
  *   Result       Meaning
  *   -----------  ----------------------------------------------------------
- *   return > 0   pid of the child that was reaped
- *   return -1    the caller has no children
- *   status       the child's 32-bit exit value; 0 conventionally means success
+ *   return > 0   pid of the child that was reaped; status is filled in
+ *   return -1    no children, the caller was killed, or copyout() of status
+ *                to a bad address failed (kernel/proc.c kwait())
+ *   return 0     never: xv6 has no WNOHANG, so wait() always blocks
+ *   status       the raw int the child passed to exit()
  *
  *  The return value identifies the child, so its status leaves through a
- *  pointer. Check for -1 first: on failure the kernel did not write status.
+ *  pointer. Check for -1 first: on failure the kernel did not write status,
+ *  and status's initial 0 would read as a child that succeeded. Linux packs
+ *  exit code and signal into one int, so there status needs WIFEXITED() and
+ *  WEXITSTATUS(). xv6 has no signals (its kill() makes the target call
+ *  exit(-1)), so status is always a plain exit() value.
+ *  With wait(0) and only the pid printed, a -1 would just print as -1, and
+ *  the check is optional (operating-system/codes/.../fork_exec.c).
  *
  *    int status;               wait() writes it before we read it
  *    int pid = wait(&status);  pid comes back, status is filled in
@@ -100,7 +108,7 @@ main(void)
     exit(1);
   }
 
-  if (pid == 0) {
+  if (pid == 0) { /* Child Process */
     char *argv[] = { "echo", "THIS", "IS", "ECHO", 0 };
     // Only the child execs; the parent must survive to wait and continue.
     exec("echo", argv);
@@ -113,13 +121,13 @@ main(void)
   printf("ex5forkexec: parent waiting for child %d\n", pid);
 
   // wait() blocks if needed, returns a pid, and writes status separately.
-  int reaped = wait(&status);
-  if (reaped < 0) {
+  int reaped_pid = wait(&status);
+  if (reaped_pid < 0) {
     fprintf(2, "ex5forkexec: wait failed\n");
     exit(1);
   }
 
-  printf("ex5forkexec: child %d exited with status %d\n", reaped, status);
+  printf("ex5forkexec: child %d exited with status %d\n", reaped_pid, status);
   exit(0);
 }
 

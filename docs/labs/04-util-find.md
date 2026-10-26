@@ -369,10 +369,10 @@ flowchart TD
         E -->|"No: EOF or error"| Z["find() closes fd and<br/>returns its status."]
         E -->|Yes| G{"Is de.inum equal to 0?"}
         G -->|"Yes: the slot is unused."| E
-        G -->|No| H["find() copies de.name to child_name<br/>and terminates it."]
-        H --> I{"Is child_name #quot;.#quot; or #quot;..#quot;?"}
+        G -->|No| H["find() copies de.name to child_name_ptr<br/>and terminates it."]
+        H --> I{"Is child_name_ptr #quot;.#quot; or #quot;..#quot;?"}
         I -->|"Yes: skip, never descend."| E
-        I -->|No| J{"Does child_name<br/>equal name?"}
+        I -->|No| J{"Does child_name_ptr<br/>equal name?"}
         J -->|Yes| K["find() prints child_path."]
         J -->|No| L
         K --> L{"Does stat(child_path)<br/>report a T_DIR?"}
@@ -397,7 +397,7 @@ _Pink opens or descends, blue decides, yellow builds the path, cyan prints or cl
 The loop shape matches the [`ls()` diagram](#ls-line-by-line). Three decisions implement the added [contract](#contract):
 
 - **Skip aliases before matching:** `find . ..` prints nothing; neither `.` nor `..` is descended into.
-- **Match the name, print the path:** compare bare `child_name`, print whole `child_path`. The [current-directory test](#what-the-grader-checks) observes the `./NAME` prefix.
+- **Match the name, print the path:** compare bare `child_name_ptr`, print whole `child_path`. The [current-directory test](#what-the-grader-checks) observes the `./NAME` prefix.
 - **Continue after a directory match:** a matching directory still reaches `stat()`, so it is printed and then searched. The corner test requires the directory-match count.
 
 A `stat()` failure is reported and marks the return status, but the loop continues with the next record. One unreadable child therefore does not hide the rest of the tree, and `main()` still exits 1 at the end.
@@ -425,11 +425,11 @@ Sizing `child_path` at `MAXPATH` rather than `ls()`'s 512 bytes is what keeps th
 
 This table answers the [Deriving it](#deriving-it) checklist row by row; the source comments hold the longer reasoning.
 
-| Decision                                   | What `user/find.c` does                                                                                                  |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| **Interpret the two operands**             | `main()` requires `argc == 3`, prints `Usage: find <dir> <name>` on fd 2 otherwise, and passes `argv[1]` and `argv[2]`.  |
-| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                  |
-| **Compare the requested basename exactly** | `memmove()` copies `DIRSIZ` bytes into `child_name`, a `'\0'` follows, and `strcmp(child_name, name)` decides the match. |
-| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                               |
-| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                          |
-| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.              |
+| Decision                                   | What `user/find.c` does                                                                                                                                    |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Interpret the two operands**             | With `argc == 3`, `main()` passes `argv[1]` and `argv[2]`; other forms are the [`-exec` extension](05-util-exec.md#solution-walkthrough) or a usage error. |
+| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                                                    |
+| **Compare the requested basename exactly** | `memcpy()` copies `DIRSIZ` bytes to `child_name_ptr`, a `'\0'` follows, and `strcmp(child_name_ptr, name)` decides the match.                              |
+| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                                                                 |
+| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                                                            |
+| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.                                                |
