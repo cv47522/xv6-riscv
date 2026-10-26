@@ -6,6 +6,8 @@
  * named <name> is printed like a file, and then still searched:
  *
  *   $ mkdir a; mkdir a/b; echo > a/b/b
+ *   // Or
+ *   $ sh < findtest.sh
  *   $ find . b
  *   ./a/b        <- the directory
  *   ./a/b/b      <- the file inside it
@@ -29,21 +31,18 @@
 #include "user/user.h"
 
 /*
- * Q: Why fork and exec here instead of once in main()?
- * A: main() runs once per find command; the contract is one command per
- *    match. A fork/exec in main() runs the command once, before or after
- *    the search, without any matched path. An exec in the searching
- *    process itself replaces find, so no later match is ever visited.
+ * Q: Why fork/exec per match, not once in main()?
+ * A: main() would run one command without a matched path; exec() in the
+ * searcher would replace find and prevent later matches.
  *
  *   Process  Does                            Ends by
  *   -------  ------------------------------  ----------------------------
  *   parent   waits, then resumes the search  returning to find()'s loop
- *   child    builds argv, execs the command  the command's exit, or
- *                                            exit(1) if exec() fails
+ *   child    builds argv, execs the command  command exit, or exit(1)
+ *                                            if exec() fails
  *
- * Waiting before the next match keeps command output in search order and
- * reaps each child at once: unreaped children hold NPROC (64) slots until
- * fork() fails. A command's own exit status is not find's failure.
+ * Waiting preserves search order and reaps children before they exhaust
+ * NPROC (64) slots. The command's exit status is not find's failure.
  */
 static int
 run(char **cmd, char *path)
@@ -56,39 +55,35 @@ run(char **cmd, char *path)
 
   if (pid == 0) {
     /*
-     * Q: Why a MAXARG array instead of char *child_argv[n] = {0}?
-     * A: n is not a constant, so that is a variable-length array, and
-     *    C99 (-std=gnu99) forbids initializing one. main() already bounded
-     *    the words, path, and null pointer by MAXARG, which is constant.
+     * Q: Why MAXARG, not char *child_argv[n] = {0}?
+     * A: C99 (-std=gnu99) forbids initializing a variable-length array.
+     * MAXARG is constant; main() bounds command words + path + null pointer.
      */
     char *child_argv[MAXARG];
-    int n = 0;
     /*
      * Q: When is cmd[n] == 0?
-     * A: One slot past the last command word. cmd is argv + 4, so cmd[n]
-     *    is argv[4 + n], and kexec() in kernel/exec.c stores
-     *    ustack[argc] = 0. For find . b -exec grep hello (argc 6):
+     * A: cmd is argv + 4; kexec() supplies argv[argc] = 0 (see main()).
+     * For find . b -exec grep hello, argc == 6:
      *
-     *      n  cmd[n]   Same slot   Loop
-     *      -  -------  ----------  -----------------------
-     *      0  "grep"   argv[4]     copy
-     *      1  "hello"  argv[5]     copy
-     *      2  0        argv[6]     stop: n == argc - 4 == 2
+     *   n  cmd[n]   Same slot   Loop
+     *   -  -------  ----------  -----------------------
+     *   0  "grep"   argv[4]     copy
+     *   1  "hello"  argv[5]     copy
+     *   2  0        argv[6]     stop: n == argc - 4 == 2
      */
-    while (cmd[n] != 0) {
-      child_argv[n] = cmd[n];
-      n++;
+    int i = 0;
+    for (i = 0; cmd[i] !=0; i++) {
+      child_argv[i] = cmd[i];
     }
-    child_argv[n++] = path;
-    child_argv[n] = 0; // sys_exec() stops only at a zero pointer, not "".
+    child_argv[i] = path;
+    child_argv[i + 1] = 0; // sys_exec() stops only at a zero pointer, not "".
 
     exec(child_argv[0], child_argv);
 
     /*
-     * Never return into find(): the child shares each open directory fd
-     * and its read offset with the parent (filedup() in kfork(),
-     * kernel/proc.c), so a second searcher would consume the parent's
-     * remaining dirents and print them twice.
+     * Never return into find(): filedup() in kernel/proc.c's kfork() shares
+     * open directory files and read offsets with the parent. A second
+     * searcher would consume the parent's remaining dirents.
      */
     fprintf(2, "find: exec %s failed\n", child_argv[0]);
     exit(1);
@@ -126,22 +121,21 @@ find(const char *path, const char *name, char **cmd)
     return -1;
   }
 
-  struct dirent de; // dirlink() zero-pads names shorter than DIRSIZ.
   /*
-   * No zero-initialization needed: strcpy() writes path and its '\0';
-   * each copied name gets an explicit '\0'. This saves a 128-byte memset
-   * per level. A prefix memcpy() needs separate termination (below).
+   * strcpy() writes the prefix and '\0'; each name gets its own terminator.
+   * No zero-initialization needed: save a 128-byte memset per level.
+   * A prefix memcpy() needs separate termination (below).
    */
   char child_path[MAXPATH];
   char *child_name_ptr = child_path;
   int return_status = 0;
 
   /*
-   * One check covers all entries: path is fixed and memcpy() always copies
-   * DIRSIZ bytes. Budget '/' + the maximum name + '\0' before any write.
+   * One check covers every entry: path is fixed; memcpy() copies DIRSIZ
+   * bytes. Budget '/' + the maximum name + '\0' before any write.
    *
    * Q: When does this reject a short child name that could fit?
-   * A: MAXPATH = 128, DIRSIZ = 14. Counts include '/' and '\0':
+   * A: MAXPATH = 128, DIRSIZ = 14. Totals include '/' and '\0':
    *
    *   Parent bytes  Name bytes  Actual total  Budget checked  Result
    *   ------------  ----------  ------------  --------------  --------
@@ -150,33 +144,28 @@ find(const char *path, const char *name, char **cmd)
    *   125            1          128           141             reject
    *   126            1          129           142             reject
    *
-   * The middle two names fit; the last exceeds MAXPATH even at one byte.
+   * The middle two fit; the last exceeds MAXPATH even with a one-byte name.
    * Accepting short names within 15 bytes of MAXPATH requires measuring
-   * each name safely (de.name may lack '\0') and copying only that length,
-   * rather than DIRSIZ bytes. The current check avoids that per-entry work.
+   * each safely (de.name may lack '\0') and copying that length, not DIRSIZ.
+   * The current check avoids this per-entry work.
    */
   /*
    * Q: Does each memcpy() grow child_path beyond the one-time size check?
-   * A: No: child_name_ptr is set once, after "path/", before the loop.
-   * memcpy() overwrites DIRSIZ bytes there; it never advances the pointer.
-   * For path = "./x", every iteration writes the same byte range:
+   * A: No: child_name_ptr stays after "path/"; each copy overwrites the same
+   * DIRSIZ bytes. For path = "./x":
    *
    *   Entry name      Prefix [0..3]  Name region [4..17]  Terminator [18]
    *   --------------  -------------  -------------------  ---------------
    *   abc             ./x/           abc + 11 NUL bytes   '\0'
    *   fourteen_chars  ./x/           fourteen_chars       '\0'
    *
-   * For abc, memcpy() copies the source padding too: child_path[4..6]
-   * holds abc; child_path[7] (child_name_ptr[3]) is the first copied NUL.
-   * dirlink()'s strncpy() in kernel/fs.c supplies the padding;
-   * memcpy() adds none. The explicit NUL at child_path[18] handles
-   * all 14 name bytes being nonzero.
-   *
-   * The name changes; the prefix, pointer, and write bounds do not.
-   * Advancing child_name_ptr inside the loop would break this invariant.
-   * Recursion uses another call's local buffer, leaving this one intact.
-   * See the fixed_width_name_field.c example and
-   * c-programming/notes/src/main/arrays_and_strings/strings/fixed_width_name_field.excalidraw
+   * For abc, child_path[4..6] holds letters; child_path[7] (child_name_ptr[3])
+   * is the first copied NUL. dirlink()'s strncpy() in kernel/fs.c supplies
+   * padding; memcpy() adds none. The explicit NUL at child_path[18] handles
+   * full-width names. Advancing the pointer in the loop breaks the bound;
+   * recursive calls use separate buffers, preserving this frame's prefix.
+   * See fixed_width_name_field.c and fixed_width_name_field.excalidraw in
+   * ../c-programming/notes/src/main/arrays_and_strings/strings/.
    */
   if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(child_path)) {
     fprintf(2, "find: path too long: %s\n", path);
@@ -185,43 +174,41 @@ find(const char *path, const char *name, char **cmd)
   }
 
   /*
-   * strcpy() terminates the prefix for strlen(child_path). Copying only
-   * strlen(path) bytes with memcpy() leaves that scan reading uninitialized
-   * stack bytes and may misplace '/'; zero the buffer first or reuse
-   * strlen(path) as the offset to make that alternative safe.
+   * strcpy() terminates the prefix for strlen(child_path). A memcpy() of only
+   * strlen(path) bytes leaves that scan reading uninitialized stack bytes
+   * and may misplace '/'; zero the buffer or reuse strlen(path) as the offset.
    */
   strcpy(child_path, path);
   child_name_ptr += strlen(child_path);
   *child_name_ptr++ = '/';
 
   // Stops at EOF (0) or error (-1); dir sizes are multiples of 16.
+  struct dirent de; // dirlink() zero-pads names shorter than DIRSIZ.
   while (read(fd, &de, sizeof(de)) == sizeof(de)) {
     // Free slot: unlink() zeroes inum without compacting the directory.
     if (de.inum == 0)
       continue;
 
     /*
-     * A DIRSIZ-long name has no '\0', so never strlen(de.name).
-     * user/printf.c has no %.*s support; %s would hide the NUL padding.
+     * Never strlen(de.name): full-width names lack '\0'. user/printf.c has no
+     * %.*s; %s hides NUL padding. Uncomment to show all DIRSIZ bytes:
      */
-    // ------------ Uncomment For Debugging -------------
     // fprintf(2, "de.name bytes:");
     // for (int i = 0; i < DIRSIZ; i++) {
     //   if (de.name[i] == '\0')
     //     fprintf(2, " \\0");
     //   else
     //     fprintf(2, " %c", de.name[i]);
-    // }
-    // fprintf(2, "\n");
-    // ------------------------------------
+    //   }
+    //  fprintf(2, "\n");
+
     memcpy(child_name_ptr, de.name, DIRSIZ);
     child_name_ptr[DIRSIZ] = '\0';
 
     /*
-     * Never treat de.name as a C string: a DIRSIZ (14)-byte name lacks '\0'.
-     * strcmp(de.name, ".") or ".." stops by index 2 on any full-width
-     * name, but a user-supplied 14+ byte name could make it read past de.
-     * child_name_ptr is terminated and safe for every comparison.
+     * strcmp(de.name, ".") or ".." stops by index 2 even on full-width names;
+     * a user-supplied 14+ byte name could instead cause an overread. Compare
+     * the terminated child_name_ptr everywhere; de.name is not a C string.
      */
     // "." and ".." lead back up: descending would loop forever.
     if (strcmp(child_name_ptr, ".") == 0 || strcmp(child_name_ptr, "..") == 0)
@@ -235,17 +222,15 @@ find(const char *path, const char *name, char **cmd)
     }
 
     /*
-     * Match the bare name, print the full path: "./a/b" is not "b".
-     * Any type matches, including directories (the grader checks this);
-     * GNU `find . -name b` agrees. Its separate `-type f` filter is omitted.
-     * The path locates the entry; matching directories are still searched.
+     * Match the bare name, print its location: "./a/b" is not "b". Any type
+     * matches, including directories (the grader checks this), which are
+     * still searched. GNU `find . -name b` agrees; `-type f` is omitted here.
      */
     if (strcmp(child_name_ptr, name) == 0) {
       /*
-       * Q: Why not `else { return_status = run(...); }`?
-       * A: return_status is sticky. Assigning run()'s 0 would erase a -1
-       *    already recorded by an earlier stat() failure or failed run();
-       *    only failures may write it, as in the descent check below.
+       * Q: Why not return_status = run(...)?
+       * A: A successful 0 would erase an earlier stat()/run() failure.
+       * Only failures may set the sticky -1, as in the descent check.
        */
       if (cmd == 0)
         printf("%s\n", child_path);
@@ -266,10 +251,9 @@ int
 main(int argc, char *argv[])
 {
   /*
-   * Test argc before reading argv[3]. With argc == 3, argv[3] is the 0
-   * from ustack[argc] in kernel/exec.c, and user text is linked at
-   * address 0 (user/user.ld), so strcmp() reads code bytes instead of
-   * faulting and silently rejects the plain form.
+   * Test argc first: with argc == 3, argv[3] is kernel/exec.c's null pointer.
+   * User text starts at address 0 (user/user.ld), so strcmp() reads code
+   * instead of faulting and silently rejects the plain form.
    */
   if (argc == 3)
     exit(find(argv[1], argv[2], 0) < 0 ? 1 : 0);
@@ -287,39 +271,33 @@ main(int argc, char *argv[])
   }
 
   /*
-   * Q: Is argv + 4 the same as argv[4]? Why pass a pointer to a pointer
-   *    instead of argv[4..argc-1]?
-   * A: No. argv[4] is *(argv + 4), one string; argv + 4 is the address
-   *    of that slot, so it reaches every later slot too:
+   * Q: Is argv + 4 the same as argv[4]? Why a pointer to a pointer?
+   * A: argv[4] == *(argv + 4) is one string; argv + 4 addresses that slot:
    *
-   *      Expression  Type     For find . b -exec grep hello
-   *      ----------  -------  ---------------------------------
-   *      argv[4]     char *   "grep" only
-   *      argv + 4    char **  &argv[4]: "grep", "hello", then 0
+   *   Expression  Type     For find . b -exec grep hello
+   *   ----------  -------  ---------------------------------
+   *   argv[4]     char *   "grep" only
+   *   argv + 4    char **  &argv[4]: "grep", "hello", then 0
    *
-   *    C has no slice type: an array argument decays to a pointer to its
-   *    first element, so argv + 4 is how a function receives
-   *    argv[4..argc-1]. Its end needs no separate count because
-   *    argv[argc] is 0 (kexec() in kernel/exec.c). Nothing is copied;
-   *    run() copies into child_argv only because it appends the path.
+   * C has no slice type; array arguments decay to first-element pointers.
+   * argv + 4 passes argv[4..argc-1] without copying or a separate count;
+   * argv[argc] == 0 marks the end. run() copies only to append the path.
    */
   /*
-   * Q: How is argv[argc] known to be 0? Who implements it?
-   * A: Each hop below needs a zero pointer from the one above it, and the
-   *    kernel writes the final one that main() sees:
+   * Q: Who guarantees argv[argc] == 0?
+   * A: Each hop consumes the previous hop's zero pointer:
    *
-   *      Step  Source                 What it does
-   *      ----  ---------------------  ----------------------------------
-   *      1     parseexec(), sh.c      sets cmd->argv[argc] = 0
-   *      2     sys_exec(), sysfile.c  copies pointers until it reads 0;
-   *                                   fails if none within MAXARG
-   *      3     kexec(), exec.c        sets ustack[argc] = 0 and copies
-   *                                   argc + 1 pointers to the stack
-   *      4     kexec(), exec.c        sets a1 = sp, main()'s argv
+   *   Step  Source                        Action
+   *   ----  ----------------------------  --------------------------------
+   *   1     user/sh.c: parseexec()         sets cmd->argv[argc] = 0
+   *   2     kernel/sysfile.c: sys_exec()   copies until 0; fails if no 0
+   *                                         within MAXARG
+   *   3     kernel/exec.c: kexec()         sets ustack[argc] = 0; copies
+   *                                         argc + 1 pointers to the stack
+   *   4     kernel/exec.c: kexec()         sets a1 = sp, main()'s argv
    *
-   *    Step 3 is the guarantee: kexec() rebuilds the vector from the
-   *    strings, so main() always gets a 0 after the last pointer. Hosted
-   *    ISO C requires the same, so this is not an xv6 quirk.
+   * Step 3 rebuilds the vector from strings and supplies main()'s final 0.
+   * Hosted ISO C requires the same guarantee.
    */
   exit(find(argv[1], argv[2], argv + 4) < 0 ? 1 : 0);
 }

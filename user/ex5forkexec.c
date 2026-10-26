@@ -32,44 +32,45 @@
  *    shell-like parent
  *          |
  *          v
- *       fork()
+ *       fork()                  child inherits a copy of the fd table
  *         |
- *         +----> child ----> exec() ----> echo
+ *         +----> child: exec("echo") -> writes THIS IS ECHO
  *         |
- *         +----> parent ---> wait(&status)  ---- blocks until child exits
- *                              |
- *                              v
- *                         report pid and status
+ *         +----> parent: printf("waiting for child N")  <-- races with child
+ *                          |
+ *                          v
+ *                        wait(&status)                <-- ordering starts
+ *                          |
+ *                          v
+ *                        report pid and status
  *
- *  A shell cannot exec directly: it would become the command and never print
- *  another prompt. The child is the process it can afford to replace.
+ * The shell must survive: direct exec() would replace it, ending prompts.
+ * The fork-to-exec gap is where shells install redirection and pipes.
  *
  * ---------------------------------------------------------------------------
- *  wait(&status)
+ *  WAIT AND REAPING
  * ---------------------------------------------------------------------------
  *
  *   Result       Meaning
  *   -----------  ----------------------------------------------------------
- *   return > 0   pid of the child that was reaped; status is filled in
- *   return -1    no children, the caller was killed, or copyout() of status
- *                to a bad address failed (kernel/proc.c kwait())
- *   return 0     never: xv6 has no WNOHANG, so wait() always blocks
- *   status       the raw int the child passed to exit()
+ *   return > 0   reaped child's pid; status is filled in
+ *   return -1    no children, caller killed, or status copyout() failed
+ *                (bad address; kernel/proc.c kwait())
+ *   return 0     never: no nonblocking WNOHANG option
+ *   status       raw 32-bit exit() value: 0 means success, nonzero failure
  *
- *  The return value identifies the child, so its status leaves through a
- *  pointer. Check for -1 first: on failure the kernel did not write status,
- *  and status's initial 0 would read as a child that succeeded. Linux packs
- *  exit code and signal into one int, so there status needs WIFEXITED() and
- *  WEXITSTATUS(). xv6 has no signals (its kill() makes the target call
- *  exit(-1)), so status is always a plain exit() value.
- *  With wait(0) and only the pid printed, a -1 would just print as -1, and
- *  the check is optional (operating-system/codes/.../fork_exec.c).
+ * The pid returns directly; status leaves through a pointer:
  *
  *    int status;               wait() writes it before we read it
  *    int pid = wait(&status);  pid comes back, status is filled in
  *
- *  An exited child remains a zombie until wait() collects its 32-bit status
- *  and frees its slot. By convention, 0 means success and nonzero failure.
+ * Check -1 before status: failure writes nothing, so its initial 0 here
+ * would falsely suggest success. With wait(0) and only the pid printed,
+ * -1 prints as -1; checking is optional (the prerequisite fork_exec.c).
+ * Linux packs exit code and signal into status, requiring WIFEXITED() and
+ * WEXITSTATUS(); xv6 has no signals, and kill() forces exit(-1).
+ * An exited child stays a zombie until wait() collects status and frees
+ * its slot; wait() blocks if needed before returning.
  *
  * ---------------------------------------------------------------------------
  *  WHERE EACH PIECE LIVES IN THIS TREE
@@ -83,14 +84,6 @@
  *   exit and reaping            kernel/proc.c  (kexit(), kwait())
  *   shell command execution     user/sh.c
  *   exercise details            docs/07-exercises.md
- *
- * ---------------------------------------------------------------------------
- *  KEY POINTS
- * ---------------------------------------------------------------------------
- *
- *  * fork() keeps the shell alive; exec() replaces only the child.
- *  * wait() orders the parent after child exit and releases the zombie.
- *  * The fork-to-exec gap is where shells later install redirection and pipes.
  */
 
 #include "kernel/types.h"
@@ -100,7 +93,6 @@ int
 main(void)
 {
   int status = 0;
-  // The child inherits a copy of the parent's descriptor table.
   int pid = fork();
 
   if (pid < 0) {
@@ -108,9 +100,8 @@ main(void)
     exit(1);
   }
 
-  if (pid == 0) { /* Child Process */
+  if (pid == 0) {
     char *argv[] = { "echo", "THIS", "IS", "ECHO", 0 };
-    // Only the child execs; the parent must survive to wait and continue.
     exec("echo", argv);
 
     // Only an exec failure leaves the child running this program.
@@ -120,7 +111,6 @@ main(void)
 
   printf("ex5forkexec: parent waiting for child %d\n", pid);
 
-  // wait() blocks if needed, returns a pid, and writes status separately.
   int reaped_pid = wait(&status);
   if (reaped_pid < 0) {
     fprintf(2, "ex5forkexec: wait failed\n");
@@ -147,24 +137,13 @@ main(void)
  *    iting for child 8
  *    ex5forkexec: child 8 exited with status 0
  *
- *  1. Output may interleave mid-word:
- *
- *    fork()
- *      |
- *      +-- child:  exec("echo") -> writes THIS IS ECHO
- *      +-- parent: printf("waiting for child N")
- *                  |
- *                  v
- *                  wait(&status)        <-- ordering starts here
- *                  printf("child N exited ...")
- *
- *  The parent's first printf() races with the child because it precedes
- *  wait(). printf() is not atomic, and uartputc() locks per character, so
- *  output can mix with CPUS=3. The post-wait status line cannot run early.
- *
- *  2. `exec ex5forkexec failed` comes from user/sh.c, not this program.
- *  A pasted burst can overflow kernel/console.c's 128-byte input buffer;
- *  consoleintr() drops excess characters, and sh may receive a corrupt name.
- *  Per-prompt runs avoid this input loss: fork(), exec(), and wait() are not
- *  the failing operations.
+ * 1. Mid-word interleaving: the first printf() precedes wait() (see header
+ *    flow). user/printf.c writes one byte per write(); kernel/uart.c's
+ *    uartwrite() locks each write, not a whole printf(). CPUS=3 can mix
+ *    output; the post-wait status cannot run early.
+ * 2. `exec ex5forkexec failed` is from user/sh.c, not this program. Pasted
+ *    bursts can overflow kernel/console.c's 128-byte input buffer:
+ *    consoleintr() drops excess characters, potentially corrupting the name
+ *    sh receives. Per-prompt runs avoid that input loss; this program's
+ *    fork(), exec(), and wait() are not the failing operations.
  */
