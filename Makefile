@@ -351,6 +351,10 @@ LAB_PRACTICE_PROGS = \
 	find_basic\
 	find\
 	uptime\
+	array\
+	ptr\
+	str\
+	hwstruct\
 
 UPROGS=\
 	$U/_cat\

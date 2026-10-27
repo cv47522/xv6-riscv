@@ -324,4 +324,98 @@ def test_ex9ls_arguments():
             "^DONE$")
 
 
+##############################################################################
+#  Lecture 2 -- array, ptr, hwstruct: addresses, scaling, struct layout
+##############################################################################
+
+def nm_symbols(binary):
+    """Map symbol name -> address for a user binary, from the host nm."""
+    import subprocess
+    out = subprocess.check_output(
+        ["riscv64-linux-gnu-nm", "-n", binary], text=True)
+    syms = {}
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) == 3:
+            syms[parts[2]] = int(parts[0], 16)
+    return syms
+
+
+def printed(name):
+    """The value of the first `name=0x...` line in the QEMU output."""
+    m = re.search(r"(?m)^%s=0x([0-9A-Fa-f]{16})$" % re.escape(name),
+                  r.qemu.output)
+    assert m, "no %s= line in the output" % name
+    return int(m.group(1), 16)
+
+
+@test(1, "array: index and pointer access, scaling by element type")
+def test_array():
+    r.run_qemu(shell_script(["array", "echo DONE"]))
+    r.match("^First element is at index 0: a\\[0\\]=1$",
+            "^a\\[1\\]=3$", "^a\\[2\\]=5$", "^DONE$")
+    a, b = printed("a"), printed("b")
+    assert_equal(printed("a+1") - a, 4, "int pointer + 1 moves 4 bytes")
+    assert_equal(printed("a+2"), printed("&a[2]"), "a + 2 == &a[2]")
+    assert_equal(printed("b+1") - b, 1, "char pointer + 1 moves 1 byte")
+    # The header's claim that globals have link-time addresses.
+    syms = nm_symbols("user/_array")
+    assert_equal(a, syms["a"], "printed a matches nm")
+    assert_equal(b, syms["b"], "printed b matches nm")
+
+
+@test(1, "ptr: writes through pointers, and argv as kexec() built it")
+def test_ptr():
+    r.run_qemu(shell_script(["ptr x yz", "echo DONE"]))
+    r.match("^g=11$", "^l=13$", "^\\*c=11$", "^st_ptr->a=10$",
+            "^\\*\\*pp=11$",
+            '^argv\\[0\\]=0x[0-9A-F]{16} "ptr"$',
+            '^argv\\[1\\]=0x[0-9A-F]{16} "x"$',
+            '^argv\\[2\\]=0x[0-9A-F]{16} "yz"$',
+            "^argv\\[3\\]=0x0000000000000000$", "^DONE$")
+    syms = nm_symbols("user/_ptr")
+    assert_equal(printed("p"), syms["g"], "p == &g, from nm")
+    assert_equal(printed("*pp"), printed("p"), "*pp == p")
+    assert_equal(printed("func"), syms["main"], "func == &main, from nm")
+    # Locals and argv live on the stack, above the .data page.
+    assert printed("q") > printed("p"), "the stack sits above .data"
+
+
+@test(1, "hwstruct: guaranteed RV64 offsets, and the loads still succeed")
+def test_hwstruct():
+    r.run_qemu(shell_script(["hwstruct", "echo DONE"]))
+    r.match("^sizeof: f=36 g=24 h=32$",
+            "^&h->g.d\\[2\\]=0x0000000000001018$",
+            "^&h->g.c=0x0000000000001008$",
+            # Values depend on memory, but the lines must appear: the
+            # loads from 0x1000 and 0x1008 hit a mapped page.
+            "^&h->f->a=0x[0-9A-F]{16}$",
+            "^&h->g.c\\[10\\]=0x[0-9A-F]{16}$",
+            "^DONE$",
+            no=["usertrap"])
+
+
+@test(1, "str: a stack overflow is silent, a literal write faults")
+def test_str():
+    r.run_qemu(shell_script(["str", "echo DONE"]))
+    r.match("^s=123$", "^s1=123$", "^\\*s=1$", "^\\*\\(s\\+2\\)=3$",
+            "^s1\\[4\\] write: no fault$",
+            "^usertrap\\(\\): unexpected scause 0xf pid=\\d+$",
+            "^DONE$",
+            no=["not reached"])
+    # stval is the literal's address + 4, wherever the linker put it.
+    lit = int(re.search(r"^ 0*([0-9a-f]+) 31323300",
+                        subprocess_out(["riscv64-linux-gnu-objdump", "-s",
+                                        "-j", ".rodata", "user/_str"]),
+                        re.M).group(1), 16)
+    m = re.search(r"stval=0x([0-9a-f]+)", r.qemu.output)
+    assert m, "no stval in the fault message"
+    assert_equal(int(m.group(1), 16), lit + 4, "fault address is s + 4")
+
+
+def subprocess_out(argv):
+    import subprocess
+    return subprocess.check_output(argv, text=True)
+
+
 run_tests()
