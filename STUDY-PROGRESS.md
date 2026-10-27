@@ -34,7 +34,7 @@
 | Item         | When to check it off                                                                                     |
 | ------------ | -------------------------------------------------------------------------------------------------------- |
 | **Lecture**  | Study the lecture and keep notes or practice code.                                                       |
-| **Homework** | Read the material, then write or check an answer. No saved answers were found, so all 23 remain open.    |
+| **Homework** | Read the material, then write or check an answer, and link where it is saved.                            |
 | **Lab**      | Finish every required exercise and check. Keep optional challenges and course submission steps separate. |
 
 When you finish an item:
@@ -47,21 +47,21 @@ When you finish an item:
 
 **Recorded on 2026-10-27.** These are study milestones, not claims of attendance or homework submission.
 
-| Area                      | Work on record                                                                                                                           | Next step                                                                                                  |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                   | Suite fully passing: [12/12 checks](#verification-evidence) after the ex3fork assertion fix on 2026-10-27. |
-| **C and memory practice** | [memdump](user/memdump.c); commits `b85fe54` and `dfc56d0`.                                                                              | Study the three Lecture 2 demos and Homework 2; the full lecture is not yet confirmed complete.            |
-| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence). | Optional shell challenges; then the syscall lab.                                                           |
-| **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                       | Read the remaining chapters; their files are scaffolding or references, not proof of reading.              |
+| Area                      | Work on record                                                                                                                                                                                      | Next step                                                                                        |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                                                                              | Suite fully passing: [16/16 checks](#verification-evidence), including Lecture 2, on 2026-10-27. |
+| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [16/16 checks](#verification-evidence). | Lecture 3 (OS design) and Homework 3.                                                            |
+| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence).                                                            | Optional shell challenges; then the syscall lab.                                                 |
+| **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                                                                                  | Read the remaining chapters; their files are scaffolding or references, not proof of reading.    |
 
-Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance and Homework 1 completion are unconfirmed. Other lectures stay open until you confirm studying them.
+Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance and Homework 1 completion are unconfirmed. Lecture 2 is checked on your confirmation on 2026-10-27, backed by the [Lecture 2 practice](#lecture-2-example-practice) and the [C in xv6](docs/10-c-in-xv6.md) note. Other lectures stay open until you confirm studying them.
 
 ## Lectures
 
 Main texts are below. FAQs, examples, and the UART manual follow in the extras table.
 
 - [x] **Lecture 01 · 2026-09-09** — [Introduction](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview.txt) / [local](lectures/l-overview.txt)
-- [ ] **Lecture 02 · 2026-09-14** — [C in xv6](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c.txt) / [local](lectures/l-c.txt)
+- [x] **Lecture 02 · 2026-09-14** — [C in xv6](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c.txt) / [local](lectures/l-c.txt) · studied 2026-10-27 · [notes](docs/10-c-in-xv6.md) · [practice](#lecture-2-example-practice)
 - [ ] **Lecture 03 · 2026-09-16** — [OS design](https://pdos.csail.mit.edu/6.1810/2026/lec/l-os.txt) / [local](lectures/l-os.txt)
 - [ ] **Lecture 04 · 2026-09-21** — [Page tables](https://pdos.csail.mit.edu/6.1810/2026/lec/l-vm.txt) / [local](lectures/l-vm.txt)
 - [ ] **Lecture 05 · 2026-09-23** — [Locking](https://pdos.csail.mit.edu/6.1810/2026/lec/l-lockv2.txt) / [local](lectures/l-lockv2.txt)
@@ -120,9 +120,10 @@ Additional code includes links found inside the lecture texts. The [archive inve
     - **Book:** Chapter 1.
     - **Optional:** [historic AT&T Unix film](https://www.youtube.com/watch?v=tc4ROCJYbm0).
 
-- [ ] **Homework 02 · 2026-09-14** — [kernel C](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-c.html)
+- [x] **Homework 02 · 2026-09-14** — [kernel C](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-c.html) · answered 2026-10-27
     - **Read:** K&R, _The C Programming Language_, second edition ([book information](https://en.wikipedia.org/wiki/The_C_Programming_Language)): §§2.9, 5.1–5.6, and 6.4.
     - **Task:** Work the handout’s pointer/structure expressions under its explicit 32-bit assumption.
+    - **Answer:** [32-bit worked answer and 64-bit comparison](docs/10-c-in-xv6.md#homework-2-struct-addresses); checked on xv6 by [user/hwstruct.c](user/hwstruct.c).
 
 - [ ] **Homework 03 · 2026-09-16** — [kernel design](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-design.html)
     - **Read:** [`kernel/proc.h`](kernel/proc.h), [`kernel/defs.h`](kernel/defs.h), [`kernel/entry.S`](kernel/entry.S), [`kernel/main.c`](kernel/main.c), and [`user/init.c`](user/init.c).
@@ -246,6 +247,7 @@ Additional code includes links found inside the lecture texts. The [archive inve
       user/memdump.c user/find.c user/find_basic.c user/uptime.c \
       user/sixfive.txt user/sf-* user/findtest.sh grade-lab-util docs/labs
     ```
+
 - [ ] **Optional util challenges**
     - [x] **uptime · 2026-10-27** — [source](user/uptime.c) · [derivation note](docs/labs/06-util-uptime.md); commit `465937d`; four local tests in [grade-lab-util](grade-lab-util).
     - [x] **find regular expressions · 2026-10-27** — [source](user/find.c) · [derivation note](docs/labs/07-util-find-regex.md); commits `578a171` and `d149c4d`; three local tests in [grade-lab-util](grade-lab-util).
@@ -269,6 +271,17 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [x] **Example 7: ex7pipe** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex7.c), [saved original](lectures/l-overview/ex7.c), [practice implementation](user/ex7pipe.c)
 - [x] **Example 8: ex8pipefork** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex8.c), [saved original](lectures/l-overview/ex8.c), [practice implementation](user/ex8pipefork.c)
 - [x] **Example 9: ex9ls** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex9.c), [saved original](lectures/l-overview/ex9.c), [practice implementation](user/ex9ls.c)
+
+### Lecture 2 example practice
+
+- **Originals:** [ptr.c](lectures/l-c/ptr.c), [array.c](lectures/l-c/array.c), and [str.c](lectures/l-c/str.c), kept byte-identical to the [manifest](lectures/manifest.json) hashes.
+- **Practice versions:** Kept the upstream names, since they are already descriptive; see the [exercise guide](docs/07-exercises.md#lecture-2--c-and-memory).
+- **Completion basis:** Four passing tests in the [16/16 exercise suite](#verification-evidence), each confirmed to fail against a deliberately broken program.
+
+- [x] **ptr** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/ptr.c), [saved original](lectures/l-c/ptr.c), [practice implementation](user/ptr.c)
+- [x] **array** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/array.c), [saved original](lectures/l-c/array.c), [practice implementation](user/array.c)
+- [x] **hwstruct** — the lecture's "[demo hw.c]" for Homework 2, which MIT did not publish; [practice implementation](user/hwstruct.c)
+- [x] **str** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/str.c), [saved original](lectures/l-c/str.c), [practice implementation](user/str.c)
 
 ## Books, code handouts, and course references
 
@@ -304,17 +317,17 @@ Additional code includes links found inside the lecture texts. The [archive inve
 
 ## Verification evidence
 
-| Snapshot          | Value                                                                                  |
-| ----------------- | -------------------------------------------------------------------------------------- |
-| **Date**          | 2026-10-27                                                                             |
-| **Commit**        | Local `HEAD` at the time: `d149c4d`                                                    |
-| **Code assessed** | That commit, plus the uncommitted `time.txt`, this file, and the `grade-exercises` fix |
-| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                     |
+| Snapshot          | Value                                                                                   |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| **Date**          | 2026-10-27                                                                              |
+| **Commit**        | `make grade`: `d149c4d`; `./grade-exercises`: `3ad68c5` plus uncommitted Lecture 2 work |
+| **Code assessed** | Those commits, plus the four Lecture 2 programs and their tests                         |
+| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                      |
 
 | Command             | Result           | What the run covers                                                                                |
 | ------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
 | `make grade`        | Exit 0 · 206/206 | All 26 util tests: every MIT test, including `time`, plus the 7 local uptime and find-regex tests. |
-| `./grade-exercises` | Exit 0 · 12/12   | All nine lecture exercises.                                                                        |
+| `./grade-exercises` | Exit 0 · 16/16   | All nine Lecture 1 exercises, plus `array`, `ptr`, `str`, and `hwstruct` from Lecture 2.           |
 
 The `ex3fork` check had expected `parent, x is 11` and `child, x is 22`, but [`user/ex3fork.c`](user/ex3fork.c) prints colons. The assertion in [`grade-exercises`](grade-exercises) now matches the program's actual output, so the suite passes without changing the exercise.
 
