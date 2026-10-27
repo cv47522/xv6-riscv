@@ -45,14 +45,14 @@ When you finish an item:
 
 ## Current checkpoint
 
-**Recorded on 2026-10-23.** These are study milestones, not claims of attendance or homework submission.
+**Recorded on 2026-10-27.** These are study milestones, not claims of attendance or homework submission.
 
-| Area                      | Work on record                                                                                                         | Next step                                                                                       |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md). | Review the stale test assertion: [11/12 checks passed](#verification-evidence).                 |
-| **C and memory practice** | [memdump](user/memdump.c); commits `b85fe54` and `dfc56d0`.                                                            | Study the three Lecture 2 demos and Homework 2; the full lecture is not yet confirmed complete. |
-| **Util lab**              | Four of five required programs; 15/15 selected checks passed.                                                          | Finish `find -exec`, run the full grader, and record actual hours.                              |
-| **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                     | Read the remaining chapters; their files are scaffolding or references, not proof of reading.   |
+| Area                      | Work on record                                                                                                                           | Next step                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                   | Suite fully passing: [12/12 checks](#verification-evidence) after the ex3fork assertion fix on 2026-10-27. |
+| **C and memory practice** | [memdump](user/memdump.c); commits `b85fe54` and `dfc56d0`.                                                                              | Study the three Lecture 2 demos and Homework 2; the full lecture is not yet confirmed complete.            |
+| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence). | Optional shell challenges; then the syscall lab.                                                           |
+| **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                       | Read the remaining chapters; their files are scaffolding or references, not proof of reading.              |
 
 Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance and Homework 1 completion are unconfirmed. Other lectures stay open until you confirm studying them.
 
@@ -217,7 +217,7 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - **Dates:** Assigned and due dates follow the schedule, even on holidays or hacking days.
 - **Status:** Util is in progress; no completed work is on record for the later labs in this snapshot.
 
-- [ ] **[util: Unix utilities](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html)** — assigned 2026-09-09; due 2026-09-17. In progress: [four completed programs](#util-exercise-checklist); `find -exec` remains.
+- [x] **[util: Unix utilities](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) · closed 2026-10-27** — assigned 2026-09-09; due 2026-09-17. [Every required exercise passes](#util-exercise-checklist), and `make grade` scores 206/206. The optional shell challenges remain open.
 - [ ] **[syscall: System calls](https://pdos.csail.mit.edu/6.1810/2026/labs/syscall.html)** — assigned 2026-09-16; due 2026-09-24.
 - [ ] **[pgtbl: Page tables](https://pdos.csail.mit.edu/6.1810/2026/labs/pgtbl.html)** — assigned 2026-09-23; due 2026-10-01.
 - [ ] **[traps: Traps](https://pdos.csail.mit.edu/6.1810/2026/labs/traps.html)** — assigned 2026-09-30; due 2026-10-08.
@@ -236,29 +236,29 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [x] **sixfive** — [source](user/sixfive.c) · [derivation note](docs/labs/02-util-sixfive.md)
 - [x] **memdump** — [source](user/memdump.c) · [derivation note](docs/labs/03-util-memdump.md)
 - [x] **find** — [source](user/find.c) · [derivation note](docs/labs/04-util-find.md)
-- [ ] **exec extension** — finish `find -exec`; [derivation note](docs/labs/05-util-find-exec.md); three exec tests in [grade-lab-util](grade-lab-util).
-- [ ] **Full verification and time record** — run the full grader; record actual hours in `time.txt`; save any required written answers.
+- [x] **exec extension · 2026-10-26** — [source](user/find.c) · [derivation note](docs/labs/05-util-find-exec.md); commit `572e45e`; the three exec tests pass.
+- [x] **Full verification and time record · 2026-10-27** — `time.txt` records **48** hours, and `make grade` scores 206/206. No written answers are required for this lab.
+
+    The hours are estimated, not clocked: 1 SP = 1 hour, summed from the `Effort:` footers of the 42 commits that touch a util source, fixture, `grade-lab-util`, or `docs/labs/`. The Lecture 1 commit `a0340fc` is excluded, because it touched `grade-lab-util` only for `ex2create`. Merge commits carry no footer and count as 0. This command lists 45 commits: the 42 counted, `a0340fc`, and two upstream starter commits by other authors (`db9a9d8`, `a41453e`), which have no `Effort:` footer:
+
+    ```bash
+    git log --no-merges --format='%h %an' -- user/sleep.c user/sixfive.c \
+      user/memdump.c user/find.c user/find_basic.c user/uptime.c \
+      user/sixfive.txt user/sf-* user/findtest.sh grade-lab-util docs/labs
+    ```
 - [ ] **Optional util challenges**
-    - [x] **uptime** — [source](user/uptime.c) · [derivation note](docs/labs/06-util-uptime.md); four local tests in [grade-lab-util](grade-lab-util).
-    - [x] **find regular expressions** — [source](user/find.c) · [derivation note](docs/labs/07-util-find-regex.md); three local tests in [grade-lab-util](grade-lab-util).
-    - [ ] **Shell** — [no prompt from a file](docs/labs/08-util-sh-prompt.md), [wait](docs/labs/09-util-sh-wait.md), [tab completion](docs/labs/10-util-sh-tab-completion.md), and [history](docs/labs/11-util-sh-history.md).
-- [ ] **Optional institutional submission** — enrolled students follow the handout’s Gradescope and zipball steps after verification; not required for self-study.
-
-| Program   | Commits                         | Selected checks passed on 2026-10-23 |
-| --------- | ------------------------------- | ------------------------------------ |
-| `sleep`   | `d4f7615`                       | 4/4                                  |
-| `sixfive` | `5ec5b5e`, `d7c5fa1`, `2109fd1` | 4/4                                  |
-| `memdump` | `b85fe54`, `dfc56d0`            | 3/3                                  |
-| `find`    | `e1eb0f0`                       | 4/4                                  |
-
-> [!NOTE]
-> The selected checks exclude exec and time. A derivation note or temporary draft does not complete an exercise.
+    - [x] **uptime · 2026-10-27** — [source](user/uptime.c) · [derivation note](docs/labs/06-util-uptime.md); commit `465937d`; four local tests in [grade-lab-util](grade-lab-util).
+    - [x] **find regular expressions · 2026-10-27** — [source](user/find.c) · [derivation note](docs/labs/07-util-find-regex.md); commits `578a171` and `d149c4d`; three local tests in [grade-lab-util](grade-lab-util).
+    - [ ] **Shell: no prompt from a file** — [derivation note](docs/labs/08-util-sh-prompt.md); `user/sh.c` unchanged so far.
+    - [ ] **Shell: wait** — [derivation note](docs/labs/09-util-sh-wait.md).
+    - [ ] **Shell: tab completion** — [derivation note](docs/labs/10-util-sh-tab-completion.md); may need a `kernel/console.c` change.
+    - [ ] **Shell: history** — [derivation note](docs/labs/11-util-sh-history.md).
 
 ### Lecture 1 example practice
 
-- **Originals:** [lectures/l-overview/](lectures/l-overview/), including `echo.c`; xv6 supplies [user/echo.c](user/echo.c).
+- **Originals:** [ex1.c](lectures/l-overview/ex1.c) through [ex9.c](lectures/l-overview/ex9.c), plus [echo.c](lectures/l-overview/echo.c), all listed in the [lecture archive](lectures/README.md#example-sets-and-practice-targets); xv6 supplies [user/echo.c](user/echo.c).
 - **Practice versions:** The nine personal xv6 programs below; suite commit `965f54e`, followed by documentation refinements.
-- **Completion basis:** Implementation history; see the [current test limit](#verification-evidence).
+- **Completion basis:** Implementation history and the passing [12/12 exercise suite](#verification-evidence).
 
 - [x] **Example 1: ex1copy** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c), [saved original](lectures/l-overview/ex1.c), [practice implementation](user/ex1copy.c)
 - [x] **Example 2: ex2create** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex2.c), [saved original](lectures/l-overview/ex2.c), [practice implementation](user/ex2create.c)
@@ -304,32 +304,23 @@ Additional code includes links found inside the lecture texts. The [archive inve
 
 ## Verification evidence
 
-| Snapshot                     | Value                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Date**                     | 2026-10-23                                                                                             |
-| **Commit**                   | Local `HEAD` at the time: `e1eb0f0`                                                                    |
-| **Code assessed**            | That commit and the working tree                                                                       |
-| **Work already in progress** | Makefile, find/exec notes, and the temporary find program; none proves the exec extension is complete. |
+| Snapshot          | Value                                                                                  |
+| ----------------- | -------------------------------------------------------------------------------------- |
+| **Date**          | 2026-10-27                                                                             |
+| **Commit**        | Local `HEAD` at the time: `d149c4d`                                                    |
+| **Code assessed** | That commit, plus the uncommitted `time.txt`, this file, and the `grade-exercises` fix |
+| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                     |
 
-| Command                                       | Result            | What the run covers                                    |
-| --------------------------------------------- | ----------------- | ------------------------------------------------------ |
-| `./grade-lab-util sleep sixfive memdump find` | Exit 0 · 15/15 OK | Four implemented exercises; excludes exec and time.    |
-| `./grade-exercises`                           | Exit 1 · 11/12    | One stale ex3fork assertion; every other check passed. |
+| Command             | Result           | What the run covers                                                                                |
+| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
+| `make grade`        | Exit 0 · 206/206 | All 26 util tests: every MIT test, including `time`, plus the 7 local uptime and find-regex tests. |
+| `./grade-exercises` | Exit 0 · 12/12   | All nine lecture exercises.                                                                        |
 
-### Why the ex3fork check failed
-
-| Branch     | Transcript        | [Existing test](grade-exercises) expects |
-| ---------- | ----------------- | ---------------------------------------- |
-| **Parent** | `parent: x is 11` | `parent, x is 11`                        |
-| **Child**  | `child: x is 22`  | `child, x is 22`                         |
-
-The test expects commas where the program prints colons, which explains the assertion failure. No source or grader change was made for this documentation task. The Lecture 1 checkmark records completed practice; it does not claim a fully passing suite.
+The `ex3fork` check had expected `parent, x is 11` and `child, x is 22`, but [`user/ex3fork.c`](user/ex3fork.c) prints colons. The assertion in [`grade-exercises`](grade-exercises) now matches the program's actual output, so the suite passes without changing the exercise.
 
 ### Check again after a code change
 
 ```bash
 ./grade-exercises
-./grade-lab-util sleep sixfive memdump find
-# After completing find -exec and recording actual time spent:
 make grade
 ```
