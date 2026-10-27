@@ -159,8 +159,8 @@ def test_ex3fork():
                    msg="no process saw fork() return 0 -- no child was created")
     # Both branches ran, and each wrote its OWN x: the address spaces are
     # separate copies, not shared memory.
-    assert_emitted(out, "parent, x is 11", msg="the parent branch did not run")
-    assert_emitted(out, "child, x is 22", msg="the child branch did not run")
+    assert_emitted(out, "parent: x is 11", msg="the parent branch did not run")
+    assert_emitted(out, "child: x is 22", msg="the child branch did not run")
 
     r.match("^DONE$")
 
