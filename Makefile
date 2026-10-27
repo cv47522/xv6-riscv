@@ -350,6 +350,7 @@ LAB_PRACTICE_PROGS = \
 	memdump\
 	find_basic\
 	find\
+	uptime\
 
 UPROGS=\
 	$U/_cat\

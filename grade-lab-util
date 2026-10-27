@@ -250,6 +250,51 @@ def test_find_corner():
     # The shell kept running (no hang / panic).
     r.match('^DONE$', no=['path too long', 'panic'])
 
+# The uptime tests are local additions for the optional challenge; the
+# 6.1810 handout leaves uptime ungraded. docs/labs/06-util-uptime.md
+# records what each one asserts.
+UPTIME_LINE = r'(?m)^Uptime: (\d+) ticks\r?$'
+
+@test(5, "uptime, prints ticks")
+def test_uptime():
+    r.run_qemu(shell_script([
+        'uptime',
+        'echo OK',
+    ]))
+    r.match('^Uptime: [0-9]+ ticks$', '^OK$', no=['exec .* failed'])
+
+@test(5, "uptime, makes syscall")
+def test_uptime_syscall():
+    r.run_qemu(shell_script([
+        'uptime',
+        'echo FAIL',
+    ]), stop_breakpoint('sys_uptime'))
+    # No Uptime line means the stop came before printing, not a timeout.
+    r.match('\\$ uptime', no=['FAIL', '^Uptime:'])
+
+@test(5, "uptime, advances across sleep")
+def test_uptime_advances():
+    r.run_qemu(shell_script([
+        'uptime',
+        'sleep 10',
+        'uptime',
+    ]))
+    ticks = [int(t) for t in re.findall(UPTIME_LINE, r.qemu.output)]
+    assert_equal(len(ticks), 2, "Number of uptime lines")
+    # pause() samples ticks after the first uptime and returns only after
+    # 10 more, so the second reading is at least 10 larger.
+    if ticks[1] - ticks[0] < 10:
+        raise AssertionError("uptime advanced %d ticks across sleep 10"
+                             % (ticks[1] - ticks[0]))
+
+@test(5, "uptime, rejects arguments")
+def test_uptime_args():
+    r.run_qemu(shell_script([
+        'uptime extra',
+        'echo OK',
+    ]))
+    r.match('^Usage: uptime$', '^OK$', no=['exec .* failed', '^Uptime:'])
+
 @test(1, "time")
 def test_time():
     check_time()

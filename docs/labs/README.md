@@ -15,6 +15,7 @@ One note per lab exercise that needed more thinking than typing: what the exerci
 | **[03-util-memdump.md](03-util-memdump.md)**     | `util` | `memdump` (moderate) — typed values, byte views, pointers, and structure layout |
 | **[04-util-find.md](04-util-find.md)**           | `util` | `find` — directory records, pathnames, and recursive search                     |
 | **[05-util-find-exec.md](05-util-find-exec.md)** | `util` | `exec` — running a command for each matched path with fork/exec/wait            |
+| **[06-util-uptime.md](06-util-uptime.md)**       | `util` | `uptime` (optional, easy) — reading the tick counter through one system call    |
 
 ## What belongs here, and what does not
 

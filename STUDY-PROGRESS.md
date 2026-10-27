@@ -239,7 +239,7 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [ ] **exec extension** — finish `find -exec`; [derivation note](docs/labs/05-util-find-exec.md); three exec tests in [grade-lab-util](grade-lab-util).
 - [ ] **Full verification and time record** — run the full grader; record actual hours in `time.txt`; save any required written answers.
 - [ ] **Optional util challenges**
-    - Uptime utility.
+    - [x] **uptime** — [source](user/uptime.c) · [derivation note](docs/labs/06-util-uptime.md); four local tests in [grade-lab-util](grade-lab-util).
     - Regular-expression matching in find.
     - Shell: batch prompt handling, wait, tab completion, and history.
 - [ ] **Optional institutional submission** — enrolled students follow the handout’s Gradescope and zipball steps after verification; not required for self-study.
