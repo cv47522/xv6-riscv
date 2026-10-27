@@ -555,9 +555,90 @@ Reading a directory is allowed; writing one is not. `sys_open()` refuses a direc
 
 The reason is integrity: a directory entry references an inode, and the inode's `nlink` count must stay in step with it. A user program writing raw bytes could produce an entry pointing at a free inode, or a link count nothing agrees on — a corrupt file system with no way back. Early Unix did allow this, and it is one of the places where later designs tightened the interface.
 
+## Lecture 2 — C and memory
+
+Lecture 2 ([`l-c.txt`](../lectures/l-c.txt)) hands out three xv6 demos that already have descriptive names, so the practice versions keep them instead of taking an `ex<N>` prefix; `hwstruct` adds the homework demo the lecture runs but MIT did not publish. The lecture's own concepts, the user address space, and the Homework 2 answer live in [10-c-in-xv6.md](10-c-in-xv6.md); these sections cover only the programs.
+
+| Program                                               | Source            | Lecture                                                             | What it introduces                                                   |
+| ----------------------------------------------------- | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **[`ptr`](#ptr--where-things-live)**                  | `user/ptr.c`      | [`ptr.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/ptr.c)     | `&`, `*`, `->`, `int **`, function pointers, and `argv` on the stack |
+| **[`array`](#array--two-spellings-of-one-access)**    | `user/array.c`    | [`array.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/array.c) | `a[i]` versus `*(a + i)`, and arithmetic that scales by element size |
+| **[`hwstruct`](#hwstruct--homework-2-on-64-bit-xv6)** | `user/hwstruct.c` | lecture's "[demo hw.c]"                                             | Homework 2's struct expressions, run instead of computed             |
+| **[`str`](#str--where-a-string-may-be-written)**      | `user/str.c`      | [`str.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/str.c)     | `0`-terminated strings and a deliberate overflow                     |
+
+### `ptr` — where things live
+
+```text
+$ ptr x yz
+p=0x0000000000001000
+q=0x0000000000004F5C
+...
+func=0x0000000000000000
+argv=0x0000000000004FB0
+argv[0]=0x0000000000004FF0 "ptr"
+...
+argv[3]=0x0000000000000000
+```
+
+Each printed address falls into one region of the [user address space](10-c-in-xv6.md#the-user-address-space): `p` (`&g`) in the `.data` page, `q` and `pp` in `main`'s stack frame, and `argv` above them where `kexec()` left it. Two results are the point of the program:
+
+| Output                        | Why                                                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **`*c=11`**                   | `*(char *)&g` reads one byte. RISC-V is little-endian, so it is the low byte of `11`; the pointer's type chose the width. |
+| **`func=0x0000000000000000`** | `main` is linked at address 0. A valid function pointer equals null here.                                                 |
+
+The lecture passes a function pointer straight to `%p` and never uses `main`'s parameters. Practice programs here build with `-Wextra -pedantic` (`STRICT_CFLAGS` in the [Makefile](../Makefile)), which rejects both, so `ptr.c` casts through `uint64` and uses `argc`/`argv` to print the stack layout the lecture draws for `ls.c`.
+
+### `array` — two spellings of one access
+
+```text
+$ array
+...
+a=0x0000000000001010
+a+1=0x0000000000001014
+...
+b=0x0000000000001000
+b+1=0x0000000000001001
+```
+
+`a + 1` moves 4 bytes and `b + 1` moves 1, from the same `+ 1`. The arrays stay global as in the lecture, so `nm -n user/_array` prints the same addresses before the program ever runs. Why `b` lands below `a` is answered in [10-c-in-xv6.md](10-c-in-xv6.md#why-does-b-sit-below-a-in-array).
+
+### `hwstruct` — Homework 2 on 64-bit xv6
+
+```text
+$ hwstruct
+sizeof: f=36 g=24 h=32
+&h->g.d[2]=0x0000000000001018
+&h->g.c=0x0000000000001008
+&h->f->a=0x0000000000000000
+&h->g.c[10]=0x000000000000000A
+```
+
+The first two addresses are guaranteed; the last two are loads from whatever this binary has at `0x1000`, which happens to be `umalloc.c`'s zeroed `freep`. The [Homework 2 section](10-c-in-xv6.md#homework-2-struct-addresses) has the 32-bit answer the handout asks for and the table of which expressions touch memory.
+
+### `str` — where a string may be written
+
+```text
+$ str
+s=123
+...
+s1[4] write: no fault
+usertrap(): unexpected scause 0xf pid=3
+            sepc=0x86 stval=0x914
+```
+
+Both writes are one byte past a 4-byte string, but only one is caught:
+
+| Write             | Lands in                                              | Result                                                                                           |
+| ----------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **`s1[4] = 'D'`** | `main`'s stack frame, mapped writable                 | nothing happens; undefined behaviour that can corrupt the frame                                  |
+| **`s[4] = 'D'`**  | `.rodata`, in the text segment mapped without `PTE_W` | store page fault (`scause` `0xf`); `usertrap()` kills the process, so `not reached` never prints |
+
+`stval` is the faulting address: the literal `"123"` sits at `0x910` (`objdump -s -j .rodata user/_str`), so `s + 4` is `0x914`, and `sepc` `0x86` is the `sb` in `user/str.asm`. The fault comes from the page permission, not from being past the end, so `s[0] = 'D'` would fault too. The lecture's version keeps `s` global and only commits the silent `s1[4]` write; the practice version adds the literal write to show the contrast.
+
 ## Regression suite
 
-[`grade-exercises`](../grade-exercises) covers all nine, twelve tests in about twelve seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose cannot drift away from the programs without something going red.
+[`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises and the four Lecture 2 programs, sixteen tests in about sixteen seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose cannot drift away from the programs without something going red.
 
 | Test              | The claim it pins                                                                                                                                                              |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -570,6 +651,10 @@ The reason is integrity: a directory entry references an inode, and the inode's 
 | **`ex7pipe`**     | `pipe()` returns descriptors 3 and 4, and the bytes come back.                                                                                                                 |
 | **`ex8pipefork`** | All 17 bytes cross the process boundary.                                                                                                                                       |
 | **`ex9ls`** ×2    | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage.                                     |
+| **`array`**       | Values after index and pointer writes, `a + 1` moving 4 bytes and `b + 1` moving 1, and printed addresses equal to `nm`'s.                                                     |
+| **`ptr`**         | Writes through `p`, `q`, `c`, and `pp`; `p` and `func` equal `nm`'s `g` and `main`; `argv` strings in order with a `0` terminator.                                             |
+| **`str`**         | Index and pointer access agree, the `s1[4]` overflow is silent, and `s[4]` raises a store fault at exactly the literal's address + 4 with the next line never printed.         |
+| **`hwstruct`**    | RV64 sizes 36/24/32, the two guaranteed addresses, and all four lines printing without a fault.                                                                                |
 
 Several of these pin _kernel_ invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
 
@@ -578,6 +663,6 @@ Several of these pin _kernel_ invariants rather than program output — `fdalloc
 
 ## Adding the next one
 
-The naming rule is `ex<N><verb>`: `N` from the lecture's own numbering, verb from the lecture's own wording, and the whole guest command name at most **14 bytes** because `DIRSIZ` in `kernel/fs.h` bounds every filename in `fs.img`.
+The naming rule is `ex<N><verb>`: `N` from the lecture's own numbering, verb from the lecture's own wording, and the whole guest command name at most **14 bytes** because `DIRSIZ` in `kernel/fs.h` bounds every filename in `fs.img`. When the lecture's file already has a descriptive name, as Lecture 2's `ptr.c` does, keep it.
 
 The full procedure — the checklist, the comment-block shape, the verification loop — is [`prompts/add-lecture-exercise.md`](prompts/add-lecture-exercise.md), runnable as `/exercise` in Claude Code and copy-pasteable into any other agent. The build-side mechanics it depends on are in [02-build-boot-and-usage.md](02-build-boot-and-usage.md#adding-and-running-a-user-exercise).
