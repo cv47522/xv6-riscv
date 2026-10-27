@@ -20,7 +20,7 @@
  *   find argv  find  .      b      -exec  grep   hello
  *   child      grep  hello  ./a/b  0
  *
- * docs/labs/05-util-exec.md explains the fork/exec/wait derivation.
+ * docs/labs/05-util-find-exec.md explains the fork/exec/wait derivation.
  */
 
 #include "kernel/types.h"

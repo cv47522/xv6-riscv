@@ -425,11 +425,11 @@ Sizing `child_path` at `MAXPATH` rather than `ls()`'s 512 bytes is what keeps th
 
 This table answers the [Deriving it](#deriving-it) checklist row by row; the source comments hold the longer reasoning.
 
-| Decision                                   | What `user/find.c` does                                                                                                                                    |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Interpret the two operands**             | With `argc == 3`, `main()` passes `argv[1]` and `argv[2]`; other forms are the [`-exec` extension](05-util-exec.md#solution-walkthrough) or a usage error. |
-| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                                                    |
-| **Compare the requested basename exactly** | `memcpy()` copies `DIRSIZ` bytes to `child_name_ptr`, a `'\0'` follows, and `strcmp(child_name_ptr, name)` decides the match.                              |
-| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                                                                 |
-| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                                                            |
-| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.                                                |
+| Decision                                   | What `user/find.c` does                                                                                                                                         |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Interpret the two operands**             | With `argc == 3`, `main()` passes `argv[1]` and `argv[2]`; other forms are the [`-exec` extension](05-util-find-exec.md#solution-walkthrough) or a usage error. |
+| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                                                         |
+| **Compare the requested basename exactly** | `memcpy()` copies `DIRSIZ` bytes to `child_name_ptr`, a `'\0'` follows, and `strcmp(child_name_ptr, name)` decides the match.                                   |
+| **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                                                                      |
+| **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                                                                 |
+| **Respect path and resource limits**       | The `DIRSIZ` budget check rejects too-long prefixes; recursion holds one fd per level, bounded by `NOFILE`.                                                     |

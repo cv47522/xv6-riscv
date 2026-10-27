@@ -357,7 +357,7 @@ main(int argc, char *argv[])
   /*
    * Bare GNU find prints every path; find(dir, "") matches nothing and exits
    * 0. GNU behavior needs a separate "no filter" mode. Require the handout's
-   * two operands until lab 05 adds -exec (docs/labs/05-util-exec.md).
+   * two operands until lab 05 adds -exec (docs/labs/05-util-find-exec.md).
    */
   if (argc != 3) {
     fprintf(2, "Usage: find_basic <dir> <name>\n");

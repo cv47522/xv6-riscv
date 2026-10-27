@@ -236,7 +236,7 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [x] **sixfive** — [source](user/sixfive.c) · [derivation note](docs/labs/02-util-sixfive.md)
 - [x] **memdump** — [source](user/memdump.c) · [derivation note](docs/labs/03-util-memdump.md)
 - [x] **find** — [source](user/find.c) · [derivation note](docs/labs/04-util-find.md)
-- [ ] **exec extension** — finish `find -exec`; [derivation note](docs/labs/05-util-exec.md); three exec tests in [grade-lab-util](grade-lab-util).
+- [ ] **exec extension** — finish `find -exec`; [derivation note](docs/labs/05-util-find-exec.md); three exec tests in [grade-lab-util](grade-lab-util).
 - [ ] **Full verification and time record** — run the full grader; record actual hours in `time.txt`; save any required written answers.
 - [ ] **Optional util challenges**
     - Uptime utility.
