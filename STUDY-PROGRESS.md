@@ -240,7 +240,7 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [ ] **Full verification and time record** — run the full grader; record actual hours in `time.txt`; save any required written answers.
 - [ ] **Optional util challenges**
     - [x] **uptime** — [source](user/uptime.c) · [derivation note](docs/labs/06-util-uptime.md); four local tests in [grade-lab-util](grade-lab-util).
-    - [ ] **find regular expressions** — [derivation note](docs/labs/07-util-find-regex.md).
+    - [x] **find regular expressions** — [source](user/find.c) · [derivation note](docs/labs/07-util-find-regex.md); three local tests in [grade-lab-util](grade-lab-util).
     - [ ] **Shell** — [no prompt from a file](docs/labs/08-util-sh-prompt.md), [wait](docs/labs/09-util-sh-wait.md), [tab completion](docs/labs/10-util-sh-tab-completion.md), and [history](docs/labs/11-util-sh-history.md).
 - [ ] **Optional institutional submission** — enrolled students follow the handout’s Gradescope and zipball steps after verification; not required for self-study.
 

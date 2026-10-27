@@ -1,6 +1,16 @@
 /*
- * find.c: print paths under a directory whose final name matches, or run
- * a command once for each such path.
+ * find.c: print paths under a directory whose final name matches a
+ * pattern, or run a command once for each such path.
+ *
+ * The pattern uses grep's rule (user/grep.c): ^ . * $ only, unanchored
+ * unless ^ or $ is given, tested against the entry's name, never its path:
+ *
+ *   Pattern  Selects names that       ab  abc  xab  b
+ *   -------  -----------------------  --  ---  ---  -
+ *   ab       contain ab               y   y    y    -
+ *   ^ab      start with ab            y   y    -    -
+ *   ab$      end with ab              y   -    y    -
+ *   ^ab$     are exactly ab           y   -    -    -
  *
  * NOTE: "matches" means any entry type, not just files. A directory
  * named <name> is printed like a file, and then still searched:
@@ -8,7 +18,7 @@
  *   $ mkdir a; mkdir a/b; echo > a/b/b
  *   // Or
  *   $ sh < findtest.sh
- *   $ find . b
+ *   $ find . ^b$
  *   ./a/b        <- the directory
  *   ./a/b/b      <- the file inside it
  *
@@ -20,7 +30,8 @@
  *   find argv  find  .      b      -exec  grep   hello
  *   child      grep  hello  ./a/b  0
  *
- * docs/labs/05-util-find-exec.md explains the fork/exec/wait derivation.
+ * docs/labs/05-util-find-exec.md explains the fork/exec/wait derivation;
+ * docs/labs/07-util-find-regex.md tabulates which pattern selects what.
  */
 
 #include "kernel/types.h"
@@ -93,6 +104,54 @@ run(char **cmd, char *path)
     fprintf(2, "find: wait failed\n");
     return -1;
   }
+  return 0;
+}
+
+/*
+ * Regexp matcher copied from user/grep.c (Kernighan & Pike, The Practice of
+ * Programming, Chapter 9), which links only into _grep. Changes: const
+ * parameters, because find() holds name as const char * and -Werror rejects
+ * discarding the qualifier; static, because nothing outside find.c calls it.
+ */
+
+static int matchhere(const char *, const char *);
+static int matchstar(int, const char *, const char *);
+
+static int
+match(const char *re, const char *text)
+{
+  if (re[0] == '^')
+    return matchhere(re + 1, text);
+  do { // must look at empty string
+    if (matchhere(re, text))
+      return 1;
+  } while (*text++ != '\0');
+  return 0;
+}
+
+// matchhere: search for re at beginning of text
+static int
+matchhere(const char *re, const char *text)
+{
+  if (re[0] == '\0')
+    return 1;
+  if (re[1] == '*')
+    return matchstar(re[0], re + 2, text);
+  if (re[0] == '$' && re[1] == '\0')
+    return *text == '\0';
+  if (*text != '\0' && (re[0] == '.' || re[0] == *text))
+    return matchhere(re + 1, text + 1);
+  return 0;
+}
+
+// matchstar: search for c*re at beginning of text
+static int
+matchstar(int c, const char *re, const char *text)
+{
+  do { // a * matches zero or more instances
+    if (matchhere(re, text))
+      return 1;
+  } while (*text != '\0' && (*text++ == c || c == '.'));
   return 0;
 }
 
@@ -222,11 +281,14 @@ find(const char *path, const char *name, char **cmd)
     }
 
     /*
-     * Match the bare name, print its location: "./a/b" is not "b". Any type
-     * matches, including directories (the grader checks this), which are
-     * still searched. GNU `find . -name b` agrees; `-type f` is omitted here.
+     * Match the bare name, print its location: with path text, ^ab could not
+     * match "./ab", and a pattern naming the start directory would select
+     * every entry. Any type matches, including directories (the grader
+     * checks this), which are still searched. user/find_basic.c keeps the
+     * earlier exact strcmp() comparison.
      */
-    if (strcmp(child_name_ptr, name) == 0) {
+    // if (strcmp(name, child_name_ptr) == 0) { // Literal match
+    if (match(name, child_name_ptr)) { // Regex match
       /*
        * Q: Why not return_status = run(...)?
        * A: A successful 0 would erase an earlier stat()/run() failure.
@@ -260,7 +322,7 @@ main(int argc, char *argv[])
 
   // No dir/name, extra operands, or -exec without a command.
   if (argc < 5 || strcmp(argv[3], "-exec") != 0) {
-    fprintf(2, "Usage: find <dir> <name> [-exec cmd [arg ...]]\n");
+    fprintf(2, "Usage: find <dir> <pattern> [-exec cmd [arg ...]]\n");
     exit(1);
   }
 

@@ -350,6 +350,9 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 > [!CAUTION]
 > **Spoiler.** This section explains the finished [`user/find.c`](../../user/find.c), which passes all four find tests. Stop here if you are still deriving it from the sections above.
 
+> [!NOTE]
+> This walkthrough describes the exact-match comparison, `strcmp(child_name_ptr, name) == 0`, which [`user/find_basic.c`](../../user/find_basic.c) still uses. The optional regular-expression challenge later replaced that one condition in `user/find.c` with grep's `match()`; [`07-util-find-regex.md`](07-util-find-regex.md#solution-walkthrough) explains the change. Everything else below still describes `user/find.c`.
+
 - **Source header:** per-entry decision and resource tables.
 - **Source `Q:`/`A:` blocks:** one design question answered beside the relevant code.
 - **Drawings below:** one call's control flow, then memory and descriptors across nested calls.

@@ -9,7 +9,7 @@
 An optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) asks `find` to accept a regular expression in place of an exact name, and points at the small matcher already in `user/grep.c`. This note explains that matcher and the decisions its semantics force on `user/find.c`; it does not write the change.
 
 > [!IMPORTANT]
-> No solution or pseudocode: the C quotation below is the unchanged matcher from `user/grep.c`, which is not the target. `user/find.c` gets a contract, decisions, and traps. Its existing behavior is explained in [`04-util-find.md`](04-util-find.md), including that note's spoiler-marked walkthrough.
+> No solution or pseudocode before the end: the C quotation below is the unchanged matcher from `user/grep.c`, which is not the target, and `user/find.c` gets a contract, decisions, and traps. Its traversal is explained in [`04-util-find.md`](04-util-find.md). The one exception is the final [Solution walkthrough](#solution-walkthrough), a marked spoiler; stop before it if you are still deriving.
 
 ## What the exercise asks for
 
@@ -46,7 +46,7 @@ Each test boots a fresh image, builds the same fixture under a directory `DIR` w
 | **`find regex, wildcards`**                   | 10     | `^a.c$`, `^a*b$`, `^.$`, `.*`            | `.` or `*` is mishandled, or `.*` prints or descends into `.` and `..`. |
 | **`find regex, names not paths, with -exec`** | 10     | `DIR` itself, then `^a.c -exec echo hit` | The pattern sees the path, or `-exec` no longer receives each match.    |
 
-[Which pattern filters what](#which-pattern-filters-what) lists every expected result. The committed exact-match `find.c` fails all three tests, and a version that applies the matcher to the full path also fails all three: `^ab` cannot match `DIR/ab`, and `find DIR DIR` prints every entry.
+[Which pattern filters what](#which-pattern-filters-what) lists every expected result. The earlier exact-match comparison, which [`user/find_basic.c`](../../user/find_basic.c) still uses, fails all three tests, and a version that applies the matcher to the full path also fails all three: `^ab` cannot match `DIR/ab`, and `find DIR DIR` prints every entry.
 
 ### What the grader does not prove
 
@@ -273,4 +273,32 @@ These are checks to run, not a transcript. Compare guest results with [the table
 6. Failure scenario: a user types `find . 'b*'`. Which function in [`user/sh.c`](../../user/sh.c) explains why nothing matches?
 7. What does `$` mean in the pattern `a$b`, and which line of `matchhere()` decides that?
 8. If `.` is skipped before the comparison, can any pattern make `find` descend into `.` or `..`?
+
+## Solution walkthrough
+
+> [!CAUTION]
+> **Spoiler.** This section explains the finished [`user/find.c`](../../user/find.c), which passes the three local `find regex` tests and the seven literal-name `find` and `exec` tests. Stop here if you are still deriving it from the sections above.
+
+| Location in `user/find.c`                   | Responsibility                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **Header comment**                          | States grep's rule and tabulates `ab`, `^ab`, `ab$`, and `^ab$` against four names.                           |
+| **`match()`, `matchhere()`, `matchstar()`** | grep's three functions, copied with `const char *` parameters and `static` linkage.                           |
+| **The match site in `find()`**              | `match(name, child_name_ptr)` replaces `strcmp(child_name_ptr, name) == 0`; nothing else in the loop changes. |
+| **`main()`**                                | Unchanged argument layout; the usage line now says `<pattern>`.                                               |
+
+The change is one condition, which is why it can stay small. Everything the earlier notes established still holds around it: the terminated copy at `child_name_ptr`, the `.` and `..` skip before the comparison, the descent into every directory whether or not it matched, and the print-or-run choice at a match.
+
+### Decisions, answered
+
+| Decision                       | What `user/find.c` does                                                                                                                                                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Apply the anchoring rule**   | Calls `match()`, whose leading-`^` test and every-offset loop are grep's rule; no wrapper adds or removes anchors.                                                                                                      |
+| **Reuse the matcher**          | Copies the functions. Moving them into `ULIB` would change `user/grep.c`, `user/user.h`, and every program's link, and the Makefile and shared files are merge-sensitive ([AGENTS.md](../../AGENTS.md#c-source-style)). |
+| **Satisfy the strict flags**   | All three functions take `const char *`, because `-Werror=discarded-qualifiers` rejects passing `name` to `char *`; none of them writes through either pointer.                                                         |
+| **Feed it a C string**         | Passes `child_name_ptr`, which `memcpy()` plus the explicit `'\0'` at `child_name_ptr[DIRSIZ]` terminates even for a 14-byte name.                                                                                      |
+| **Keep `.` and `..` excluded** | The skip still precedes the match, so `.*` prints neither alias and the corner test's single-report count holds.                                                                                                        |
+| **Preserve `-exec`**           | The pattern is still `argv[2]`; `run()` receives `child_path`, so `^a.c -exec echo hit` prints `hit DIR/abc` and `hit DIR/axc`.                                                                                         |
+
+> [!NOTE]
+> Literal names keep working only in the sense the [warning above](#the-concept-underneath) describes: `find . b` now also lists `zombie`, `find_basic`, and `sf-bad-eof`. `^b$` restores the exact meaning, and `user/find_basic.c` keeps the exact `strcmp()` version for comparison.
 
