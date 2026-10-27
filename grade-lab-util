@@ -250,6 +250,68 @@ def test_find_corner():
     # The shell kept running (no hang / panic).
     r.match('^DONE$', no=['path too long', 'panic'])
 
+# The find regex tests are local additions for the optional challenge. They
+# fix grep's rule from user/grep.c: a pattern is unanchored unless it uses
+# ^ or $, and it is matched against each entry's name, never its path.
+# docs/labs/07-util-find-regex.md tabulates the fixture and every result.
+REGEX_NAMES = ['ab', 'abc', 'xab', 'aab', 'b', 'axc']
+
+def find_regex_run(pattern_cases):
+    """Build the fixture under a fresh directory, run one find per case,
+    and compare each command's output lines, ignoring their order."""
+    d = random_str()
+    setup = ['mkdir %s' % d]
+    setup += ['echo > %s/%s' % (d, n) for n in REGEX_NAMES]
+    setup += ['mkdir %s/sub' % d, 'echo > %s/sub/ab' % d]
+    commands = [cmd % {'d': d} for cmd, _ in pattern_cases]
+    r.run_qemu(shell_script(setup + commands + ['echo END']))
+    output = r.qemu.output.replace("\r", "")
+    for i, (_, expected) in enumerate(pattern_cases):
+        start = "$ %s\n" % commands[i]
+        end = "$ %s\n" % (commands + ['echo END'])[i + 1]
+        if start not in output or end not in output:
+            raise AssertionError("command boundaries missing for `%s`"
+                                 % commands[i])
+        actual = output.split(start, 1)[1].split(end, 1)[0].splitlines()
+        want = [line % {'d': d} for line in expected]
+        assert_equal(sorted(actual), sorted(want),
+                     "Output from `%s`" % commands[i])
+
+@test(10, "find regex, anchors")
+def test_find_regex_anchors():
+    find_regex_run([
+        ('find %(d)s ab', ['%(d)s/ab', '%(d)s/abc', '%(d)s/xab',
+                           '%(d)s/aab', '%(d)s/sub/ab']),
+        ('find %(d)s ^ab', ['%(d)s/ab', '%(d)s/abc', '%(d)s/sub/ab']),
+        ('find %(d)s ab$', ['%(d)s/ab', '%(d)s/xab', '%(d)s/aab',
+                            '%(d)s/sub/ab']),
+        ('find %(d)s ^ab$', ['%(d)s/ab', '%(d)s/sub/ab']),
+    ])
+
+@test(10, "find regex, wildcards")
+def test_find_regex_wildcards():
+    find_regex_run([
+        ('find %(d)s ^a.c$', ['%(d)s/abc', '%(d)s/axc']),
+        ('find %(d)s ^a*b$', ['%(d)s/ab', '%(d)s/aab', '%(d)s/b',
+                              '%(d)s/sub/ab']),
+        ('find %(d)s ^.$', ['%(d)s/b']),
+        # .* matches every name, including the directory sub, but . and
+        # .. must still be skipped rather than printed or descended.
+        ('find %(d)s .*', ['%(d)s/' + n for n in REGEX_NAMES]
+                          + ['%(d)s/sub', '%(d)s/sub/ab']),
+    ])
+
+@test(10, "find regex, names not paths, with -exec")
+def test_find_regex_names_exec():
+    find_regex_run([
+        # Every path contains the start directory; no name does.
+        ('find %(d)s %(d)s', []),
+        # No "$ " inside a command: shell_script() would read its echo as
+        # a prompt and type the next command before this one finishes.
+        ('find %(d)s ^a.c -exec echo hit', ['hit %(d)s/abc',
+                                            'hit %(d)s/axc']),
+    ])
+
 # The uptime tests are local additions for the optional challenge; the
 # 6.1810 handout leaves uptime ungraded. docs/labs/06-util-uptime.md
 # records what each one asserts.

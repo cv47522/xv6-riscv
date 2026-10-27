@@ -16,7 +16,7 @@ One note per lab exercise that needed more thinking than typing: what the exerci
 | **[04-util-find.md](04-util-find.md)**                           | `util` | `find` — directory records, pathnames, and recursive search                                                  |
 | **[05-util-find-exec.md](05-util-find-exec.md)**                 | `util` | `exec` — running a command for each matched path with fork/exec/wait                                         |
 | **[06-util-uptime.md](06-util-uptime.md)**                       | `util` | `uptime` (optional, easy) — reading the tick counter through one system call                                 |
-| **[07-util-find-regex.md](07-util-find-regex.md)**               | `util` | `find` regular expressions (optional, easy) — reusing grep's matcher and choosing anchoring                  |
+| **[07-util-find-regex.md](07-util-find-regex.md)**               | `util` | `find` regular expressions (optional, easy) — grep's matcher applied to names, with local tests              |
 | **[08-util-sh-prompt.md](08-util-sh-prompt.md)**                 | `util` | shell: no `$ ` from a file (optional, moderate) — telling a person from a script; owns shared shell material |
 | **[09-util-sh-wait.md](09-util-sh-wait.md)**                     | `util` | shell: `wait` (optional, easy) — why `&` orphans its job, and who may wait for it                            |
 | **[10-util-sh-tab-completion.md](10-util-sh-tab-completion.md)** | `util` | shell: tab completion (optional, easy) — the console line discipline that hides Tab                          |
