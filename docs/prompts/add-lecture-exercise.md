@@ -1,5 +1,11 @@
 # Prompt: add or upgrade a lecture exercise
 
+---
+
+[toc]
+
+---
+
 Portable, agent-neutral. Copy this whole file into any coding agent, replace the target on the first line, and run it. It assumes only a shell and file access.
 
 ---
@@ -24,6 +30,7 @@ Read all four sources. Do not write from memory of Unix; xv6 diverges from POSIX
 | `../xv6-riscv-book/*.tex` (`unix.tex` for ch. 1) | The long-form authority. Precise semantics, and the _why_ behind interface choices         |
 | The kernel source the exercise touches           | The actual implementation. Quote real identifiers and real constants                       |
 | `user/ex1copy.c`                                 | The house style you are matching                                                           |
+| The learner's staged file, if one exists         | The starting point. Review and fix it; do not replace it without saying what changed       |
 
 **Verify every factual claim against the source tree.** Grep for each constant, function, and struct field you plan to name. `DIRSIZ`, `PIPESIZE`, `NOFILE`, `MAXARG`, `NPROC`, and `NDEV` all have specific values in `kernel/param.h`, `kernel/fs.h`, and `kernel/pipe.c` — cite them, do not guess. If you cannot find something you were about to assert, cut the assertion.
 
@@ -34,6 +41,7 @@ The rule is `ex<N><verb>.c`:
 - `N` is the **lecture's** number for the example, not the order files were added. Lecture 1's ex5 is `fork` + `exec` + `wait`, so it is `ex5forkexec.c` even if it was written third.
 - The verb comes from the lecture's own phrasing ("copy input to output" → `copy`; "redirect the output of a command" → `redirect`).
 - **The guest command name must be at most 14 bytes.** `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts on it — a longer name aborts the image build. Count before committing to a name.
+- **Keep a descriptive upstream name.** Lecture 1's files are `ex1.c` through `ex9.c`, so they need the `ex<N><verb>` rule. Lecture 2's are already named `ptr.c`, `array.c`, and `str.c`; keep those names, and check that they do not collide with an existing `user/` program.
 - Avoid words xv6 does not have. `stdin`/`stdout` name C `FILE *` streams that do not exist here, and the repo's own docs warn against them, so a filename built from them contradicts the house rules.
 
 Renaming an existing file: use `git mv`, then update `Makefile` `UPROGS`, `docs/07-exercises.md`, `docs/02-build-boot-and-usage.md`, any `grade-*` script, and the `fprintf`/`printf` message prefixes inside the source itself. Grep for the old name afterwards and expect zero hits outside `docs/superpowers/`.
@@ -105,6 +113,8 @@ Append to `UPROGS` in the `Makefile`, tab-indented, **with a trailing backslash 
 	$U/_ex5forkexec\
 ```
 
+Programs in `LAB_PRACTICE_PROGS` also build with `STRICT_CFLAGS` (`-Wextra -pedantic`), so unused `main` parameters and a function pointer passed to `%p` are errors here even though the lecture's original compiles. Never leave a commented-out `# name\` line in that list: the trailing backslash continues the comment.
+
 Then:
 
 ```bash
@@ -140,6 +150,7 @@ Then fix the comments to match reality. Real behaviour is frequently _more_ inte
 
 - **`docs/07-exercises.md`** — add a row to the overview table, a node to the Mermaid dependency graph, and a section. Section shape: transcript, then what the lecture uses it to teach, then the questions the source raises. The source comments carry the long form, so the doc must be tighter and must not duplicate them.
 - **Prerequisite map** — when the exercise depends on earlier material, distinguish what to read first from references to consult only when needed. Link the owning local note before individual examples, and label hosted or sibling-repository examples when their APIs are not available in xv6.
+- **The lecture's companion note** — when the lecture has one (Lecture 2's is [`10-c-in-xv6.md`](../10-c-in-xv6.md)), the program's concepts go there and `07-exercises.md` keeps only the transcript and the program-specific findings. Closing out a whole lecture is [`close-lecture.md`](close-lecture.md).
 - **`docs/02-build-boot-and-usage.md`** — only if the shared mechanics changed. Ordinary exercises need nothing here.
 - **`docs/05-syscall-reference.md`** — if this is the first exercise to use a call, check the entry is accurate.
 - Markdown rules: **never hard-wrap prose** (one continuous line per paragraph), bold the first column in comparison tables, use GitHub callouts (`> [!NOTE]`, `> [!WARNING]`) where they earn the emphasis, and follow the documented Mermaid band colors. The scan-layer rule from step 3 applies to the Markdown section too — its Markdown equivalents for each information shape are in [`derive-lab-exercise.md`](derive-lab-exercise.md#step-3a---apply-the-scan-layer-rule).

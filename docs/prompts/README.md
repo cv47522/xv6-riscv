@@ -8,10 +8,11 @@
 
 Task prompts for repeated work in this repository, written to be **agent-neutral**: plain Markdown, no tool-specific front matter, no vendor syntax. Copy one whole file into whatever agent you are using, fill in the target on the first line, and run it.
 
-| Prompt                                                 | Use it when                                                                                               |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| **[add-lecture-exercise.md](add-lecture-exercise.md)** | Adding a new `user/ex*.c` from a lecture example, or bringing an existing one up to the teaching standard |
-| **[derive-lab-exercise.md](derive-lab-exercise.md)**   | Writing the `docs/labs/` note for a 6.1810 lab exercise: what to read, what to link, and where to stop     |
+| Prompt                                                 | Use it when                                                                                                                                                                          |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **[add-lecture-exercise.md](add-lecture-exercise.md)** | Adding a new `user/ex*.c` from a lecture example, or bringing an existing one up to the teaching standard                                                                            |
+| **[derive-lab-exercise.md](derive-lab-exercise.md)**   | Writing the `docs/labs/` note for a 6.1810 lab exercise: what to read, what to link, and where to stop                                                                               |
+| **[close-lecture.md](close-lecture.md)**               | Closing out a studied lecture: protect the archive, place its concepts across this repo and the sibling notes, review the practice code and homework, and update `STUDY-PROGRESS.md` |
 
 ## Why one file per prompt
 
@@ -30,14 +31,14 @@ docs/prompts/setup-agent-commands.sh --check    # verify nothing has drifted, wr
 docs/prompts/setup-agent-commands.sh --check --codex  # include installed Codex prompts
 ```
 
-| Agent | How the rules load | Command location | Committed? |
-| ----- | ------------------ | ---------------- | ---------- |
-| **Claude Code** | Each generated command points to `AGENTS.md` through its canonical prompt | `.claude/commands/` | Yes |
-| **Cursor** | The always-on rule below points to `AGENTS.md` | `.cursor/commands/` | Yes |
-| **Codex** | Loads `AGENTS.md` automatically | `$CODEX_HOME/prompts/`, user-level | No; run `--codex` |
-| **Anything else** | Read `AGENTS.md`, then paste the prompt | None | No |
+| Agent             | How the rules load                                                        | Command location                   | Committed?        |
+| ----------------- | ------------------------------------------------------------------------- | ---------------------------------- | ----------------- |
+| **Claude Code**   | Each generated command points to `AGENTS.md` through its canonical prompt | `.claude/commands/`                | Yes               |
+| **Cursor**        | The always-on rule below points to `AGENTS.md`                            | `.cursor/commands/`                | Yes               |
+| **Codex**         | Loads `AGENTS.md` automatically                                           | `$CODEX_HOME/prompts/`, user-level | No; run `--codex` |
+| **Anything else** | Read `AGENTS.md`, then paste the prompt                                   | None                               | No                |
 
-So `/exercise ex5forkexec` and `/lab util: find` work in Claude Code and Cursor after a clone. Codex custom prompts use `/prompts:exercise ex5forkexec` and `/prompts:lab util: find`; after running `--codex`, restart the CLI session or open a new chat so Codex reloads them.
+So `/exercise ex5forkexec`, `/lab util: find`, and `/lecture lecture 3` work in Claude Code and Cursor after a clone. Codex custom prompts use `/prompts:exercise ex5forkexec` and `/prompts:lab util: find`; after running `--codex`, restart the CLI session or open a new chat so Codex reloads them.
 
 > [!NOTE]
 > Codex custom prompts are deprecated in favor of skills, but the user-level mirrors remain useful for matching the repository's Claude and Cursor commands while Codex still supports them.
