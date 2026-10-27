@@ -114,7 +114,7 @@ def run_tests():
 
     # Handle command line
     global options
-    parser = OptionParser(usage="usage: %prog [-v] [filters...]")
+    parser = OptionParser(usage="Usage: %prog [-v] [filters...]")
     parser.add_option("-v", "--verbose", action="store_true",
                       help="print commands")
     parser.add_option("--color", choices=["never", "always", "auto"],

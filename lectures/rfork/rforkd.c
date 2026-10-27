@@ -202,7 +202,7 @@ int main(int argc, char **argv)
         else if (argv[i][0] >= '0' && argv[i][0] <= '9')
             port = atoi(argv[i]);
         else {
-            fprintf(stderr, "usage: %s [-v] [port]\n", argv[0]);
+            fprintf(stderr, "Usage: %s [-v] [port]\n", argv[0]);
             return 2;
         }
     }

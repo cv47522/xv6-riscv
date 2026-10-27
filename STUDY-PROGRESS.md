@@ -115,7 +115,7 @@ Additional code includes links found inside the lecture texts. The [archive inve
 | **Self-study answer**  | Keep your answer locally.                                                          |
 | **Enrolled students**  | Submit an ASCII `homework.txt` to the matching Lecture N assignment on Gradescope. |
 
-- [ ] **Homework 01 · 2026-09-09** — [file descriptors](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-intro.html)
+- [x] **Homework 01 · 2026-09-09** — [file descriptors](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-intro.html)
     - **Read:** [`user/cat.c`](user/cat.c) ([upstream](https://github.com/mit-pdos/xv6-riscv/blob/riscv/user/cat.c)).
     - **Book:** Chapter 1.
     - **Optional:** [historic AT&T Unix film](https://www.youtube.com/watch?v=tc4ROCJYbm0).
@@ -240,8 +240,8 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [ ] **Full verification and time record** — run the full grader; record actual hours in `time.txt`; save any required written answers.
 - [ ] **Optional util challenges**
     - [x] **uptime** — [source](user/uptime.c) · [derivation note](docs/labs/06-util-uptime.md); four local tests in [grade-lab-util](grade-lab-util).
-    - Regular-expression matching in find.
-    - Shell: batch prompt handling, wait, tab completion, and history.
+    - [ ] **find regular expressions** — [derivation note](docs/labs/07-util-find-regex.md).
+    - [ ] **Shell** — [no prompt from a file](docs/labs/08-util-sh-prompt.md), [wait](docs/labs/09-util-sh-wait.md), [tab completion](docs/labs/10-util-sh-tab-completion.md), and [history](docs/labs/11-util-sh-history.md).
 - [ ] **Optional institutional submission** — enrolled students follow the handout’s Gradescope and zipball steps after verification; not required for self-study.
 
 | Program   | Commits                         | Selected checks passed on 2026-10-23 |
