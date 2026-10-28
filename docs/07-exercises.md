@@ -636,9 +636,58 @@ Both writes are one byte past a 4-byte string, but only one is caught:
 
 `stval` is the faulting address: the literal `"123"` sits at `0x910` (`objdump -s -j .rodata user/_str`), so `s + 4` is `0x914`, and `sepc` `0x86` is the `sb` in `user/str.asm`. The fault comes from the page permission, not from being past the end, so `s[0] = 'D'` would fault too. The lecture's version keeps `s` global and only commits the silent `s1[4]` write; the practice version adds the literal write to show the contrast.
 
+## Lecture 3 — the user/kernel boundary
+
+Lecture 3 ([`l-os.txt`](../lectures/l-os.txt)) publishes no example code, so both programs are written here to make the lecture's claims observable: `isolate` attacks the boundary four ways, and `forkfill` answers the lecture's "what happens if out of proc's?". The concepts, the boot path, and the `fork`/`exec` walkthroughs live in [11-os-design-in-xv6.md](11-os-design-in-xv6.md); these sections cover only the programs.
+
+| Program                                                   | Source            | Lecture                                                 | What it introduces                                                     |
+| --------------------------------------------------------- | ----------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **[`isolate`](#isolate--four-attempts-four-refusals)**    | `user/isolate.c`  | "hardware-level isolation", "How do system calls work?" | privileged instructions, `PTE_U`, `a7` checks, and user-pointer checks |
+| **[`forkfill`](#forkfill--running-out-of-process-slots)** | `user/forkfill.c` | "HW: allocproc; what happens if out of proc's?"         | `NPROC`, `allocproc()` failure, and slots freed only by `wait()`       |
+
+### `isolate` — four attempts, four refusals
+
+```text
+$ isolate csr
+isolate: csrr sstatus from user mode
+usertrap(): unexpected scause 0x2 pid=3
+            sepc=0x44 stval=0x100027f3
+$ isolate kload
+isolate: load from TRAMPOLINE 0x0000003FFFFFF000
+usertrap(): unexpected scause 0xd pid=4
+            sepc=0x86 stval=0x3ffffff000
+$ isolate badsys
+isolate: ecall with a7=99
+5 isolate: unknown sys call 99
+isolate: ecall returned -1
+$ isolate kcopy
+isolate: read() into TRAPFRAME 0x0000003FFFFFE000 returned -1
+isolate: read() into a user buffer returned 2: "hi"
+```
+
+The first two runs die and the last two survive, which is the lecture's split between hardware isolation and a careful system-call interface; the [boundary table](11-os-design-in-xv6.md#where-the-boundary-is-enforced) names the check behind each line. Two program-specific findings:
+
+| Finding                                  | Why                                                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **`stval=0x100027f3` is not an address** | For an illegal instruction, RISC-V reports the instruction's encoding; `user/isolate.asm` shows `100027f3` at `0x44`, `csrr a5,sstatus`. |
+| **`"hi"` survives the refused read**     | `piperead()` returns `-1` from inside its copy loop before `nread++`, so a failed `copyout()` consumes nothing.                          |
+
+`badsys` needs a hand-written `ecall`, because every stub in `user/usys.S` hard-codes its own `a7`. `r_sstatus()` is the kernel's own accessor from `kernel/riscv.h`, included unchanged: the same inline function is legal in S-mode and fatal in U-mode.
+
+### `forkfill` — running out of process slots
+
+```text
+$ forkfill
+forkfill: fork returned -1 after 61 children
+forkfill: reaped 61 children
+forkfill: fork works again
+```
+
+61 is `NPROC` (64) minus `init`, `sh`, and `forkfill`. Each child closes its inherited write end before blocking in `read()`, so the parent's single `close(p[1])` releases all of them at once; a child that kept `p[1]` would hold the pipe open forever, the same protocol as [`ex8pipefork`](#closing-unused-ends-is-protocol-not-hygiene). Running it twice gives 61 both times, which shows the reaped slots really returned to `UNUSED`.
+
 ## Regression suite
 
-[`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises and the four Lecture 2 programs, sixteen tests in about sixteen seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose cannot drift away from the programs without something going red.
+[`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises, the four Lecture 2 programs, and the two Lecture 3 programs: eighteen tests in about twenty seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose **cannot** drift away from the programs without something going red.
 
 | Test              | The claim it pins                                                                                                                                                              |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -655,6 +704,8 @@ Both writes are one byte past a 4-byte string, but only one is caught:
 | **`ptr`**         | Writes through `p`, `q`, `c`, and `pp`; `p` and `func` equal `nm`'s `g` and `main`; `argv` strings in order with a `0` terminator.                                             |
 | **`str`**         | Index and pointer access agree, the `s1[4]` overflow is silent, and `s[4]` raises a store fault at exactly the literal's address + 4 with the next line never printed.         |
 | **`hwstruct`**    | RV64 sizes 36/24/32, the two guaranteed addresses, and all four lines printing without a fault.                                                                                |
+| **`isolate`**     | `csr` and `kload` die with `scause` 2 and `0xd`, `stval` naming the `csrr` encoding and `TRAMPOLINE`; `badsys` and `kcopy` return `-1`; `"hi"` is kept.                        |
+| **`forkfill`**    | `fork()` fails after exactly 61 children, all 61 are reaped, and a second run finds the same 61 free slots.                                                                    |
 
 Several of these pin _kernel_ invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
 

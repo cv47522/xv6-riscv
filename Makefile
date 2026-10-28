@@ -355,6 +355,8 @@ LAB_PRACTICE_PROGS = \
 	ptr\
 	str\
 	hwstruct\
+	isolate\
+	forkfill\
 
 UPROGS=\
 	$U/_cat\

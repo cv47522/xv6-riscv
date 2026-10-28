@@ -418,4 +418,44 @@ def subprocess_out(argv):
     return subprocess.check_output(argv, text=True)
 
 
+##############################################################################
+#  Lecture 3 -- isolate, forkfill: the user/kernel boundary and a full table
+##############################################################################
+
+@test(1, "isolate: hardware kills csr and kload, the kernel refuses badsys and kcopy")
+def test_isolate():
+    r.run_qemu(shell_script(["isolate csr", "isolate kload",
+                             "isolate badsys", "isolate kcopy",
+                             "echo DONE"]))
+    r.match("^usertrap\\(\\): unexpected scause 0x2 pid=\\d+$",
+            "^usertrap\\(\\): unexpected scause 0xd pid=\\d+$",
+            "^ +sepc=0x[0-9a-f]+ stval=0x3ffffff000$",
+            "^\\d+ isolate: unknown sys call 99$",
+            "^isolate: ecall returned -1$",
+            "^isolate: read\\(\\) into TRAPFRAME 0x0000003FFFFFE000 "
+            "returned -1$",
+            "^isolate: read\\(\\) into a user buffer returned 2: \"hi\"$",
+            "^DONE$",
+            no=["not reached", "panic"])
+    # For an illegal instruction, stval is the encoding of the csrr itself.
+    m = re.search(r"scause 0x2 pid=\d+\n +sepc=0x([0-9a-f]+) "
+                  r"stval=0x([0-9a-f]+)", r.qemu.output)
+    assert m, "no csr fault registers"
+    asm = open("user/isolate.asm").read()
+    assert re.search(r"^ +%s:\t%s +\tcsrr\t" % (m.group(1), m.group(2)),
+                     asm, re.M), "sepc/stval do not name a csrr in isolate.asm"
+
+
+@test(1, "forkfill: fork fails at NPROC, and the table refills after wait")
+def test_forkfill():
+    r.run_qemu(shell_script(["forkfill", "forkfill", "echo DONE"]))
+    r.match("^forkfill: fork returned -1 after 61 children$",
+            "^forkfill: reaped 61 children$",
+            "^forkfill: fork works again$",
+            "^DONE$",
+            no=["fork still fails", "panic"])
+    assert_equal(r.qemu.output.count("after 61 children"), 2,
+                 "second run sees the same number of free slots")
+
+
 run_tests()
