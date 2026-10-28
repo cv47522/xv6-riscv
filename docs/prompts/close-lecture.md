@@ -46,22 +46,7 @@ grep -A8 '"path": "<dir>/' lectures/manifest.json | grep -E 'path|sha256'
 
 ## Step 3 — Place each concept where it is owned
 
-Make a table of the lecture's topics, then classify each one before writing anything.
-
-| The topic is...                                          | It belongs in                                          | Check first                                                       |
-| -------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------- |
-| **General C language**                                   | `../c-programming/C_*.md`                              | `ls ../c-programming/*.md`, then `grep -n '^#'` the likely files  |
-| **A portable OS concept**                                | `../operating-system/*.md`                             | [`book/00-ostep-concordance.md`](../book/00-ostep-concordance.md) |
-| **xv6's implementation of a concept**                    | the matching `docs/book/ch*.md`                        | [`book/README.md`](../book/README.md) ownership rules             |
-| **Lecture-specific xv6 material with no single chapter** | a lecture companion note, `docs/<NN>-<topic>.md`       | `docs/README.md`; follow `10-c-in-xv6.md`'s shape                 |
-| **A practice program**                                   | its section in [`07-exercises.md`](../07-exercises.md) | the existing section for that lecture                             |
-
-Rules that keep this from turning into duplication:
-
-1. **Find the gap before writing.** The sibling repositories are large and usually already cover the generic concept. Add only what is missing, typically one subsection, and say in the summary why it was missing.
-2. **Link instead of restating.** The companion note opens with a topic map: lecture topic, the generic note to read, the xv6-specific section, the practice program. Each sibling note that gained content links back to the xv6 note.
-3. **Measure, do not recall.** Every address, symbol, size, and constant in the note comes from this tree's build or source: `riscv64-linux-gnu-nm -n`, `objdump -h`/`-fp`/`-r`, `grep` in `kernel/`. Where the lecture's number differs from this build (Lecture 2's `0xf6: start` versus this tree's `0xea`), give both and say why.
-4. **Record divergences.** When the lecture describes code this tree has changed (Lecture 2 says `start()` calls `exit(0)`; `user/ulib.c` calls `exit(main(...))`), state the difference in the note.
+Run [`write-lecture-note.md`](write-lecture-note.md) for this lecture. It owns the placement table, the no-duplication rules, figure placement, and cross-references between this repository and `../operating-system/`, `../c-programming/`, and `../cpp-programming/`. If the lecture's companion note already exists as a draft, that prompt updates it in place; do not start a second note. Leave its draft callout for Step 6 to resolve.
 
 ## Step 4 — Review and fix the practice code
 
@@ -88,6 +73,7 @@ When the lecture says "[demo X.c]" for a file MIT did not publish, a small pract
 In [`STUDY-PROGRESS.md`](../../STUDY-PROGRESS.md):
 
 - Check the lecture only when the learner says it is studied, and write that it rests on their confirmation, with the date and links to notes and practice.
+- Once it is checked, replace the companion note's draft `[!IMPORTANT]` status callout with the confirmation date, and drop "draft" from its `docs/README.md` row.
 - Check the homework only when an answer is saved, and link the answer.
 - Add a `### Lecture <N> example practice` section mirroring Lecture 1's: originals, practice versions, completion basis, and one checkbox per program, open ones included.
 - Update the **Current checkpoint** row and the **Verification evidence** tables with the commands you actually ran and their real scores.

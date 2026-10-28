@@ -16,6 +16,8 @@ PROMPTS="
 exercise:add-lecture-exercise.md:<exercise> - e.g. ex5forkexec, or \"lecture 2, ex3\"
 lab:derive-lab-exercise.md:<lab>: <exercise> - e.g. \"util: find\" or \"syscall: trace\"
 lecture:close-lecture.md:<lecture> - e.g. \"lecture 3\" or \"l-os.txt\"
+lecture-note:write-lecture-note.md:<lecture> - e.g. \"lecture 4\", \"l-vm.txt\", or \"next\"
+book:sync-book-chapter.md:<chapters> - e.g. \"ch3\", \"3-4\", \"next\", or \"all\"
 "
 
 check=0
@@ -42,7 +44,7 @@ Read \`docs/prompts/$1\` in this repository and follow it exactly, including its
 
 **Target:** $2
 
-If the target is empty, ask before doing anything else. Do not infer it from \`conf/lab.mk\` or recently edited files.
+If the target is empty, ask before doing anything else. **Do not** infer it from \`conf/lab.mk\` or recently edited files.
 EOF
 }
 
