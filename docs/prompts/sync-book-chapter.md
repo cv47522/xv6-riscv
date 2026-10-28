@@ -69,11 +69,11 @@ ls "$B"/fig/
 
 Every hit **must** end up in exactly one of these states, recorded in [`docs/book/fig/README.md`](../book/fig/README.md):
 
-| Upstream form                            | What to do                                                                                                                                                                                                                  |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`.svg` beside the referenced file**    | Copy through [`prep-figures.py`](../book/fig/prep-figures.py) (crop plus white backdrop), never by hand. Re-run it for an existing copy whose upstream file changed in Step 1's diff.                                       |
-| **TikZ `fig/*.tex` or PDF-only**         | If `pdflatex` and `pdf2svg` exist, render with upstream's `fig/tikz-to-svg.sh <abs path> <docs/book/fig/name.svg>` (or `pdf2svg` for a PDF), then run `prep-figures.py` on the result. Otherwise keep or update the redraw. |
-| **Redraw already in a note**             | Compare it against the changed upstream source and fix any label, field, or order that drifted.                                                                                                                             |
+| Upstream form                         | What to do                                                                                                                                                                                                                  |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`.svg` beside the referenced file** | Copy through [`prep-figures.py`](../book/fig/prep-figures.py) (crop plus white backdrop), never by hand. Re-run it for an existing copy whose upstream file changed in Step 1's diff.                                       |
+| **TikZ `fig/*.tex` or PDF-only**      | If `pdflatex` and `pdf2svg` exist, render with upstream's `fig/tikz-to-svg.sh <abs path> <docs/book/fig/name.svg>` (or `pdf2svg` for a PDF), then run `prep-figures.py` on the result. Otherwise keep or update the redraw. |
+| **Redraw already in a note**          | Compare it against the changed upstream source and fix any label, field, or order that drifted.                                                                                                                             |
 
 ```bash
 cd docs/book/fig
@@ -83,7 +83,8 @@ python3 prep-figures.py ../../../../xv6-riscv-book/fig . <name.svg> [...]
 - `tikz-to-svg.sh` writes only to its temporary directory and the output path you give it, so it does not touch `$B`. Point the output inside `docs/book/fig/`, never inside `$B/fig/`.
 - Keep upstream leftovers that no `.tex` includes (`bufrace.svg`, `deadlock.svg`) out, as the figure README explains.
 - Update both inventory tables in the figure README and the `python3 prep-figures.py` reproduction command whenever a file is added, replaced, or converted from a redraw.
-- A figure whose subject is portable (a race, SMP, a microkernel) may additionally be used by a sibling note; that copy is governed by [`write-lecture-note.md`](write-lecture-note.md#step-4--place-figures), not here.
+- Lecture notes embed book figures too. For each figure added or re-processed, run `grep -rn 'book/fig/<name>' docs/*.md` and correct any lecture-note caption the change made wrong. For a newly saved figure, list the lecture notes whose topics it illustrates in the report; embedding it there follows [`write-lecture-note.md`](write-lecture-note.md#show-the-book-figures-that-teach-the-lecture) and is not this prompt's job.
+- Sibling repositories hold copies of portable book figures. For each figure re-processed, run `grep -rln 'xv6-book/<name>\|xv6_book/<name>' ../operating-system ../c-programming ../cpp-programming --include='*.md'`, re-copy the new file over each copy (`cmp` should then report no difference), and correct any caption the change made wrong. For a newly saved figure of a portable concept, list the written sibling sections it would illustrate in the report; adding it follows [`write-lecture-note.md`](write-lecture-note.md#show-book-figures-in-the-sibling-notes).
 
 ## Step 4 — Write or update the chapter note
 

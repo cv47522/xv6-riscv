@@ -8,13 +8,13 @@
 
 Task prompts for repeated work in this repository, written to be **agent-neutral**: plain Markdown, no tool-specific front matter, no vendor syntax. Copy one whole file into whatever agent you are using, fill in the target on the first line, and run it.
 
-| Prompt                                                 | Use it when                                                                                                                                                                          |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **[add-lecture-exercise.md](add-lecture-exercise.md)** | Adding a new `user/ex*.c` from a lecture example, or bringing an existing one up to the teaching standard                                                                            |
-| **[derive-lab-exercise.md](derive-lab-exercise.md)**   | Writing the `docs/labs/` note for a 6.1810 lab exercise: what to read, what to link, and where to stop                                                                               |
-| **[close-lecture.md](close-lecture.md)**               | Closing out a studied lecture: protect the archive, place its concepts across this repo and the sibling notes, review the practice code and homework, and update `STUDY-PROGRESS.md` |
+| Prompt                                                 | Use it when                                                                                                                                                                                          |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[add-lecture-exercise.md](add-lecture-exercise.md)** | Adding a new `user/ex*.c` from a lecture example, or bringing an existing one up to the teaching standard                                                                                            |
+| **[derive-lab-exercise.md](derive-lab-exercise.md)**   | Writing the `docs/labs/` note for a 6.1810 lab exercise: what to read, what to link, and where to stop                                                                                               |
+| **[close-lecture.md](close-lecture.md)**               | Closing out a studied lecture: protect the archive, place its concepts across this repo and the sibling notes, review the practice code and homework, and update `STUDY-PROGRESS.md`                 |
 | **[write-lecture-note.md](write-lecture-note.md)**     | Drafting or updating a lecture's `docs/<NN>-*.md` companion note from `lectures/`, `docs/book/`, and this tree, keeping generic material and figures in the sibling notes with cross-links both ways |
-| **[sync-book-chapter.md](sync-book-chapter.md)**       | Fast-forwarding the read-only `~/personal/xv6-riscv-book` checkout from upstream, saving every figure a chapter uses into `docs/book/fig/`, and writing or updating its `docs/book/ch*.md` note |
+| **[sync-book-chapter.md](sync-book-chapter.md)**       | Fast-forwarding the read-only `~/personal/xv6-riscv-book` checkout from upstream, saving every figure a chapter uses into `docs/book/fig/`, and writing or updating its `docs/book/ch*.md` note      |
 
 ## Why one file per prompt
 
@@ -41,6 +41,39 @@ docs/prompts/setup-agent-commands.sh --check --codex  # include installed Codex 
 | **Anything else** | Read `AGENTS.md`, then paste the prompt                                   | None                               | No                |
 
 So `/exercise ex5forkexec`, `/lab util: find`, `/lecture lecture 3`, `/lecture-note next`, and `/book next` work in Claude Code and Cursor after a clone. Codex custom prompts use `/prompts:exercise ex5forkexec` and `/prompts:lab util: find`; after running `--codex`, restart the CLI session or open a new chat so Codex reloads them.
+
+### Example invocations
+
+Type the command and its target as one chat message. Each one reads its canonical prompt, so the target is the only thing you supply.
+
+| Command         | Example                    | What it does                                                                                                                     |
+| --------------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `/book`         | `/book next`               | Syncs the book chapter assigned to the first open lecture in `STUDY-PROGRESS.md`: pulls upstream, saves figures, writes the note |
+| `/book`         | `/book ch3`                | Syncs one chapter's note and figures, whatever the tracker says                                                                  |
+| `/book`         | `/book 3-4`                | Syncs a range of chapters in one run                                                                                             |
+| `/book`         | `/book all`                | Syncs every chapter the upstream book changed since the last recorded sync, plus every chapter still a scaffold                  |
+| `/lecture-note` | `/lecture-note next`       | Drafts the companion note for the first unchecked lecture, marked as a draft                                                     |
+| `/lecture-note` | `/lecture-note lecture 4`  | Drafts or updates Lecture 4's `docs/<NN>-*.md`, adding only missing generic material to the sibling repositories                 |
+| `/lecture-note` | `/lecture-note l-vm.txt`   | Same, naming the lecture by its archived text instead of its number                                                              |
+| `/exercise`     | `/exercise ex5forkexec`    | Adds or upgrades one practice program under `user/`, with its docs and tests                                                     |
+| `/exercise`     | `/exercise lecture 2, ex3` | Same, naming the exercise by lecture and position                                                                                |
+| `/lab`          | `/lab util: find`          | Writes the solution-free derivation note for one lab exercise under `docs/labs/`                                                 |
+| `/lecture`      | `/lecture lecture 3`       | Closes a lecture you have studied: reviews the practice and homework, then checks it off in `STUDY-PROGRESS.md`                  |
+
+A typical cycle for a new lecture runs these in order:
+
+```text
+/book next              # chapter note and figures for the assigned reading
+/lecture-note next      # draft companion note built on that chapter
+/exercise lecture 4, ex1
+                        # study the lecture, write the practice, answer the homework
+/lecture lecture 4      # close it out once you have studied it
+```
+
+> [!TIP]
+> Add a sentence after the target to narrow a run, for example `/book ch7 — figures only, leave the note alone` or `/lecture-note lecture 4 — do not edit ../operating-system yet`. The prompt still runs its verification step.
+
+In Codex, prefix the same targets with `prompts:`, for example `/prompts:book next`. In any other agent, paste the prompt file and replace its **Target** line with the same text.
 
 > [!NOTE]
 > Codex custom prompts are deprecated in favor of skills, but the user-level mirrors remain useful for matching the repository's Claude and Cursor commands while Codex still supports them.

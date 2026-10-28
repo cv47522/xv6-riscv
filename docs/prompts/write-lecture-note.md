@@ -24,14 +24,14 @@ This prompt never marks a lecture studied. [`close-lecture.md`](close-lecture.md
 
 ## Step 1 — Gather the sources
 
-| Source                                      | What to take from it                                                                                                                                                      |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`STUDY-PROGRESS.md`**                     | The lecture's row (date, links, checked or draft), its homework's `**Book:**` or `**Read:**` line, and its practice section if one exists                               |
-| **`lectures/l-*.txt` and `lectures/<dir>/`** | Every topic, in order, and every command, file, or demo the lecture names. These are upstream bytes hashed in `lectures/manifest.json`; read them, never edit them      |
-| **The assigned `docs/book/ch*.md`**         | What the chapter note already owns. If the chapter is still a scaffold, run [`sync-book-chapter.md`](sync-book-chapter.md) for it first, or record the gap in the report |
-| **`book/00-ostep-concordance.md`**          | Which portable concepts are linked, on loan, or xv6-only                                                                                                                  |
-| **This tree's source and build**            | Every symbol, address, size, and constant the note will state                                                                                                             |
-| **An existing `docs/<NN>-*.md`**            | Update it in place rather than starting a second note. Check `docs/README.md` for the next free `<NN>` when none exists                                                   |
+| Source                                       | What to take from it                                                                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`STUDY-PROGRESS.md`**                      | The lecture's row (date, links, checked or draft), its homework's `**Book:**` or `**Read:**` line, and its practice section if one exists                                |
+| **`lectures/l-*.txt` and `lectures/<dir>/`** | Every topic, in order, and every command, file, or demo the lecture names. These are upstream bytes hashed in `lectures/manifest.json`; read them, never edit them       |
+| **The assigned `docs/book/ch*.md`**          | What the chapter note already owns. If the chapter is still a scaffold, run [`sync-book-chapter.md`](sync-book-chapter.md) for it first, or record the gap in the report |
+| **`book/00-ostep-concordance.md`**           | Which portable concepts are linked, on loan, or xv6-only                                                                                                                 |
+| **This tree's source and build**             | Every symbol, address, size, and constant the note will state                                                                                                            |
+| **An existing `docs/<NN>-*.md`**             | Update it in place rather than starting a second note. Check `docs/README.md` for the next free `<NN>` when none exists                                                  |
 
 ## Step 2 — Map each topic to its owner
 
@@ -63,15 +63,42 @@ Apply one test when placement is unclear: **would the sentence still be true on 
 
 A figure follows the same ownership as prose, with one difference: each repository has to render on its own, so an image may exist in two repositories when both genuinely show it. Prose never does.
 
-| Figure                                                             | Lives in                                                                                                       |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| **A book figure**                                                  | `docs/book/fig/`, the complete mirror kept by [`sync-book-chapter.md`](sync-book-chapter.md); link it from here |
-| **An xv6-specific diagram or screenshot authored for this repo**   | Inline Mermaid in the note, or `docs/images/` for a raster or Excalidraw figure                                |
-| **A portable concept drawn for a sibling note**                    | `../operating-system/images/<topic>/` or `../c-programming/img/<topic>/`, following that repo's `AGENTS.md`    |
-| **A book figure of a portable concept that a sibling note uses**   | Copy the prepared file from `docs/book/fig/` into the sibling's image directory, with its provenance           |
+| Figure                                                           | Lives in                                                                                                        |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **A book figure**                                                | `docs/book/fig/`, the complete mirror kept by [`sync-book-chapter.md`](sync-book-chapter.md); link it from here |
+| **An xv6-specific diagram or screenshot authored for this repo** | Inline Mermaid in the note, or `docs/images/` for a raster or Excalidraw figure                                 |
+| **A portable concept drawn for a sibling note**                  | `../operating-system/images/<topic>/` or `../c-programming/img/<topic>/`, following that repo's `AGENTS.md`     |
+| **A book figure of a portable concept that a sibling note uses** | Copy the prepared file into the sibling's image directory; see [below](#show-book-figures-in-the-sibling-notes) |
 
-- When copying a book figure into a sibling repository, carry the provenance with it: the upstream source and label (`` `lock.tex`, `fig:race` ``), the MIT-style licence notice from [`book/fig/README.md`](../book/fig/README.md#provenance-and-licence), and a link back to the xv6 chapter note. Copy the prepared file, never re-crop it by hand.
-- Diagrams follow the repository palette and the figure rules in `AGENTS.md`; the sibling repository's own conventions win inside that repository.
+### Show the book figures that teach the lecture
+
+A lecture note **should** embed every book figure that makes one of its topics easier to learn, because the reader studies the lecture without the chapter open. Check the inventory in [`book/fig/README.md`](../book/fig/README.md#what-each-chapter-note-uses) against the topic map: a figure belongs when it draws a region, boundary, or path that a section of this note explains or measures.
+
+1. **Link the shared copy**, `book/fig/<name>.svg` from `docs/`; never copy a book figure within this repository. For a TikZ figure that exists only as a redraw, link the chapter note's redraw section instead of duplicating its Mermaid.
+2. **Place it in the section it illustrates**, directly before or after that section's table or diagram, not in a figures section at the top.
+3. **Caption it in the three moves** from [`book/README.md`](../book/README.md#figures): the book's caption in quotes with `book figure` linked to the inventory and the source and label (`` `mem.tex` `fig:processlayout` ``), what is drawn, then what it shows **for this lecture**: which measured address, `isolate` result, or lecture claim it matches, and where this tree differs from the drawing. Write that last move fresh; do not paste the chapter note's caption.
+4. **Keep alt text to one line** describing the image's shape; every fact goes in the caption.
+5. **Do not restate a figure as a table, or a table as a figure.** When the note already has a measured table of the same region, the figure is the overview and the table stays the evidence; the caption names the differences between them.
+6. **Spend the visual budget on distinct relationships.** One or two figures per note by default; add another only when it draws a relationship neither of the others does. A figure the note never refers to in prose is decoration and stays out.
+
+`grep -rn 'book/fig/' docs/*.md` lists every lecture note that embeds a book figure, which is what [`sync-book-chapter.md`](sync-book-chapter.md) checks when a figure changes.
+
+### Show book figures in the sibling notes
+
+The sibling notes teach the portable concept, and a book figure is often the clearest picture of one real kernel doing it. For each book figure, ask which **already-written** sibling section explains the concept it draws, and embed it there, whether or not this lecture's topics led you to that section. Check every figure in [`book/fig/README.md`](../book/fig/README.md#what-each-chapter-note-uses), not only the ones this lecture uses.
+
+| Repository                 | Image directory    | Provenance file             |
+| -------------------------- | ------------------ | --------------------------- |
+| **`../operating-system/`** | `images/xv6-book/` | `images/xv6-book/README.md` |
+| **`../c-programming/`**    | `img/xv6_book/`    | `img/xv6_book/README.md`    |
+| **`../cpp-programming/`**  | `img/xv6_book/`    | `img/xv6_book/README.md`    |
+
+1. **Copy the prepared file unchanged** from `docs/book/fig/`, keeping its upstream file name so it stays traceable; never re-crop or re-render it in the sibling. Create the directory's provenance README if it is missing, modelled on `../operating-system/images/xv6-book/README.md`: a table of file, book caption, upstream source and label, and the notes that use it, followed by the **full** text of `../xv6-riscv-book/LICENSE`, which its terms require to travel with every copy. Add a row whenever a note starts using a new file.
+2. **Embed it only in a written section** whose prose the figure illustrates. A placeholder note gets nothing; list the figure for it in the report instead.
+3. **Caption it for the sibling's reader** in the three moves: the book's caption in quotes with `xv6 book`, the source and label, and a `provenance` link; what is drawn; then how it shows **this section's** concept, including where xv6 differs from the convention the section describes. Use RISC-V names only with a short gloss (`satp`, RISC-V's PDBR). Finish with one link back to the xv6 note that realizes it, in the editor-relative form `../xv6-riscv/docs/...`.
+4. **Do not move xv6-specific explanation into the sibling.** The caption may name a symbol to read next, but walkthroughs of `kernel/` code stay in this repository.
+5. **Edit sibling notes additively.** They often carry uncommitted work; insert the figure and caption without reflowing or reordering anything around it, and report which files already had changes.
+6. Diagrams the agent draws itself follow the repository palette and the figure rules in `AGENTS.md`; the sibling repository's own conventions win inside that repository.
 
 ## Step 5 — Cross-reference both ways
 
