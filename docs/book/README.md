@@ -8,6 +8,8 @@
 
 Chapter notes from [xv6: a simple, Unix-like teaching operating system](https://mit-pdos.github.io/xv6-riscv-book/), added as each chapter is read.
 
+Synced against upstream book commit `fa3b46b` on 2026-10-28, for Chapter 2 only. The other chapters have not been checked against any recorded commit, so treat every one of them as changed when it is next synced.
+
 ## Chapters
 
 Tick these off as you go, and link each to its notes file once written.

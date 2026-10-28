@@ -12,7 +12,7 @@
 
 ![Two ellipses in user space above a red dividing line, with one arrow crossing it into the kernel box below](fig/os.svg)
 
-_“A kernel and two user processes.” — [book figure](fig/README.md), `unix.tex` `fig:os`. Two user processes, `shell` and `cat`, drawn as ellipses above a red line; below it, a single box holding the whole kernel. One arrow leaves the shell, crosses the line, and is labelled **system call**. That arrow is the chapter: everything the shell can ask for arrives through it, and the twenty entries in the book's system-call table are the complete set of things it can say._
+_“A kernel and two user processes.” — [book figure](fig/README.md), `unix.tex` `fig:os`. Two user processes, `shell` and `cat`, drawn as ellipses above a red line; below it, a single box holding the whole kernel. One arrow leaves the shell, crosses the line, and is labelled **system call**. That arrow is the chapter: everything the shell can ask for arrives through it, and the twenty-two entries in the book's system-call table are the complete set of things it can say._
 
 ## What xv6 actually does
 
