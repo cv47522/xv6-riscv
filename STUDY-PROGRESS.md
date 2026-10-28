@@ -45,16 +45,17 @@ When you finish an item:
 
 ## Current checkpoint
 
-**Recorded on 2026-10-27.** These are study milestones, not claims of attendance or homework submission.
+**Recorded on 2026-10-28.** These are study milestones, not claims of attendance or homework submission.
 
-| Area                      | Work on record                                                                                                                                                                                      | Next step                                                                                        |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                                                                              | Suite fully passing: [16/16 checks](#verification-evidence), including Lecture 2, on 2026-10-27. |
-| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [16/16 checks](#verification-evidence). | Lecture 3 (OS design) and Homework 3.                                                            |
-| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence).                                                            | Optional shell challenges; then the syscall lab.                                                 |
-| **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                                                                                  | Read the remaining chapters; their files are scaffolding or references, not proof of reading.    |
+| Area                      | Work on record                                                                                                                                                                                      | Next step                                                                                               |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                                                                              | Suite fully passing: [18/18 checks](#verification-evidence), including Lectures 2 and 3, on 2026-10-28. |
+| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [18/18 checks](#verification-evidence). | Lecture 3 (OS design) and Homework 3.                                                                   |
+| **Lecture 3 draft**       | [isolate](user/isolate.c), [forkfill](user/forkfill.c); [draft OS design note](docs/11-os-design-in-xv6.md); [18/18 checks](#verification-evidence). Not yet studied.                               | Study Lecture 3, confirm it, and answer Homework 3.                                                     |
+| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence).                                                            | Optional shell challenges; then the syscall lab.                                                        |
+| **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                                                                                  | Read the remaining chapters; their files are scaffolding or references, not proof of reading.           |
 
-Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance and Homework 1 completion are unconfirmed. Lecture 2 is checked on your confirmation on 2026-10-27, backed by the [Lecture 2 practice](#lecture-2-example-practice) and the [C in xv6](docs/10-c-in-xv6.md) note. Other lectures stay open until you confirm studying them.
+Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance and Homework 1 completion are unconfirmed. Lecture 2 is checked on your confirmation on 2026-10-27, backed by the [Lecture 2 practice](#lecture-2-example-practice) and the [C in xv6](docs/10-c-in-xv6.md) note. Lecture 3 has [draft notes](docs/11-os-design-in-xv6.md) and [practice](#lecture-3-example-practice) from 2026-10-28 but stays open: you said on 2026-10-28 that it is not yet studied. Other lectures stay open until you confirm studying them.
 
 ## Lectures
 
@@ -62,7 +63,7 @@ Main texts are below. FAQs, examples, and the UART manual follow in the extras t
 
 - [x] **Lecture 01 · 2026-09-09** — [Introduction](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview.txt) / [local](lectures/l-overview.txt)
 - [x] **Lecture 02 · 2026-09-14** — [C in xv6](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c.txt) / [local](lectures/l-c.txt) · studied 2026-10-27 · [notes](docs/10-c-in-xv6.md) · [practice](#lecture-2-example-practice)
-- [ ] **Lecture 03 · 2026-09-16** — [OS design](https://pdos.csail.mit.edu/6.1810/2026/lec/l-os.txt) / [local](lectures/l-os.txt)
+- [ ] **Lecture 03 · 2026-09-16** — [OS design](https://pdos.csail.mit.edu/6.1810/2026/lec/l-os.txt) / [local](lectures/l-os.txt) · draft [notes](docs/11-os-design-in-xv6.md) and [practice](#lecture-3-example-practice); not yet studied
 - [ ] **Lecture 04 · 2026-09-21** — [Page tables](https://pdos.csail.mit.edu/6.1810/2026/lec/l-vm.txt) / [local](lectures/l-vm.txt)
 - [ ] **Lecture 05 · 2026-09-23** — [Locking](https://pdos.csail.mit.edu/6.1810/2026/lec/l-lockv2.txt) / [local](lectures/l-lockv2.txt)
 - [ ] **Lecture 06 · 2026-09-28** — [System call entry/exit](https://pdos.csail.mit.edu/6.1810/2026/lec/l-internal.txt) / [local](lectures/l-internal.txt)
@@ -283,6 +284,16 @@ Additional code includes links found inside the lecture texts. The [archive inve
 - [x] **hwstruct** — the lecture's "[demo hw.c]" for Homework 2, which MIT did not publish; [practice implementation](user/hwstruct.c)
 - [x] **str** — [MIT](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/str.c), [saved original](lectures/l-c/str.c), [practice implementation](user/str.c)
 
+### Lecture 3 example practice
+
+- **Originals:** None. MIT published no example code for [Lecture 3](lectures/l-os.txt); both programs reproduce the lecture's claims rather than an upstream file.
+- **Practice versions:** Descriptive names; see the [exercise guide](docs/07-exercises.md#lecture-3--the-userkernel-boundary) and the [draft OS design note](docs/11-os-design-in-xv6.md).
+- **Completion basis:** Two passing tests in the [18/18 exercise suite](#verification-evidence), each confirmed to fail against a deliberately broken program. These programs **do not** by themselves check off Lecture 3.
+- **Deliberately not done:** The lecture's `syscall()` trace demo, because it is the syscall lab's `trace` exercise.
+
+- [x] **isolate** — "hardware-level isolation" and "How do system calls work?": four attempts across the boundary; [practice implementation](user/isolate.c)
+- [x] **forkfill** — "HW: allocproc; what happens if out of proc's?"; [practice implementation](user/forkfill.c)
+
 ## Books, code handouts, and course references
 
 - [ ] **Read the complete xv6 book** — [book and source](https://mit-pdos.github.io/xv6-riscv-book/); [local chapter notes and ownership rules](docs/book/README.md). Chapter 1 is evidenced below; the whole book remains open.
@@ -317,17 +328,17 @@ Additional code includes links found inside the lecture texts. The [archive inve
 
 ## Verification evidence
 
-| Snapshot          | Value                                                                                   |
-| ----------------- | --------------------------------------------------------------------------------------- |
-| **Date**          | 2026-10-27                                                                              |
-| **Commit**        | `make grade`: `d149c4d`; `./grade-exercises`: `3ad68c5` plus uncommitted Lecture 2 work |
-| **Code assessed** | Those commits, plus the four Lecture 2 programs and their tests                         |
-| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                      |
+| Snapshot          | Value                                                                               |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| **Date**          | 2026-10-28                                                                          |
+| **Commit**        | `a7c7f92` plus uncommitted Lecture 3 work and the staged Lecture 2 note restructure |
+| **Code assessed** | That commit, plus `isolate`, `forkfill`, and their tests                            |
+| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                  |
 
-| Command             | Result           | What the run covers                                                                                |
-| ------------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
-| `make grade`        | Exit 0 · 206/206 | All 26 util tests: every MIT test, including `time`, plus the 7 local uptime and find-regex tests. |
-| `./grade-exercises` | Exit 0 · 16/16   | All nine Lecture 1 exercises, plus `array`, `ptr`, `str`, and `hwstruct` from Lecture 2.           |
+| Command             | Result           | What the run covers                                                                                                               |
+| ------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `make grade`        | Exit 0 · 206/206 | All 26 util tests: every MIT test, including `time`, plus the 7 local uptime and find-regex tests.                                |
+| `./grade-exercises` | Exit 0 · 18/18   | All nine Lecture 1 exercises, `array`, `ptr`, `str`, and `hwstruct` from Lecture 2, plus `isolate` and `forkfill` from Lecture 3. |
 
 The `ex3fork` check had expected `parent, x is 11` and `child, x is 22`, but [`user/ex3fork.c`](user/ex3fork.c) prints colons. The assertion in [`grade-exercises`](grade-exercises) now matches the program's actual output, so the suite passes without changing the exercise.
 
