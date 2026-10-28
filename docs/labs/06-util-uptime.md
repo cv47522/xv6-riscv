@@ -18,9 +18,9 @@ The first optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu
 | Aspect                 | Requirement or local convention                                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Program**            | Handout: write a program named `uptime`. Repository: put it at `user/uptime.c`, so its build product `user/_uptime` enters `fs.img`.                                            |
-| **Source of the time** | Handout: obtain the value from the `uptime` system call; do not count or estimate it in user space.                                                                             |
+| **Source of the time** | Handout: obtain the value from the `uptime` system call; **do not** count or estimate it in user space.                                                                         |
 | **Unit**               | Handout: print the value in ticks. Converting to seconds is not requested; see [What a tick means](01-util-sleep.md#what-a-tick-means) for why it is not a guarantee either.    |
-| **Arguments**          | The handout specifies none. The local grader requires rejection: `uptime extra` must print the line `Usage: uptime` and no reading.                                             |
+| **Arguments**          | The handout specifies none. The local grader requires rejection: `uptime extra` **must** print the line `Usage: uptime` and no reading.                                         |
 | **Output**             | The handout fixes no format. The local grader requires one line of the form `Uptime: N ticks`, with `N` a decimal number.                                                       |
 | **Available APIs**     | Repository: only [`user/user.h`](../../user/user.h); there is no host C library or `<time.h>`.                                                                                  |
 | **Build registration** | Repository: this tree lists `uptime` in `LAB_PRACTICE_PROGS` in the [Makefile](../../Makefile), which adds `$U/_uptime` to `UPROGS` and compiles it with `STRICT_CFLAGS`.       |
@@ -38,7 +38,7 @@ The first optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu
 | **`uptime, advances across sleep`** | 5      | `uptime`, `sleep 10`, `uptime` | Exactly two `Uptime: N ticks` lines, the second at least 10 larger | No separate pattern          |
 | **`uptime, rejects arguments`**     | 5      | `uptime extra`, then `echo OK` | Lines matching `^Usage: uptime$` and `^OK$`                        | `exec .* failed`, `^Uptime:` |
 
-The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.md#what-the-grader-does-not-prove) records that its own breakpoint test cannot tell a breakpoint stop from a timeout; here, a program that never enters `sys_uptime()` prints its line and fails. The lower bound of 10 is a guarantee, not a tolerance: `sys_pause()` samples `ticks` after the first reading and returns only after 10 more have elapsed.
+The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.md#what-the-grader-does-not-prove) records that its own breakpoint test **cannot** tell a breakpoint stop from a timeout; here, a program that **never** enters `sys_uptime()` prints its line and fails. The lower bound of 10 is a guarantee, not a tolerance: `sys_pause()` samples `ticks` after the first reading and returns only after 10 more have elapsed.
 
 ### What the grader does not prove
 
@@ -93,7 +93,7 @@ sys_uptime(void)
 | Line or value                   | Consequence                                                                                                                                   |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **No `argint()` call**          | The handler reads no saved argument register, so anything a caller might pass is ignored.                                                     |
-| **`acquire(&tickslock)`**       | The same lock `clockintr()` holds while it increments `ticks`, so the read never observes a half-finished update.                             |
+| **`acquire(&tickslock)`**       | The same lock `clockintr()` holds while it increments `ticks`, so the read **never** observes a half-finished update.                         |
 | **`xticks = ticks`**            | A snapshot. By the time the user program prints it, more ticks may have elapsed.                                                              |
 | **`uint` returned as `uint64`** | `syscall()` in [`kernel/syscall.c`](../../kernel/syscall.c) stores the result in the saved `a0`; the user declaration then reads it as `int`. |
 
@@ -130,7 +130,7 @@ The `uint`-to-`int` boundary is the one portability edge. Values at or above 2^3
 | Trap                                            | Observable consequence                                                                                                                                                            | Source to inspect                                                        |
 | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | **Printing seconds as if guaranteed**           | The output is wrong on any build that changes the timer constant.                                                                                                                 | [`kernel/trap.c`](../../kernel/trap.c)                                   |
-| **Expecting host `uptime` output**              | Effort spent on load averages or hours that xv6 cannot supply.                                                                                                                    | [`user/user.h`](../../user/user.h)                                       |
+| **Expecting host `uptime` output**              | Effort spent on load averages or hours that xv6 **cannot** supply.                                                                                                                | [`user/user.h`](../../user/user.h)                                       |
 | **Calling `pause()` to "measure" time**         | The program sleeps instead of reporting; `pause` waits for ticks, it does not return them.                                                                                        | [`05-syscall-reference.md`](../05-syscall-reference.md#time-and-system)  |
 | **Leaving `user/uptime.c` empty**               | The Makefile entry already exists, so `make` fails: `STRICT_CFLAGS` rejects an empty translation unit, and without them the linker reports `start()` calling an undefined `main`. | [`Makefile`](../../Makefile), [`user/ulib.c`](../../user/ulib.c)         |
 | **Declaring `argv` but never using it**         | `STRICT_CFLAGS` adds `-Wextra`, so `make` fails with `unused parameter 'argv' [-Werror=unused-parameter]`.                                                                        | [`Makefile`](../../Makefile)                                             |
@@ -211,7 +211,7 @@ Saved `a7` should be 14. `finish` prints the handler's return value, which is th
 | Step in `main()`     | What [`user/uptime.c`](../../user/uptime.c) does                               | Why                                                                                       |
 | -------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
 | **Check `argc`**     | Anything other than `1` prints `Usage: <argv[0]>` on fd 2 and calls `exit(1)`. | `sys_uptime()` would ignore the words; printing `argv[0]` also uses `argv` for `-Wextra`. |
-| **Read the counter** | Calls `uptime()` once, directly inside the `printf` argument list.             | One snapshot; there is nothing to validate, because the call cannot fail.                 |
+| **Read the counter** | Calls `uptime()` once, directly inside the `printf` argument list.             | One snapshot; there is nothing to validate, because the call **cannot** fail.             |
 | **Print**            | `printf("Uptime: %d ticks\n", ...)` on fd 1.                                   | `%d` matches the `int` declaration in `user/user.h`; the unit stays in the output.        |
 | **Finish**           | `exit(0)`.                                                                     | The repository's success convention.                                                      |
 

@@ -75,7 +75,7 @@ hello
 $
 ```
 
-The first `hello` is the console echoing the keys you typed. The second is `ex1copy` writing the bytes returned by `read()`. The program then calls `read()` again, and `consoleread()` in `kernel/console.c` hands back at most one line per call — so once the typed input is drained, that read sleeps in the kernel. Pressing `Ctrl-d` there makes it return 0, which ends the loop and restores the shell prompt. The wait is expected input-filter behaviour, not a deadlock.
+The first `hello` is the console echoing the keys you typed. The second is `ex1copy` writing the bytes returned by `read()`. The program then calls `read()` again, and `consoleread()` in `kernel/console.c` hands back at most one line per call — so once the typed input is drained, that read sleeps in the kernel. Pressing `Ctrl-d` there makes it return 0, which ends the loop and restores the shell prompt. The wait is expected input-filter behaviour, not a **deadlock**.
 
 A finite pipeline supplies EOF automatically when its writer exits, and the two hint lines are gone:
 
@@ -85,11 +85,11 @@ hello
 $
 ```
 
-That difference is the point. A filter must not add bytes to its output, so the hint is bound by two rules that the program enforces itself:
+That difference is the point. A filter **must not** add bytes to its output, so the hint is bound by two rules that the program enforces itself:
 
 | Rule                                        | Mechanism                                                                                                                                                              |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **It never travels with the data**          | The hint is written to descriptor 2, never 1, so `ex1copy > out` and `ex1copy \| wc` see only copied bytes.                                                            |
+| **It never travels with the data**          | The hint is written to descriptor 2, **never** 1, so `ex1copy > out` and `ex1copy \| wc` see only copied bytes.                                                        |
 | **It only appears when a human is waiting** | `fstat(0, &st)` decides: `T_DEVICE` means the console, so print it; `T_FILE` means a redirect, so stay quiet; and a pipe makes `fstat()` fail outright, so stay quiet. |
 
 That last case is not a special case in `ex1copy` — `filestat()` in `kernel/file.c` serves `FD_INODE` and `FD_DEVICE` and returns -1 for `FD_PIPE`, so one `fstat()` call separates all three sources for free.
@@ -107,9 +107,9 @@ Twenty lines of C carry most of the Unix I/O model. The commentary block at the 
 | **The first argument is a file descriptor, naming an already-open file**                                       | Resolved through `p->ofile[NOFILE]` in `kernel/proc.h`. `NOFILE` is 16, so one process can hold many descriptors.                                                                        |
 | **An FD may be a file, a pipe, a device, or the console**                                                      | `struct file` carries a type tag; `kernel/file.c` `fileread()` branches on it, so the caller's code is identical for all four.                                                           |
 | **FD 0 is standard input and FD 1 is standard output, by convention**                                          | `user/sh.c` arranges the descriptors before `exec`, and `user/init.c` guarantees 0, 1, and 2 exist at boot.                                                                              |
-| **The second and third arguments are a destination address and a maximum byte count**                          | `read()` may return fewer bytes than requested and never more, which is why the program writes `n` and not `sizeof(buf)`.                                                                |
+| **The second and third arguments are a destination address and a maximum byte count**                          | `read()` may return fewer bytes than requested and **never** more, which is why the program writes `n` and not `sizeof(buf)`.                                                            |
 | **The return value is a byte count, `0` for EOF, or `-1` for an error**                                        | All three outcomes appear in the loop: positive drives the copy, zero exits it, negative reaches the `read error` branch.                                                                |
-| **Unix I/O is untyped 8-bit bytes**                                                                            | Nothing in `ex1copy` inspects `buf`. Interpreting the bytes as text, a record, or an image is the application's job, never the kernel's.                                                 |
+| **Unix I/O is untyped 8-bit bytes**                                                                            | Nothing in `ex1copy` inspects `buf`. Interpreting the bytes as text, a record, or an image is the application's job, **never** the kernel's.                                             |
 | **A program can still ask what kind of thing a descriptor names**                                              | `fstat(0, &st)` reports `T_DEVICE` for the console and `T_FILE` for a redirect, and fails for a pipe. `ex1copy` uses it for one decision only: whether a human is sitting there waiting. |
 
 The lecture ends on an open question — how do you make a _new_ file descriptor? — and the answer is `open()`, `pipe()`, and `dup()` in `user/user.h`. `user/sh.c` builds every redirection and pipeline out of those three plus `close()`, resting entirely on `fdalloc()`'s lowest-unused-descriptor rule; see [book/ch01](book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection).
@@ -137,7 +137,7 @@ In this tree, nothing else, and no. `T_DEVICE` is the inode type that `mknod()` 
 
 #### Why write the hint to descriptor 2 when it is not an error?
 
-Descriptor 2 is better read as the _out-of-band_ descriptor than as the error one: it is what stays pointed at the terminal when `>` moves descriptor 1 somewhere else. Anything _about_ the run rather than _part_ of it belongs there — errors, progress, prompts, and this hint. The filter rule is what forces the choice: `ex1copy > out` and `ex1copy | wc` must see the input bytes and nothing more, and `sh` redirects only the descriptor you name.
+Descriptor 2 is better read as the _out-of-band_ descriptor than as the error one: it is what stays pointed at the terminal when `>` moves descriptor 1 somewhere else. Anything _about_ the run rather than _part_ of it belongs there — errors, progress, prompts, and this hint. The filter rule is what forces the choice: `ex1copy > out` and `ex1copy | wc` **must** see the input bytes and nothing more, and `sh` redirects only the descriptor you name.
 
 #### Why `fprintf(2, …)` rather than `printf(…)`?
 
@@ -145,7 +145,7 @@ Descriptor 2 is better read as the _out-of-band_ descriptor than as the error on
 
 #### Where is Ctrl-d implemented?
 
-Nowhere in `ex1copy.c`, which never names it: `read()` returns 0 and the `> 0` loop test does the rest. Two functions in `kernel/console.c` produce that zero.
+Nowhere in `ex1copy.c`, which **never** names it: `read()` returns 0 and the `> 0` loop test does the rest. Two functions in `kernel/console.c` produce that zero.
 
 | Function            | What it does with `C('D')`                                                                                                                                                     |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -206,7 +206,7 @@ p->ofile[3]  ──►  struct file  ──►  inode
                     offset)           data)
 ```
 
-`fork()` copies the first level and _shares_ the second, which is why a parent and child writing the same descriptor append in turn rather than overwriting each other. `dup()` does the same. Two descriptors share an offset if and only if they came from the same original by `fork()` or `dup()` — never merely by opening the same file twice.
+`fork()` copies the first level and _shares_ the second, which is why a parent and child writing the same descriptor append in turn rather than overwriting each other. `dup()` does the same. Two descriptors share an offset **if and only if** they came from the same original by `fork()` or `dup()` — **never** merely by opening the same file twice.
 
 ### What xv6 leaves out
 
@@ -304,11 +304,11 @@ Omit the `0` and the loop keeps fetching whatever follows the array on the stack
 
 ### Why this program is useless on its own
 
-`exec()` consumed the caller. A shell cannot work this way: if `sh` called `exec()` directly it would _become_ `echo`, print, exit, and never read a second command. The fix is to `exec()` in a process you can afford to lose — which is the next exercise.
+`exec()` consumed the caller. A shell **cannot** work this way: if `sh` called `exec()` directly it would _become_ `echo`, print, exit, and **never** read a second command. The fix is to `exec()` in a process you can afford to lose — which is the next exercise.
 
 ### Why there is no `fork()` here
 
-Because the exercise is about what `exec()` does, and forking first would hide it. `exec()` replaces the program inside _this_ process — same pid, same descriptors, same parent — and the proof is that `this is echo` appears while `ex4exec`'s own error line never runs. Add a `fork()` and you are watching two processes instead of one program becoming another, which is [`ex5forkexec`](#ex5forkexec--the-shells-execution-model).
+Because the exercise is about what `exec()` does, and forking first would hide it. `exec()` replaces the program inside _this_ process — same pid, same descriptors, same parent — and the proof is that `this is echo` appears while `ex4exec`'s own error line **never** runs. Add a `fork()` and you are watching two processes instead of one program becoming another, which is [`ex5forkexec`](#ex5forkexec--the-shells-execution-model).
 
 | Shape                                    | The caller afterwards                                 | Good for                                 |
 | ---------------------------------------- | ----------------------------------------------------- | ---------------------------------------- |
@@ -329,7 +329,7 @@ THIS IS ECHO
 ex5forkexec: child 9 exited with status 0
 ```
 
-Unlike `ex3fork`, the order is fixed after the first line: `wait()` does not return until the child is gone, so the exit message can never precede the child's output. This is the complete shape of what `user/sh.c` does for **every** command you type.
+Unlike `ex3fork`, the order is fixed after the first line: `wait()` does not return until the child is gone, so the exit message can **never** precede the child's output. This is the complete shape of what `user/sh.c` does for **every** command you type.
 
 ```mermaid
 sequenceDiagram
@@ -372,18 +372,18 @@ The `parent waiting` message is printed in the gap between `fork()` and `wait()`
 
 ### `wait()` returns a pid and delivers status through a pointer
 
-One integer cannot carry both the identity of the child and the value it exited with, so the status leaves through an out-parameter.
+One integer **cannot** carry both the identity of the child and the value it exited with, so the status leaves through an out-parameter.
 
 | Return  | Means                                                                                                                                |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | **> 0** | the pid of a child that exited. With several children this is how you learn _which_ — `wait()` reaps any, and xv6 has no `waitpid()` |
 | **-1**  | the caller has no children at all                                                                                                    |
 
-`wait()` blocks only if no child has exited _yet_. One that finished earlier is already a **zombie** — exited but retained so its status can still be collected — and `wait()` returns from it immediately. `kexit()` sets `p->state = ZOMBIE` and wakes the parent; `kwait()` copies `p->xstate` out and calls `freeproc()`. A parent that never waits is what `user/zombie.c` demonstrates.
+`wait()` blocks **only if** no child has exited _yet_. One that finished earlier is already a **zombie** — exited but retained so its status can still be collected — and `wait()` returns from it immediately. `kexit()` sets `p->state = ZOMBIE` and wakes the parent; `kwait()` copies `p->xstate` out and calls `freeproc()`. A parent that **never** waits is what `user/zombie.c` demonstrates.
 
 Passing `0` instead of an address tells the kernel to skip the store — `kwait()` guards it with `if (addr != 0 && copyout(...) < 0)`. That is the documented way to say "I don't want the status", and it is what [`ex6redirect`](#ex6redirect--how--is-implemented) does.
 
-The exit status is convention, not enforcement: `0` for success, non-zero for failure. It is how a child reports an outcome to a parent that cannot see its memory, and 32 bits is the entire channel.
+The exit status is convention, not enforcement: `0` for success, non-zero for failure. It is how a child reports an outcome to a parent that **cannot** see its memory, and 32 bits is the entire channel.
 
 ### Why `fork` and `exec` are not one call
 
@@ -404,7 +404,7 @@ $ cat ex6.out
 ex6redirect's redirected echo
 ```
 
-`echo`'s output never reaches the console, and nothing about `echo` changed. The child rewired descriptor 1 before exec'ing it.
+`echo`'s output **never** reaches the console, and nothing about `echo` changed. The child rewired descriptor 1 before exec'ing it.
 
 ```text
 child's FD table       close(1)              open("ex6.out", ...)
@@ -430,7 +430,7 @@ Descriptor 2 is untouched, which is why an error from `echo` would still reach t
 
 ### Why the parent is unaffected
 
-`close(1)` runs in the child, whose descriptor table is a _copy_ made by `fork()`. Closing a slot marks `p->ofile[1] = 0` in one `struct proc` only. This is precisely why the shell must fork before redirecting: a shell that closed its own descriptor 1 would lose the terminal permanently, and every later prompt would land in whatever file the last command mentioned.
+`close(1)` runs in the child, whose descriptor table is a _copy_ made by `fork()`. Closing a slot marks `p->ofile[1] = 0` in one `struct proc` only. This is precisely why the shell **must** fork before redirecting: a shell that closed its own descriptor 1 would lose the terminal permanently, and every later prompt would land in whatever file the last command mentioned.
 
 > [!TIP]
 > The `(int *)` cast in `wait((int *)0)` is style, not necessity — a bare `0` is a valid null pointer constant and compiles identically. The xv6 book writes the cast to make the argument's type visible; `user/sh.c` writes plain `wait(0)`. Both appear in this tree. The cast is worth keeping where a lone `0` would read like a status _value_.
@@ -493,7 +493,7 @@ The mirror-image rule holds on the other side: if every read end closes while a 
 
 ### How the shell goes one step further
 
-`ls | grep x` needs something this file does not show. Here the parent reads descriptor 3 knowingly; `grep` must read descriptor 0, because that is all any program knows. The shell bridges the gap with `dup()`:
+`ls | grep x` needs something this file does not show. Here the parent reads descriptor 3 knowingly; `grep` **must** read descriptor 0, because that is all any program knows. The shell bridges the gap with `dup()`:
 
 ```c
 close(0);          // give up the console
@@ -536,7 +536,7 @@ Sixteen bytes per entry, so a directory of _n_ entries is exactly 16*n* bytes. T
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Skip entries with `inum == 0`**          | Those are free slots. `unlink()` blanks a `dirent` by zeroing it rather than compacting the directory, so the array is sparse. Printing them yields blank lines and stale names.                                                       |
 | **Do not assume `name` is NUL-terminated** | It is marked `__attribute__((nonstring))`: a 14-character name fills the field with no room for a terminator, so `printf("%s")` would run off the end into the next record. Copy into a `DIRSIZ + 1` buffer and terminate it yourself. |
-| **Read whole records**                     | `== sizeof(de)` is both the loop condition and the guard — a short read means the directory ended, and a partial record is never processed.                                                                                            |
+| **Read whole records**                     | `== sizeof(de)` is both the loop condition and the guard — a short read means the directory ended, and a partial record is **never** processed.                                                                                        |
 
 `ex9ls` also calls `fstat()` first and rejects anything that is not `T_DIR`. Without that check a plain file would be read 16 bytes at a time and its contents printed as names, with the first two bytes of every chunk silently taken for an inode number.
 
@@ -553,7 +553,7 @@ So `open(".", O_RDONLY)` opens the process's current directory, tracked as `p->c
 
 Reading a directory is allowed; writing one is not. `sys_open()` refuses a directory opened with anything but `O_RDONLY`. Only the kernel edits directory contents, through `create()`, `sys_link()`, and `sys_unlink()`.
 
-The reason is integrity: a directory entry references an inode, and the inode's `nlink` count must stay in step with it. A user program writing raw bytes could produce an entry pointing at a free inode, or a link count nothing agrees on — a corrupt file system with no way back. Early Unix did allow this, and it is one of the places where later designs tightened the interface.
+The reason is integrity: a directory entry references an inode, and the inode's `nlink` count **must** stay in step with it. A user program writing raw bytes could produce an entry pointing at a free inode, or a link count nothing agrees on — a corrupt file system with no way back. Early Unix did allow this, and it is one of the places where later designs tightened the interface.
 
 ## Lecture 2 — C and memory
 
@@ -587,7 +587,7 @@ Each printed address falls into one region of the [user address space](10-c-in-x
 | **`*c=11`**                   | `*(char *)&g` reads one byte. RISC-V is little-endian, so it is the low byte of `11`; the pointer's type chose the width. |
 | **`func=0x0000000000000000`** | `main` is linked at address 0. A valid function pointer equals null here.                                                 |
 
-The lecture passes a function pointer straight to `%p` and never uses `main`'s parameters. Practice programs here build with `-Wextra -pedantic` (`STRICT_CFLAGS` in the [Makefile](../Makefile)), which rejects both, so `ptr.c` casts through `uint64` and uses `argc`/`argv` to print the stack layout the lecture draws for `ls.c`.
+The lecture passes a function pointer straight to `%p` and **never** uses `main`'s parameters. Practice programs here build with `-Wextra -pedantic` (`STRICT_CFLAGS` in the [Makefile](../Makefile)), which rejects both, so `ptr.c` casts through `uint64` and uses `argc`/`argv` to print the stack layout the lecture draws for `ls.c`.
 
 ### `array` — two spellings of one access
 
@@ -631,7 +631,7 @@ Both writes are one byte past a 4-byte string, but only one is caught:
 
 | Write             | Lands in                                              | Result                                                                                           |
 | ----------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **`s1[4] = 'D'`** | `main`'s stack frame, mapped writable                 | nothing happens; undefined behaviour that can corrupt the frame                                  |
+| **`s1[4] = 'D'`** | `main`'s stack frame, mapped writable                 | nothing happens; **undefined behaviour** that can corrupt the frame                              |
 | **`s[4] = 'D'`**  | `.rodata`, in the text segment mapped without `PTE_W` | store page fault (`scause` `0xf`); `usertrap()` kills the process, so `not reached` never prints |
 
 `stval` is the faulting address: the literal `"123"` sits at `0x910` (`objdump -s -j .rodata user/_str`), so `s + 4` is `0x914`, and `sepc` `0x86` is the `sb` in `user/str.asm`. The fault comes from the page permission, not from being past the end, so `s[0] = 'D'` would fault too. The lecture's version keeps `s` global and only commits the silent `s1[4]` write; the practice version adds the literal write to show the contrast.
@@ -694,15 +694,15 @@ forkfill: fork works again
 | **`ex1copy`** ×3  | Filter semantics: a finite pipe is copied byte for byte, `Ctrl-d` at an empty position ends an interactive run, and a closed reader produces `write error` rather than a hang. |
 | **`ex2create`**   | `open()` returns **3**, and `Hello` reaches the disk.                                                                                                                          |
 | **`ex3fork`**     | Both branches run, and each writes its **own** `x` — the address spaces are copies, not shared.                                                                                |
-| **`ex4exec`**     | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` never runs.                                                 |
+| **`ex4exec`**     | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` **never** runs.                                             |
 | **`ex5forkexec`** | Every byte the child wrote is out **before** the parent's status line.                                                                                                         |
-| **`ex6redirect`** | The redirected text reaches the console **only** via `cat`, never while the program runs.                                                                                      |
+| **`ex6redirect`** | The redirected text reaches the console **only** via `cat`, **never** while the program runs.                                                                                  |
 | **`ex7pipe`**     | `pipe()` returns descriptors 3 and 4, and the bytes come back.                                                                                                                 |
 | **`ex8pipefork`** | All 17 bytes cross the process boundary.                                                                                                                                       |
 | **`ex9ls`** ×2    | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage.                                     |
 | **`array`**       | Values after index and pointer writes, `a + 1` moving 4 bytes and `b + 1` moving 1, and printed addresses equal to `nm`'s.                                                     |
 | **`ptr`**         | Writes through `p`, `q`, `c`, and `pp`; `p` and `func` equal `nm`'s `g` and `main`; `argv` strings in order with a `0` terminator.                                             |
-| **`str`**         | Index and pointer access agree, the `s1[4]` overflow is silent, and `s[4]` raises a store fault at exactly the literal's address + 4 with the next line never printed.         |
+| **`str`**         | Index and pointer access agree, the `s1[4]` overflow is silent, and `s[4]` raises a store fault at exactly the literal's address + 4 with the next line **never** printed.     |
 | **`hwstruct`**    | RV64 sizes 36/24/32, the two guaranteed addresses, and all four lines printing without a fault.                                                                                |
 | **`isolate`**     | `csr` and `kload` die with `scause` 2 and `0xd`, `stval` naming the `csrr` encoding and `TRAMPOLINE`; `badsys` and `kcopy` return `-1`; `"hi"` is kept.                        |
 | **`forkfill`**    | `fork()` fails after exactly 61 children, all 61 are reaped, and a second run finds the same 61 free slots.                                                                    |

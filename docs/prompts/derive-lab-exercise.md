@@ -6,7 +6,7 @@ Portable and agent-neutral. Supply one target and follow every step.
 
 **Target exercise:** `<REPLACE ME - e.g. "util: find" or "syscall: trace">`
 
-If the target is empty, ask for the lab and exercise. Do not infer it from `conf/lab.mk`; one lab contains several exercises.
+If the target is empty, ask for the lab and exercise. **Do not** infer it from `conf/lab.mk`; one lab contains several exercises.
 
 ---
 
@@ -30,7 +30,7 @@ Use this only to enumerate test names and points, then inspect the matching Pyth
 sed -n 's/^@test(\([0-9]*\), "\(.*\)").*/\1 pts  \2/p' grade-lab-<lab>
 ```
 
-Verify every symbol and behavioral claim against this tree. Record meaningful upstream divergences, such as `pause` here where upstream uses `sleep`; do not rely on remembered xv6 names.
+Verify every symbol and behavioral claim against this tree. Record meaningful upstream divergences, such as `pause` here where upstream uses `sleep`; **do not** rely on remembered xv6 names.
 
 ## Step 2 - Define ownership
 
@@ -60,7 +60,7 @@ Use applicable sections in this order:
 4. **The code to read first:** show which existing files contribute what and what each deliberately does not do.
 5. **The key existing function:** quote one contiguous function verbatim, cite its source, and explain its consequential lines and control flow.
 6. **The concept underneath:** use source-backed constants and distinguish observations from guarantees.
-7. **Deriving it:** link back to the contract, then give source-anchored decision questions and a trap table. Do not repeat the requirements or prescribe the target program's ordered statements.
+7. **Deriving it:** link back to the contract, then give source-anchored decision questions and a trap table. **Do not** repeat the requirements or prescribe the target program's ordered statements.
 8. **Verifying it:** give the build, guest checks, focused grader command, and a gdb recipe only when kernel behavior is worth observing. Keep optional exercise-specific harness internals and troubleshooting here; refer back to the grader evidence limits instead of explaining them again.
 9. **Questions:** provide five to eight source-answerable questions, including at least two failure scenarios.
 
@@ -73,25 +73,25 @@ A lab note is read twice: once end to end, then repeatedly as a lookup surface w
 | The paragraph is really...                                     | Lead with                              | Then keep in prose below it                     |
 | -------------------------------------------------------------- | -------------------------------------- | ----------------------------------------------- |
 | **One invariant, warning, or decision to preserve**            | A GitHub callout                       | Why it holds, and what breaks without it        |
-| **Repeated fields, widths, alternatives, or two designs**      | A comparison table                     | The trade-off the table cannot express          |
+| **Repeated fields, widths, alternatives, or two designs**      | A comparison table                     | The trade-off the table **cannot** express      |
 | **An ordered mechanism with no branching**                     | A numbered list                        | The one or two steps with a non-obvious reason  |
 | **Which file owns what, or what a check does not prove**       | A two-column ownership or limits table | The single exception worth naming               |
-| **Relationships, pointer hops, or a branch that splits paths** | A diagram                              | The consequence the picture cannot state        |
+| **Relationships, pointer hops, or a branch that splits paths** | A diagram                              | The consequence the picture **cannot** state    |
 | **A claim with source-backed constants**                       | A table of constant, value, and source | The portability boundary around those constants |
 
 Three rules keep this from degrading into decoration:
 
-1. **Never simplify to fit.** Restructuring may reorder and front-load, but every invariant, exception, failure mode, constant, and source citation must survive into the prose below. Losing a qualification to make a cell fit is a defect, not a style choice.
+1. **Never simplify to fit.** Restructuring may reorder and front-load, but every invariant, exception, failure mode, constant, and source citation **must** survive into the prose below. Losing a qualification to make a cell fit is a defect, not a style choice.
 2. **Never inflate a cell.** A table cell or Mermaid node holding a paragraph is a paragraph with borders drawn on it. Move that text below the visual.
 3. **Never decorate what already scans.** A three-line explanation that is already clear needs nothing. Add a visual only when the audit below shows a retrieval failure.
 
-Apply the diagram budget and [Lab figure formats](../../AGENTS.md#lab-figure-formats) from `AGENTS.md`. For each proposed figure, identify the relationship or spatial arrangement the reader needs to see, choose its format accordingly, and keep detailed values or causal explanations in adjacent tables or prose. Do not convert an effective existing figure merely to match the sleep note.
+Apply the diagram budget and [Lab figure formats](../../AGENTS.md#lab-figure-formats) from `AGENTS.md`. For each proposed figure, identify the relationship or spatial arrangement the reader needs to see, choose its format accordingly, and keep detailed values or causal explanations in adjacent tables or prose. **Do not** convert an effective existing figure merely to match the sleep note.
 
 Apply that section's teaching-label and detail-view rules: define unfamiliar abbreviations before use, make action labels state who does what, and locate the action through source files or enclosing groups. When a retained Excalidraw drawing adds detail, link its SVG and editable source beside the overview and explain what the reader will find there.
 
-**The scan audit.** Before finishing, reread the note using _only_ headings, bolded terms, callouts, tables, lists, diagrams, and code blocks. A reader skipping every prose sentence must still be able to locate:
+**The scan audit.** Before finishing, reread the note using _only_ headings, bolded terms, callouts, tables, lists, diagrams, and code blocks. A reader skipping every prose sentence **must** still be able to locate:
 
-- [ ] The contract the new file must satisfy
+- [ ] The contract the new file **must** satisfy
 - [ ] What to read first, and what to consult only when needed
 - [ ] Which document owns each piece of shared material
 - [ ] The state or control-flow branches
@@ -99,26 +99,26 @@ Apply that section's teaching-label and detail-view rules: define unfamiliar abb
 - [ ] The failure modes and traps
 - [ ] The build, run, and grading commands
 
-Each item that cannot be found is a retrieval problem: fix that section, and leave the ones that passed alone.
+Each item that **cannot** be found is a retrieval problem: fix that section, and leave the ones that passed alone.
 
 ### Step 3b - Check ownership and repetition
 
 - Locate the single contract and the single account of grader assertions and limits. Replace repeated versions with links while retaining context needed at the point of use.
 - Compare the prose, tables, and diagrams. Keep an overview plus its detailed evidence; remove a second full explanation of the same mechanism. Move paragraph-sized cells and labels into adjacent prose.
 - Check each cut against the ownership map from step 2. Preserve invariants, exceptions, failure behavior, constants, and source citations, including details previously carried only by an image.
-- Check the structure against step 3: the derivation must remain reachable before optional grader-protocol or debugger detail. Preserve or update incoming section anchors.
+- Check the structure against step 3: the derivation **must** remain reachable before optional grader-protocol or debugger detail. Preserve or update incoming section anchors.
 
 ## Step 4 - Register related changes
 
 - Add the note to `docs/labs/README.md`.
 - Update `docs/05-syscall-reference.md` if the exercise changes a system call.
-- Do not change `docs/README.md` or `docs/03-lab-workflow.md` for each new note; they index the collection.
+- **Do not** change `docs/README.md` or `docs/03-lab-workflow.md` for each new note; they index the collection.
 
 ## Step 5 - Audit the no-solution boundary
 
 Read the note as someone about to implement the exercise. Remove anything that can be copied as the answer, replace missing choices with source-anchored questions, and cut explanations already owned elsewhere. Inspect diagrams too: an ordered target algorithm is still a solution when drawn rather than written in C. The only exception is a final `## Solution walkthrough` section, added after the exercise passes and opened with a `[!CAUTION]` spoiler callout; audit every other section as above.
 
-Every fenced `c` block must be a contiguous, verbatim quotation from an existing non-target file and must cite that file. Inspect this manually. The following smoke check finds unmatched nonblank lines, but it cannot prove order, contiguity, or that the target solution was excluded:
+Every fenced `c` block **must** be a contiguous, verbatim quotation from an existing non-target file and **must** cite that file. Inspect this manually. The following smoke check finds unmatched nonblank lines, but it **cannot** prove order, contiguity, or that the target solution was excluded:
 
 ````bash
 awk '/^```c$/{f=1;next} /^```/{f=0} f && NF' docs/labs/<note>.md |
@@ -145,4 +145,4 @@ Follow the harness when a claimed observation depends on how execution stops: di
 
 Render changed diagrams with the available renderer and inspect readability, branch labels, and contrast. Check an Excalidraw export against its editable source. If rendering is unavailable, report that limitation rather than claiming visual verification. Finish with the scan audit and the ownership/repetition audit above, and confirm that no new hard wraps were introduced into Markdown prose.
 
-Do not create nested `docs/labs/<lab>/` directories, restructure `docs/`, or add the solution after grading anywhere except a final spoiler-marked `## Solution walkthrough` section.
+**Do not** create nested `docs/labs/<lab>/` directories, restructure `docs/`, or add the solution after grading anywhere except a final spoiler-marked `## Solution walkthrough` section.

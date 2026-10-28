@@ -22,7 +22,7 @@ You are working in an xv6-riscv study repository. The exercises under `user/` ar
 
 ## Step 1 — Establish ground truth before writing
 
-Read all four sources. Do not write from memory of Unix; xv6 diverges from POSIX in ways that matter, and a plausible-sounding claim that is wrong for xv6 is worse than no comment.
+Read all four sources. **Do not** write from memory of Unix; xv6 diverges from POSIX in ways that matter, and a plausible-sounding claim that is wrong for xv6 is worse than no comment.
 
 | Source                                           | What to take from it                                                                       |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
@@ -30,9 +30,9 @@ Read all four sources. Do not write from memory of Unix; xv6 diverges from POSIX
 | `../xv6-riscv-book/*.tex` (`unix.tex` for ch. 1) | The long-form authority. Precise semantics, and the _why_ behind interface choices         |
 | The kernel source the exercise touches           | The actual implementation. Quote real identifiers and real constants                       |
 | `user/ex1copy.c`                                 | The house style you are matching                                                           |
-| The learner's staged file, if one exists         | The starting point. Review and fix it; do not replace it without saying what changed       |
+| The learner's staged file, if one exists         | The starting point. Review and fix it; **do not** replace it without saying what changed   |
 
-**Verify every factual claim against the source tree.** Grep for each constant, function, and struct field you plan to name. `DIRSIZ`, `PIPESIZE`, `NOFILE`, `MAXARG`, `NPROC`, and `NDEV` all have specific values in `kernel/param.h`, `kernel/fs.h`, and `kernel/pipe.c` — cite them, do not guess. If you cannot find something you were about to assert, cut the assertion.
+**Verify every factual claim against the source tree.** Grep for each constant, function, and struct field you plan to name. `DIRSIZ`, `PIPESIZE`, `NOFILE`, `MAXARG`, `NPROC`, and `NDEV` all have specific values in `kernel/param.h`, `kernel/fs.h`, and `kernel/pipe.c` — cite them, **do not** guess. If you **cannot** find something you were about to assert, cut the assertion.
 
 ## Step 2 — Name the file
 
@@ -41,8 +41,8 @@ The rule is `ex<N><verb>.c`:
 - `N` is the **lecture's** number for the example, not the order files were added. Lecture 1's ex5 is `fork` + `exec` + `wait`, so it is `ex5forkexec.c` even if it was written third.
 - The verb comes from the lecture's own phrasing ("copy input to output" → `copy`; "redirect the output of a command" → `redirect`).
 - **The guest command name must be at most 14 bytes.** `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts on it — a longer name aborts the image build. Count before committing to a name.
-- **Keep a descriptive upstream name.** Lecture 1's files are `ex1.c` through `ex9.c`, so they need the `ex<N><verb>` rule. Lecture 2's are already named `ptr.c`, `array.c`, and `str.c`; keep those names, and check that they do not collide with an existing `user/` program.
-- Avoid words xv6 does not have. `stdin`/`stdout` name C `FILE *` streams that do not exist here, and the repo's own docs warn against them, so a filename built from them contradicts the house rules.
+- **Keep a descriptive upstream name.** Lecture 1's files are `ex1.c` through `ex9.c`, so they need the `ex<N><verb>` rule. Lecture 2's are already named `ptr.c`, `array.c`, and `str.c`; keep those names, and check that they **do not** collide with an existing `user/` program.
+- Avoid words xv6 does not have. `stdin`/`stdout` name C `FILE *` streams that **do not** exist here, and the repo's own docs warn against them, so a filename built from them contradicts the house rules.
 
 Renaming an existing file: use `git mv`, then update `Makefile` `UPROGS`, `docs/07-exercises.md`, `docs/02-build-boot-and-usage.md`, any `grade-*` script, and the `fprintf`/`printf` message prefixes inside the source itself. Grep for the old name afterwards and expect zero hits outside `docs/superpowers/`.
 
@@ -74,15 +74,15 @@ Someone reads this header with the code open, looking for one specific thing. **
 
 Three rules keep this from degrading into decoration:
 
-1. **Never simplify to fit.** Exceptions, failure behavior, and source evidence must survive into the prose below the structure. A 79-column budget is a reason to write tighter sentences, never a reason to drop a qualification.
+1. **Never simplify to fit.** Exceptions, failure behavior, and source evidence **must** survive into the prose below the structure. A 79-column budget is a reason to write tighter sentences, **never** a reason to drop a qualification.
 2. **Never inflate a cell.** If a column needs a sentence, it belongs under the table.
 3. **Never decorate what already scans.** Length alone does not justify a visual.
 
-Before you finish the file, reread the header using only its banners, ALL-CAPS titles, tables, lists, and diagrams. A reader skipping every prose sentence must still find the prerequisites, the interface, the data path, the failure behavior, and where each idea lives in the tree. Fix only the sections where that fails.
+Before you finish the file, reread the header using only its banners, ALL-CAPS titles, tables, lists, and diagrams. A reader skipping every prose sentence **must** still find the prerequisites, the interface, the data path, the failure behavior, and where each idea lives in the tree. Fix only the sections where that fails.
 
 ### Constraints that are not style preferences
 
-- **79 columns maximum**, including comment delimiters and the ` *` prefix. Verify mechanically, never by eye:
+- **79 columns maximum**, including comment delimiters and the ` *` prefix. Verify mechanically, **never** by eye:
 
     ```bash
     awk 'length > 79 {print FILENAME" "FNR": "length}' user/ex*.c
@@ -113,7 +113,7 @@ Append to `UPROGS` in the `Makefile`, tab-indented, **with a trailing backslash 
 	$U/_ex5forkexec\
 ```
 
-Programs in `LAB_PRACTICE_PROGS` also build with `STRICT_CFLAGS` (`-Wextra -pedantic`), so unused `main` parameters and a function pointer passed to `%p` are errors here even though the lecture's original compiles. Never leave a commented-out `# name\` line in that list: the trailing backslash continues the comment.
+Programs in `LAB_PRACTICE_PROGS` also build with `STRICT_CFLAGS` (`-Wextra -pedantic`), so unused `main` parameters and a function pointer passed to `%p` are errors here even though the lecture's original compiles. **Never** leave a commented-out `# name\` line in that list: the trailing backslash continues the comment.
 
 Then:
 
@@ -127,7 +127,7 @@ Match `error:` and `Error`, not a bare case-insensitive `error` — every compil
 
 ## Step 6 — Run it, and check the transcript against your own comments
 
-**This step is not optional.** Boot xv6 and run the exercise. Every transcript in your comment block must match what actually happens — a documented output that differs from the real one is worse than none.
+**This step is not optional.** Boot xv6 and run the exercise. Every transcript in your comment block **must** match what actually happens — a documented output that differs from the real one is worse than none.
 
 ```bash
 cat > /tmp/run-ex.py <<'PY'
@@ -144,24 +144,24 @@ python3 /tmp/run-ex.py && sed -n '/ex5forkexec/,/ALLDONE/p' xv6.out.exercises
 
 If QEMU fails to start, run `pkill -f qemu-system-riscv64` and retry — a stale instance holds the GDB port.
 
-Then fix the comments to match reality. Real behaviour is frequently _more_ interesting than the prediction: `ex3fork` turned out to interleave mid-word rather than mid-line, because `printf` is not atomic and `uartputc` locks per character — which became the best thing in that file. Look for the surprise and write it up.
+Then fix the comments to match reality. Real behaviour is frequently _more_ interesting than the prediction: `ex3fork` turned out to interleave mid-word rather than mid-line, because `printf` is **not atomic** and `uartputc` locks per character — which became the best thing in that file. Look for the surprise and write it up.
 
 ## Step 7 — Update the docs
 
-- **`docs/07-exercises.md`** — add a row to the overview table, a node to the Mermaid dependency graph, and a section. Section shape: transcript, then what the lecture uses it to teach, then the questions the source raises. The source comments carry the long form, so the doc must be tighter and must not duplicate them.
+- **`docs/07-exercises.md`** — add a row to the overview table, a node to the Mermaid dependency graph, and a section. Section shape: transcript, then what the lecture uses it to teach, then the questions the source raises. The source comments carry the long form, so the doc **must** be tighter and **must not** duplicate them.
 - **Prerequisite map** — when the exercise depends on earlier material, distinguish what to read first from references to consult only when needed. Link the owning local note before individual examples, and label hosted or sibling-repository examples when their APIs are not available in xv6.
 - **The lecture's companion note** — when the lecture has one (Lecture 2's is [`10-c-in-xv6.md`](../10-c-in-xv6.md)), the program's concepts go there and `07-exercises.md` keeps only the transcript and the program-specific findings. Closing out a whole lecture is [`close-lecture.md`](close-lecture.md).
-- **`docs/02-build-boot-and-usage.md`** — only if the shared mechanics changed. Ordinary exercises need nothing here.
+- **`docs/02-build-boot-and-usage.md`** — **only if** the shared mechanics changed. Ordinary exercises need nothing here.
 - **`docs/05-syscall-reference.md`** — if this is the first exercise to use a call, check the entry is accurate.
 - Markdown rules: **never hard-wrap prose** (one continuous line per paragraph), bold the first column in comparison tables, use GitHub callouts (`> [!NOTE]`, `> [!WARNING]`) where they earn the emphasis, and follow the documented Mermaid band colors. The scan-layer rule from step 3 applies to the Markdown section too — its Markdown equivalents for each information shape are in [`derive-lab-exercise.md`](derive-lab-exercise.md#step-3a---apply-the-scan-layer-rule).
 
-Add tests to [`grade-exercises`](../../grade-exercises) — one per claim the comments or docs make. Do not create a new `grade-*` file; the suite filters by test title, so prefix every title with the exercise name (`ex9ls: lists a named directory`).
+Add tests to [`grade-exercises`](../../grade-exercises) — one per claim the comments or docs make. **Do not** create a new `grade-*` file; the suite filters by test title, so prefix every title with the exercise name (`ex9ls: lists a named directory`).
 
-**Then break the code deliberately and confirm the test goes red.** Two assertions in this suite were vacuous when first written and passed against deliberately broken programs. A green test that cannot fail is worse than no test, because it is trusted.
+**Then break the code deliberately and confirm the test goes red.** Two assertions in this suite were vacuous when first written and passed against deliberately broken programs. A green test that **cannot** fail is worse than no test, because it is trusted.
 
 ## Step 8 — Verify before claiming done
 
-Run these and report the actual output. Do not assert success without them.
+Run these and report the actual output. **Do not** assert success without them.
 
 ```bash
 make fs.img 2>&1 | grep -E "error:|Error|Assertion"   # expect no output
@@ -177,4 +177,4 @@ Then run the scan audit from step 3 over both the source header and the `docs/07
 
 ## Scope note
 
-Do not reorganize `user/` into subdirectories. Four mechanisms assume the flat layout and three of them fail _silently_; `docs/02-build-boot-and-usage.md` has the analysis under "Why sources and build products stay flat". Scalability here comes from the naming convention and the doc structure, not from directories.
+**Do not** reorganize `user/` into subdirectories. Four mechanisms assume the flat layout and three of them fail _silently_; `docs/02-build-boot-and-usage.md` has the analysis under "Why sources and build products stay flat". Scalability here comes from the naming convention and the doc structure, not from directories.

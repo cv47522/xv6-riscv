@@ -21,7 +21,7 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 | **Search**      | Visit names throughout that directory tree, including names of directories.                              |
 | **Match**       | Compare the entry's name, not the whole path, with the requested name.                                   |
 | **Output**      | Print the path of each match, including its starting-path prefix, as in `./a/b`.                         |
-| **Termination** | Do not descend through the special `.` and `..` entries.                                                 |
+| **Termination** | **Do not** descend through the special `.` and `..` entries.                                             |
 | **Build**       | Put the source directly in `user/find.c` and register `$U/_find` in `UPROGS`; this tree has neither yet. |
 
 > [!WARNING]
@@ -248,18 +248,18 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 | **Inspect only directory records**         | Which [`ls()`](../../user/ls.c) branch and `struct stat.type` value establish that `read()` will return directory entries?                                                                                                                                       |
 | **Compare the requested basename exactly** | What does [`strcmp()`](../../user/ulib.c) require of a full-width `de.name`, and why is comparing a full path against the basename different?                                                                                                                    |
 | **Report every matching name once**        | How do the four [`grade-lab-util`](../../grade-lab-util) find tests distinguish a path, a directory match, a missing match, and duplicate visits?                                                                                                                |
-| **Descend without revisiting ancestors**   | Which real entries in [`kernel/sysfile.c`](../../kernel/sysfile.c) and [`user/ls.c`](../../user/ls.c) must a recursive reader recognize, and why?                                                                                                                |
+| **Descend without revisiting ancestors**   | Which real entries in [`kernel/sysfile.c`](../../kernel/sysfile.c) and [`user/ls.c`](../../user/ls.c) **must** a recursive reader recognize, and why?                                                                                                            |
 | **Respect path and resource limits**       | What do [`ls()`'s buffer check](../../user/ls.c), `MAXPATH`, and `NOFILE` in [`kernel/param.h`](../../kernel/param.h) imply for long paths and open descriptors?                                                                                                 |
 
 | Trap                                                            | Observable consequence                                                                                               | Source to inspect                                                                                             |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | **Treat `de.name` as an ordinary C string**                     | A 14-byte name can make `strcmp` or printing read beyond the field.                                                  | [`kernel/fs.h`](../../kernel/fs.h), [`user/ls.c`](../../user/ls.c)                                            |
 | **Descend into `.` or `..`**                                    | The same entry can be reported repeatedly, or traversal may reach a path-length failure.                             | [`kernel/sysfile.c`](../../kernel/sysfile.c), corner test in [`grade-lab-util`](../../grade-lab-util)         |
-| **Match only files, not directories**                           | A directory named like the target is never printed, so the corner test's directory-match count is 0, not 1.          | corner test in [`grade-lab-util`](../../grade-lab-util)                                                       |
-| **Print only the basename**                                     | The current-directory and nested-path checks cannot recognize the full path.                                         | [`grade-lab-util`](../../grade-lab-util)                                                                      |
+| **Match only files, not directories**                           | A directory named like the target is **never** printed, so the corner test's directory-match count is 0, not 1.      | corner test in [`grade-lab-util`](../../grade-lab-util)                                                       |
+| **Print only the basename**                                     | The current-directory and nested-path checks **cannot** recognize the full path.                                     | [`grade-lab-util`](../../grade-lab-util)                                                                      |
 | **Treat a failed `open`, `fstat`, or `stat` as valid metadata** | An invalid descriptor or uninitialized type can misdirect the search.                                                | [`user/ls.c`](../../user/ls.c), [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors) |
 | **Keep every ancestor descriptor open**                         | Deep searches can exhaust the per-process descriptor table.                                                          | `NOFILE` in [`kernel/param.h`](../../kernel/param.h), [`kernel/proc.h`](../../kernel/proc.h)                  |
-| **Read `DIRSIZ` bytes instead of `sizeof(de)`**                 | `read()` returns 14, never 16, so a `== sizeof(de)` loop never runs; later reads would also start mid-record.        | `struct dirent` in [`kernel/fs.h`](../../kernel/fs.h), `readi()` in [`kernel/fs.c`](../../kernel/fs.c)        |
+| **Read `DIRSIZ` bytes instead of `sizeof(de)`**                 | `read()` returns 14, **never** 16, so a `== sizeof(de)` loop never runs; later reads would also start mid-record.    | `struct dirent` in [`kernel/fs.h`](../../kernel/fs.h), `readi()` in [`kernel/fs.c`](../../kernel/fs.c)        |
 | **Test `strcmp()`'s result as a boolean**                       | `strcmp()` returns 0 on equality, so `if (strcmp(s, ".."))` is true for every other name.                            | `strcmp()` in [`user/ulib.c`](../../user/ulib.c)                                                              |
 | **Compare the dots against the parent or the full path**        | The parent path is the same for every record, and `"path/."` never equals `"."`, so `.` and `..` are still followed. | `ls()`'s `buf` and `p` in [`user/ls.c`](../../user/ls.c)                                                      |
 | **Return from inside the record loop**                          | Returning on a child's result or on one failed `stat()` skips its remaining siblings and leaks the directory fd.     | `ls()`'s `continue` and final `close(fd)` in [`user/ls.c`](../../user/ls.c)                                   |
@@ -319,8 +319,8 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
     - **Copy:** `memmove(p, de.name, DIRSIZ)` copies the field; `p[DIRSIZ] = 0` terminates it inside `buf`.
     - **Budget:** the length check's final `+ 1` reserves that terminator byte.
 
-3. Why does [`user/ls.c`](../../user/ls.c) tolerate `.` and `..`, while a traversal cannot follow them as ordinary children?
-    - **Listing:** `ls()` never follows a record; `.` and `..` are just two more output lines.
+3. Why does [`user/ls.c`](../../user/ls.c) tolerate `.` and `..`, while a traversal **cannot** follow them as ordinary children?
+    - **Listing:** `ls()` **never** follows a record; `.` and `..` are just two more output lines.
     - **Traversal:** `.` reaches the current inode; `..` reaches the parent, which lists the current directory again.
 
     Following every directory record therefore repeats output until a path or descriptor limit stops it; see [`dir-dot-entries-loop.svg`](../../../operating-system/images/file-systems/dir-dot-entries-loop.svg).
@@ -431,7 +431,7 @@ This table answers the [Deriving it](#deriving-it) checklist row by row; the sou
 | Decision                                   | What `user/find.c` does                                                                                                                                         |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Interpret the two operands**             | With `argc == 3`, `main()` passes `argv[1]` and `argv[2]`; other forms are the [`-exec` extension](05-util-find-exec.md#solution-walkthrough) or a usage error. |
-| **Inspect only directory records**         | The starting path must be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                                                         |
+| **Inspect only directory records**         | The starting path **must** be `T_DIR`; children are passed to `find()` only after `stat()` reports `T_DIR`.                                                     |
 | **Compare the requested basename exactly** | `memcpy()` copies `DIRSIZ` bytes to `child_name_ptr`, a `'\0'` follows, and `strcmp(child_name_ptr, name)` decides the match.                                   |
 | **Report every matching name once**        | Each record is tested once, and skipping `.` and `..` means no directory is entered twice.                                                                      |
 | **Descend without revisiting ancestors**   | `.` and `..` are skipped before both the match and the descent.                                                                                                 |

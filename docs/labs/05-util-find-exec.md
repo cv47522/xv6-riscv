@@ -41,7 +41,7 @@ In the first regex, the dot is an unescaped wildcard despite the end anchor. In 
 
 ### What the grader does not prove
 
-Printing a matching path could satisfy `exec` without executing a child. The other tests count text anywhere in the transcript and do not inspect child status, failures, individual output lines, or parent/child ordering. Extra output without `hello` is not rejected. None directly proves a `fork`, `exec`, or `wait` call; keep the handout's lifetime requirement in the [contract](#contract).
+Printing a matching path could satisfy `exec` without executing a child. The other tests count text anywhere in the transcript and **do not** inspect child status, failures, individual output lines, or parent/child ordering. Extra output without `hello` is not rejected. None directly proves a `fork`, `exec`, or `wait` call; keep the handout's lifetime requirement in the [contract](#contract).
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ Printing a matching path could satisfy `exec` without executing a child. The oth
 
 ## `ex5forkexec`'s `main()` line by line
 
-This is the complete, unchanged `main()` from [`user/ex5forkexec.c`](../../user/ex5forkexec.c). The fixed `echo` command belongs to that lecture example; the lab must determine its own command vector.
+This is the complete, unchanged `main()` from [`user/ex5forkexec.c`](../../user/ex5forkexec.c). The fixed `echo` command belongs to that lecture example; the lab **must** determine its own command vector.
 
 ```c
 int
@@ -153,7 +153,7 @@ The parent and child run concurrently after `fork()`. The parent may call `wait(
 | ---------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | **`exec(path, argv)`** | `int exec(const char *, char **)`              | [`user/user.h`](../../user/user.h)                                               | `path` names the image; the vector supplies the new program's argument strings.                     |
 | **`MAXARG`**           | 32 vector slots                                | [`kernel/param.h`](../../kernel/param.h), [`sys_exec()`](../../kernel/sysfile.c) | One slot must be the terminating null pointer, so at most 31 non-null arguments pass this boundary. |
-| **`wait(int *)`**      | One child pid returned; optional status output | [`user/user.h`](../../user/user.h), [`kernel/proc.c`](../../kernel/proc.c)       | The parent must account for the child it created; `wait(0)` discards exit status.                   |
+| **`wait(int *)`**      | One child pid returned; optional status output | [`user/user.h`](../../user/user.h), [`kernel/proc.c`](../../kernel/proc.c)       | The parent **must** account for the child it created; `wait(0)` discards exit status.               |
 | **`findtest.sh`**      | Three `hello` files and one search command     | [`user/findtest.sh`](../../user/findtest.sh)                                     | The script fixture checks that each matched path can reach `grep` as a file operand.                |
 
 > [!IMPORTANT]
@@ -219,7 +219,7 @@ These are future-implementation checks, not claimed command output. [Docs 02](..
 3. How many non-null pointers can [`sys_exec()`](../../kernel/sysfile.c) accept when `MAXARG` is 32, and where does it require a zero pointer?
 4. What would a successful direct `exec` do to the process that is still searching, according to [`book/ch01`](../book/ch01-operating-system-interfaces.md)?
 5. If `fork()` returns `-1`, which branch of [`ex5forkexec.c`](../../user/ex5forkexec.c) runs, and is there a child to reap?
-6. If the command image cannot be loaded, which process is still running after `exec()` returns, and what does the example do next?
+6. If the command image **cannot** be loaded, which process is still running after `exec()` returns, and what does the example do next?
 7. Why does the `exec, multiple args` test count five `hello` strings when [`findtest.sh`](../../user/findtest.sh) has four lines containing that word?
 8. What do `wait()`'s return value and optional status pointer tell the parent in [`user/ex5forkexec.c`](../../user/ex5forkexec.c)?
 
@@ -289,9 +289,9 @@ For `find . b -exec grep hello` matching `./a/b`:
 | **`child_argv`**  | `grep` | `hello` | `./a/b` | `0`     |        |         |
 
 - **Command list:** `main()` passes `argv + 4`. `kexec()` stores `ustack[argc] = 0` in [`kernel/exec.c`](../../kernel/exec.c), so that list is already terminated.
-- **Budget:** `(argc - 4)` command words, one path, and one null pointer must not exceed `MAXARG`, so `main()` rejects `argc - 4 + 2 > MAXARG`, which allows at most 30 command words.
+- **Budget:** `(argc - 4)` command words, one path, and one null pointer **must not** exceed `MAXARG`, so `main()` rejects `argc - 4 + 2 > MAXARG`, which allows at most 30 command words.
 - **Terminator:** the last slot is the integer `0`. `"\0"` would be a non-null pointer to an empty string, which `sys_exec()` accepts as one more argument.
-- **Fixed array:** `child_argv[MAXARG]` replaces a VLA because C99 (`-std=gnu99`) forbids initializing a variable-length array. Its 256 bytes exist only while `run()` is active, never once per recursion frame.
+- **Fixed array:** `child_argv[MAXARG]` replaces a VLA because C99 (`-std=gnu99`) forbids initializing a variable-length array. Its 256 bytes exist only while `run()` is active, **never** once per recursion frame.
 
 ### Failure modes the source guards
 

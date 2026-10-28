@@ -66,6 +66,6 @@ Read [book/00-ostep-concordance.md](book/00-ostep-concordance.md) first. It list
 
 The rule the concordance encodes: **`../operating-system/` owns concepts; `docs/book/` owns xv6's realization of them.** A concept whose OSTEP note is not written yet sits on loan in the xv6 note until it is, which is why each concordance row carries a status.
 
-[book/README.md](book/README.md) has the full procedure — the three-case table, the note shape, and the blockquote variant that goes with each case. Do not restate any of it here; that file is the single authority.
+[book/README.md](book/README.md) has the full procedure — the three-case table, the note shape, and the blockquote variant that goes with each case. **Do not** restate any of it here; that file is the single authority.
 
 Keep notes linked to the source they describe — `kernel/vm.c:57` style references are clickable in most editors — and add any new vocabulary to the glossary rather than defining it inline.

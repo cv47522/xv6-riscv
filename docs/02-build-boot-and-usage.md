@@ -116,7 +116,7 @@ The four columns are `name`, `type`, `inode number`, `size in bytes` — see the
 | **2** | `T_FILE` — regular file | everything else |
 | **3** | `T_DEVICE` — device     | `console`       |
 
-Two things worth noticing. `console` has size 0 because it is a device, not stored data — reads and writes route to `kernel/console.c` instead of the disk. And every one of these files came from `UPROGS` in the Makefile: if a program is not listed there, it never reaches `fs.img`, and the shell reports `exec ... failed` no matter how cleanly it compiled.
+Two things worth noticing. `console` has size 0 because it is a device, not stored data — reads and writes route to `kernel/console.c` instead of the disk. And every one of these files came from `UPROGS` in the Makefile: if a program is not listed there, it **never** reaches `fs.img`, and the shell reports `exec ... failed` no matter how cleanly it compiled.
 
 `findtest.sh`, `sixfive.txt`, the `sf-*` parser fixtures, `sleep`, `sixfive`, and `memdump` are present because `conf/lab.mk` currently selects `LAB=util`. See [03-lab-workflow.md](03-lab-workflow.md).
 
@@ -149,7 +149,7 @@ The same terminal carries two control layers. xv6 handles console-editing and pr
 > [!IMPORTANT]
 > `Ctrl-a` is a prefix, not a chord. Hold `Ctrl`, press `a`, release both keys, and then press plain `x`, `c`, or `h` without `Ctrl`. The sequence must be typed in the terminal that directly owns the QEMU process.
 
-GNU Screen uses `Ctrl-a` as its default prefix; `Ctrl-a` then `a` sends a literal `Ctrl-a` through to QEMU. tmux normally uses `Ctrl-b`, but a configuration that remaps its prefix to `Ctrl-a` must use its configured `send-prefix` binding. A terminal application can also intercept the key before QEMU sees it; `Ctrl-a` then `h` is the quickest check because QEMU should print help.
+GNU Screen uses `Ctrl-a` as its default prefix; `Ctrl-a` then `a` sends a literal `Ctrl-a` through to QEMU. tmux normally uses `Ctrl-b`, but a configuration that remaps its prefix to `Ctrl-a` **must** use its configured `send-prefix` binding. A terminal application can also intercept the key before QEMU sees it; `Ctrl-a` then `h` is the quickest check because QEMU should print help.
 
 To find emulator processes from another host terminal, run:
 
@@ -195,11 +195,11 @@ A C file on the host is not automatically visible inside xv6. `make qemu` builds
 3. `kexec()` in `kernel/exec.c` counts entries until the null pointer, copies the strings and pointer array onto the new user stack, places `argv` in register `a1`, and returns the count in `a0` as `argc`.
 4. `start()` in `user/ulib.c` receives those two values and calls `main(argc, argv)`; when `main` returns, `start()` passes its result to `exit()`.
 
-Therefore, a normal command always counts its own name as `argv[0]`. For `echo one two`, `argc` is 3 and the array contains `"echo"`, `"one"`, `"two"`, then a null pointer. `user/echo.c` begins its loop at index 1 because the command name is metadata, not output.
+Therefore, a normal command **always** counts its own name as `argv[0]`. For `echo one two`, `argc` is 3 and the array contains `"echo"`, `"one"`, `"two"`, then a null pointer. `user/echo.c` begins its loop at index 1 because the command name is metadata, not output.
 
 Use this checklist for a standalone exercise:
 
-1. Put the source directly under `user/`, for example `user/ex1copy.c`. `mkfs` imports the _linked binary_, never the source, and it strips one leading `user/` component and then asserts that no second slash remains — so a source under `user/exercises/` compiles and links cleanly, and then aborts the image step as `user/exercises/_ex1copy`.
+1. Put the source directly under `user/`, for example `user/ex1copy.c`. `mkfs` imports the _linked binary_, **never** the source, and it strips one leading `user/` component and then asserts that no second slash remains — so a source under `user/exercises/` compiles and links cleanly, and then aborts the image step as `user/exercises/_ex1copy`.
 2. **Keep the guest command name at most 14 bytes**. `DIRSIZ` in `kernel/fs.h` is 14, and `mkfs/mkfs.c` asserts that every imported basename fits. The host binary has a leading underscore, but `mkfs` removes it: `user/_ex1copy` becomes the xv6 command `ex1copy`.
 3. Include xv6's headers, usually `kernel/types.h` followed by `user/user.h`. **Do not include the host `<stdio.h>`**: xv6 is freestanding and links against `ULIB`, not the host C library.
 4. Use integer file descriptors with xv6 system calls. **By Unix convention, 0 is standard input, 1 is standard output, and 2 is standard error**; they are not C `FILE *` streams such as `stdin` and `stdout`.
@@ -255,7 +255,7 @@ mkfs: mkfs/mkfs.c:142: main: Assertion `index(shortname, '/') == 0' failed.
 
 The build stops there with a `SIGABRT`, before a broken image is ever handed to QEMU.
 
-The artifacts are already invisible where it counts. `.gitignore` covers `_*`, `*.o`, `*.d`, `*.asm`, `*.sym`, `*.img`, and `*.img.bk`, and `git ls-files` returns nothing generated — so the clutter is a file-listing annoyance, never a diff or a commit. Moving it into a `build/` tree would buy a tidier `ls` and cost the four mechanisms above.
+The artifacts are already invisible where it counts. `.gitignore` covers `_*`, `*.o`, `*.d`, `*.asm`, `*.sym`, `*.img`, and `*.img.bk`, and `git ls-files` returns nothing generated — so the clutter is a file-listing annoyance, **never** a diff or a commit. Moving it into a `build/` tree would buy a tidier `ls` and cost the four mechanisms above.
 
 > [!IMPORTANT]
 > The decisive reason is merge cost. The Makefile carries an `ifeq ($(LAB),...)` block for every lab — eleven of them, counting `thread` and `lazy`, which have no branch on the `labs` remote — and is merged from `labs/<lab>` at the start of each one, see [03-lab-workflow.md](03-lab-workflow.md). Restructuring the build turns every future lab merge into a conflict on the single file most likely to have changed upstream, in exchange for cosmetics.
@@ -274,7 +274,7 @@ The conventions below are enforced by tooling or by the absence of a C library, 
 | **`return 0` and `return 1`, or `exit(0)` and `exit(1)`** | Both are correct here. `start()` in `user/ulib.c` is the real entry point and does `exit(main(argc, argv))`, so a returned value reaches the `exit` system call unchanged.                                                                                               |
 | **No `EXIT_SUCCESS`, no `<stdlib.h>`**                    | There is no host C library to take them from. The Makefile compiles with `-ffreestanding -nostdlib`, and `user/user.h` is the complete set of functions available.                                                                                                       |
 | **`/* ... */` for multiline comments; `//` for one line** | Use separate block-delimiter lines and ` *` body prefixes for teaching headers and Q/A blocks. Keep comments ASCII and at most 79 columns, preserve aligned tables and diagrams, and follow [the complete source-comment rules](../AGENTS.md#source-comment-formatting). |
-| **`return 1` means failure**                              | Non-zero is a failure status by convention and is what `user/sh.c` and the graders read. It is never a stand-in for success.                                                                                                                                             |
+| **`return 1` means failure**                              | Non-zero is a failure status by convention and is what `user/sh.c` and the graders read. It is **never** a stand-in for success.                                                                                                                                         |
 
 > [!NOTE]
 > Most programs under `user/` end with `exit(0)` rather than `return 0`, and there is no need to change them — `exit` is declared `__attribute__((noreturn))` in `user/user.h`, which is genuinely useful on error paths. `user/ex1copy.c` uses `return` instead because it is a teaching program and the point is that `main`'s return value _is_ the exit status.
@@ -299,7 +299,7 @@ Kernel bugs rarely announce themselves clearly, so it is worth building the habi
 
 ### Print statements, and keeping the output
 
-If a test fails, do not guess why. Insert `printf` calls until you can see what is actually happening. When that produces more output than fits in a scrollback buffer, run the whole session under `script`, which logs the console to a file you can search:
+If a test fails, **do not** guess why. Insert `printf` calls until you can see what is actually happening. When that produces more output than fits in a scrollback buffer, run the whole session under `script`, which logs the console to a file you can search:
 
 ```bash
 script -c "make qemu" xv6.log     # or: script xv6.log, then make qemu, then exit
@@ -397,7 +397,7 @@ gdb-multiarch kernel/kernel  # terminal 2
 (gdb) bt
 ```
 
-For a **hang** — a deadlock, or a loop that never exits — there is nothing to break on. Continue, wait for it to wedge, then interrupt it and look at where it stopped:
+For a **hang** — a **deadlock**, or a loop that **never** exits — there is nothing to break on. Continue, wait for it to wedge, then interrupt it and look at where it stopped:
 
 ```gdb
 (gdb) c
@@ -426,7 +426,7 @@ make CPUS=1 qemu
 
 ### Pointer arithmetic
 
-Half of the confusing bugs in these labs are C pointer arithmetic rather than kernel logic. Operating systems cast between pointers and integers constantly, which ordinary C programs almost never do, and the two kinds of addition are not the same:
+Half of the confusing bugs in these labs are C pointer arithmetic rather than kernel logic. Operating systems cast between pointers and integers constantly, which ordinary C programs almost **never** do, and the two kinds of addition are not the same:
 
 ```c
 int *p = (int*)100;
@@ -464,11 +464,11 @@ For grading a lab specifically, see [03-lab-workflow.md](03-lab-workflow.md).
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`ERROR: Need qemu version >= 7.2`**                 | QEMU too old. Ubuntu 24.04 or newer, or build QEMU from source.                                                                                                                                                                                                                                                                       |
 | **`Couldn't find a riscv64 version of GCC/binutils`** | The cross toolchain is not on `PATH`. See [01-environment-setup.md](01-environment-setup.md).                                                                                                                                                                                                                                         |
-| **`exec ... failed` for a program you just wrote**    | The command is absent from `fs.img`, usually because it is missing from `UPROGS`; nested source paths and guest names longer than 14 bytes also cannot be imported by this `mkfs`.                                                                                                                                                    |
+| **`exec ... failed` for a program you just wrote**    | The command is absent from `fs.img`, usually because it is missing from `UPROGS`; nested source paths and guest names longer than 14 bytes also **cannot** be imported by this `mkfs`.                                                                                                                                                |
 | **A filter copies a line and then appears to hang**   | It is waiting for more standard input. Press `Ctrl-d` at an empty input position to send EOF, or feed it finite input through a pipe. `ex1copy` says so on descriptor 2 — see [07-exercises.md](07-exercises.md#waiting-is-part-of-the-interface); `cat` with no arguments, `wc`, and `grep` behave identically and announce nothing. |
 | **Build succeeds but changes have no effect**         | A stale object tree, most often after switching `conf/lab.mk`. Run `make clean`.                                                                                                                                                                                                                                                      |
-| **Terminal is wrecked after a crash**                 | QEMU left the terminal in raw mode. Run `reset` — it will work even though you cannot see what you are typing.                                                                                                                                                                                                                        |
+| **Terminal is wrecked after a crash**                 | QEMU left the terminal in raw mode. Run `reset` — it will work even though you **cannot** see what you are typing.                                                                                                                                                                                                                    |
 | **`make clean` fails**                                | Another xv6 instance is still running and holding files. Find it with `ps` and kill it.                                                                                                                                                                                                                                               |
 | **Hangs forever with no output**                      | Usually a kernel panic before the console is up, or an infinite loop in early boot. Attach with `make qemu-gdb` and break on `main`.                                                                                                                                                                                                  |
-| **Hangs after booting normally**                      | Likely a deadlock. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](#backtraces-panics-and-hangs).                                                                                                                                                                                                         |
+| **Hangs after booting normally**                      | Likely a **deadlock**. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](#backtraces-panics-and-hangs).                                                                                                                                                                                                     |
 | **A fault message with an `sepc` value**              | Turn the address into a line with `addr2line -e kernel/kernel <sepc>`, or search for it in `kernel/kernel.asm`.                                                                                                                                                                                                                       |

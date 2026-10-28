@@ -20,7 +20,7 @@ Select-all and paste is the whole interaction. A single combined `Prompts.md` wo
 
 ## Using them
 
-Every prompt is a plain Markdown file that assumes only a shell and file access, so **copy the whole file into any agent's chat** and it works. The per-agent wiring below only saves you that copy-paste; it never changes what the prompt says.
+Every prompt is a plain Markdown file that assumes only a shell and file access, so **copy the whole file into any agent's chat** and it works. The per-agent wiring below only saves you that copy-paste; it **never** changes what the prompt says.
 
 [setup-agent-commands.sh](setup-agent-commands.sh) generates all of it from the files in this directory:
 

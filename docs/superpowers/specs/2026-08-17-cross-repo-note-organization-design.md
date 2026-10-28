@@ -51,7 +51,7 @@ The rule as stated assumes the concept note exists. For Chapter 1 it does. For m
 
 **On loan** is the case that makes the design survive contact with the reading order. Concepts are borrowed, not annexed: the block is capped at a few paragraphs, marked with a fixed heading so it is greppable, and carries the name of the OSTEP note it is destined for. When that note is written, the block moves there and a link replaces it. The concordance status flips from `loan` to `linked`, which is what makes the debt visible rather than forgotten.
 
-**xv6-only** is not a failure of the mapping — it is most of what makes xv6 worth reading. RISC-V machine mode and the boot path in `entry.S`, the trampoline page, `swtch.S`, the `fence` instructions in `spinlock.c:70` and `virtio_disk.c:277`, and the whole of Chapter 13 have no OSTEP counterpart and are never on loan. They are the xv6 notes' own material.
+**xv6-only** is not a failure of the mapping — it is most of what makes xv6 worth reading. RISC-V machine mode and the boot path in `entry.S`, the trampoline page, `swtch.S`, the `fence` instructions in `spinlock.c:70` and `virtio_disk.c:277`, and the whole of Chapter 13 have no OSTEP counterpart and are **never** on loan. They are the xv6 notes' own material.
 
 ### Divergence between the trees
 
@@ -101,7 +101,7 @@ A new file, `docs/book/00-ostep-concordance.md`, maps one concept across every s
 
 Symbol names lead and line numbers follow, because `proc.c` `kfork()` survives an edit above it while `proc.c:259` does not. Line numbers appear only where the reference is to a comment or a specific instruction rather than a function.
 
-The `Exercise` column spans `codes/`, `../ostep-homework/`, and `../ostep-projects/` — three repositories, distinguished by path when written out in full. The six xv6-based entries in `ostep-projects` are annotated as targeting `xv6-public`, so they are never mistaken for labs runnable in this tree.
+The `Exercise` column spans `codes/`, `../ostep-homework/`, and `../ostep-projects/` — three repositories, distinguished by path when written out in full. The six xv6-based entries in `ostep-projects` are annotated as targeting `xv6-public`, so they are **never** mistaken for labs runnable in this tree.
 
 The concordance does not overlap the chapter checklist in `docs/book/README.md`. That table tracks progress per chapter; this one tracks one concept across six sources. They now share one column — the chapter table's `Case` summarizes the statuses of that chapter's concordance rows — so they can drift into contradicting each other, and `check_cases` in `docs/book/check-notes.sh` is what stops them: it recomputes each chapter's `Case` from the concordance and fails when the two disagree.
 
@@ -122,7 +122,7 @@ The "Suggested shape" block in `docs/book/README.md` is replaced by one that enf
 ## Lab connection
 ```
 
-`What xv6 actually does` is the only mandatory section. The opening blockquote is load-bearing: it is the note declaring itself deliberately incomplete, so a future reader does not mistake a gap for an omission. In an `xv6-only` chapter the blockquote instead states that no OSTEP counterpart exists, so the note stands alone by design.
+`What xv6 actually does` is the only **mandatory** section. The opening blockquote is load-bearing: it is the note declaring itself deliberately incomplete, so a future reader does not mistake a gap for an omission. In an `xv6-only` chapter the blockquote instead states that no OSTEP counterpart exists, so the note stands alone by design.
 
 `Concept on loan:` is a fixed, greppable heading. Its presence is a debt, and `grep -rn '^## Concept on loan' docs/book/` lists every one outstanding.
 
@@ -158,7 +158,7 @@ Five OSTEP notes get no backlink, because no xv6 chapter corresponds: `SSDs_And_
 
 ### Terminology
 
-The two glossaries stay separate but stop competing. `04-terminology.md` holds xv6, RISC-V, and toolchain vocabulary (hart, PLIC, Sv39, `ecall`); the OSTEP notes' `## Terminology` sections hold portable concepts (process, PCB, limited direct execution). The overlap is small — roughly *context switch*, *trap*, and *process* — and the same rule resolves it: the definition lives on the OSTEP side, and `04-terminology.md` may carry a one-line gloss plus a link but never a second definition. Where the concept is `xv6-only`, `04-terminology.md` owns the definition outright.
+The two glossaries stay separate but stop competing. `04-terminology.md` holds xv6, RISC-V, and toolchain vocabulary (hart, PLIC, Sv39, `ecall`); the OSTEP notes' `## Terminology` sections hold portable concepts (process, PCB, limited direct execution). The overlap is small — roughly *context switch*, *trap*, and *process* — and the same rule resolves it: the definition lives on the OSTEP side, and `04-terminology.md` may carry a one-line gloss plus a link but **never** a second definition. Where the concept is `xv6-only`, `04-terminology.md` owns the definition outright.
 
 ### Link mechanics
 
@@ -184,7 +184,7 @@ The book has **thirteen** chapters, which `docs/book/README.md` currently gets w
 | 12 | Concurrency revisited | `lock2.tex` | `Concurrency_Bugs_And_Events.md` | loan |
 | 13 | Summary | `sum.tex` | — | xv6-only |
 
-Seven of thirteen chapters are `loan` and two are `mixed`, which is the quantitative reason the three-case rule is load-bearing rather than an edge case. The seven match the seven placeholder OSTEP notes exactly, as they must.
+Seven of thirteen chapters are `loan` and two are `mixed`, which is the quantitative reason the three-case rule is load-bearing rather than an edge case. The seven match the seven placeholder OSTEP notes exactly, as they **must**.
 
 ## Per-chapter procedure
 
@@ -219,7 +219,7 @@ Not in this pass: any `loan` block. Those are written when their chapter is read
 
 ## Constraints
 
-- Do not hard-wrap prose, and do not reflow paragraphs outside the lines being changed.
+- **Do not** hard-wrap prose, and **do not** reflow paragraphs outside the lines being changed.
 - Restate rather than transcribe; no xv6 book text is copied into the notes.
 - Reference kernel code by symbol name first, line number second.
 - Add new vocabulary to a glossary rather than defining it inline.

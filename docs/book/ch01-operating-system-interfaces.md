@@ -44,13 +44,13 @@ flowchart LR
     - **Copy:** Step through the parent's address space one `PGSIZE` at a time, `walk()` the parent PTE, `kalloc()` a fresh physical page, `memmove()` 4096 bytes, and `mappages()` the page into the child at the same virtual address with the same flag bits.
     - **Policy:** The copy is eager and byte-for-byte; the base tree has no copy-on-write, which is exactly the gap the `cow` lab fills ([ch05](ch05-page-faults.md)).
     - **Sparse mappings:** `continue` past PTEs that are absent or lack `PTE_V` rather than treating them as errors.
-    - **Failure invariant:** Unwind a partial copy with `uvmunmap(new, 0, i / PGSIZE, 1)`, so the child never survives with a partial address space.
+    - **Failure invariant:** Unwind a partial copy with `uvmunmap(new, 0, i / PGSIZE, 1)`, so the child **never** survives with a partial address space.
 3. **Duplicate the register state.**
     - **Copy:** `*(np->trapframe) = *(p->trapframe)` copies the saved user registers wholesale.
     - **Return split:** `np->trapframe->a0 = 0` overwrites the child's return-value register. There is no second return anywhere, only two saved register sets: the child finds zero in `a0`, while the parent finds the new pid.
     - **Restore:** Neither process returns until the trap path restores its own trapframe.
 4. **Duplicate the descriptor table.** A loop over `NOFILE` entries calls `filedup()` on each non-null `p->ofile[i]`, and `idup()` on `p->cwd`. Both operations bump reference counts rather than copying the underlying objects.
-5. **Publish the child.** Set the parent link under the global `wait_lock`, not `np->lock`, and flip the state to `RUNNABLE` last, so the scheduler cannot select an incomplete child.
+5. **Publish the child.** Set the parent link under the global `wait_lock`, not `np->lock`, and flip the state to `RUNNABLE` last, so the scheduler **cannot** select an incomplete child.
 
 ### Replacing the image: `kexec()`
 
@@ -193,7 +193,7 @@ flowchart LR
 - **REDIR** — `close(rcmd->fd)`, `open(rcmd->file, rcmd->mode)`, then recurse into the wrapped command. Three lines, resting entirely on `fdalloc()`'s lowest-free rule.
 - **PIPE** — `pipe(p)` and two `fork1()`s; the left child does `close(1); dup(p[1])`, the right does `close(0); dup(p[0])`, and both close the raw `p[0]` and `p[1]`. The parent closes both descriptors and waits twice.
 - **LIST** — fork the left side, wait, then recurse into the right side in the current process.
-- **BACK** — fork and do not wait.
+- **BACK** — fork and **do not** wait.
 
 Because each pipeline child recurses into `runcmd()`, `a | b | c` nests through the right-hand child. Every non-leaf process exists only to coordinate descriptors and wait:
 
@@ -241,14 +241,14 @@ The parser (`parsecmd()` and its helpers) is the larger half of the file and is 
 | `kernel/pipe.c`    | `pipealloc()`                | One page of buffer exposed as two oppositely-permissioned `struct file`                               |
 | `kernel/pipe.c`    | `piperead()` / `pipeclose()` | Blocking on empty, and turning the last write-end close into EOF                                      |
 | `user/sh.c`        | `main()`                     | Guarantees fds 0–2, reads a line, forks, waits; special-cases `cd`                                    |
-| `user/sh.c`        | `runcmd()`                   | One arm per command type; never returns                                                               |
+| `user/sh.c`        | `runcmd()`                   | One arm per command type; **never** returns                                                           |
 
 ## Questions I had
 
 - **Why does `uvmcopy()` skip unmapped pages instead of panicking?** The upstream version panics on a missing PTE. Skipping is what lets a process with holes in its address space — which is what lazy allocation and demand paging produce — be forked at all, so the `continue` looks like preparation for [ch05](ch05-page-faults.md) rather than mere tolerance.
 - **Why is the parent pointer protected by a global `wait_lock` rather than by `np->lock`?** `kexit()` has to wake a parent it can only reach through that pointer, and `kwait()` has to scan for children, so the link is read by processes that hold neither end's lock. A single global lock sidesteps the ordering problem; [ch07](ch07-locking.md) is where that reasoning belongs.
 - **What happens if `fdalloc()` succeeds for the read end of a pipe and fails for the write end?** `sys_pipe()` nulls `p->ofile[fd0]` by hand before closing both files, rather than calling the ordinary close path — worth remembering as the shape of xv6's unwind code generally.
-- **Is `NOFILE` = 16 ever actually limiting?** A deep pipeline forks per stage rather than accumulating descriptors in one process, so the shell never approaches it. It would bite a program that opened many files itself.
+- **Is `NOFILE` = 16 ever actually limiting?** A deep pipeline forks per stage rather than accumulating descriptors in one process, so the shell **never** approaches it. It would bite a program that opened many files itself.
 
 ## Lab connection
 

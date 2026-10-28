@@ -15,7 +15,7 @@ There are two GitHub repositories and three remotes, but only **one working copy
 | Remote       | URL                                         | Role                                                                                                              |
 | ------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **origin**   | `git@github.com:cv47522/xv6-riscv.git`      | Your fork. This is where your work is pushed.                                                                     |
-| **upstream** | `https://github.com/mit-pdos/xv6-riscv.git` | MIT's public xv6. Read-only — never push here, never open a pull request.                                         |
+| **upstream** | `https://github.com/mit-pdos/xv6-riscv.git` | MIT's public xv6. Read-only — **never** push here, **never** open a pull request.                                 |
 | **labs**     | `git@github.com:cv47522/xv6-labs-2026.git`  | Your fork of the 6.1810 labs repo. Source of lab starter code and grading scripts. Fetched from, never worked in. |
 
 | Branch    | Role                                                                                                                                                        |
@@ -143,7 +143,7 @@ This is the single most useful command for revision — it shows your work with 
 
 ## Why merge instead of rebase
 
-You are never sending a pull request upstream, so there is no clean-history requirement to pay for. Rebasing would rewrite your growing `study` history every time upstream moves and force a `--force` push each time. Merging resolves each conflict once, keeps your commit dates, and never needs a force push.
+You are **never** sending a pull request upstream, so there is no clean-history requirement to pay for. Rebasing would rewrite your growing `study` history every time upstream moves and force a `--force` push each time. Merging resolves each conflict once, keeps your commit dates, and **never** needs a force push.
 
 The one place this differs from typical open-source advice is exactly the place it matters: advice to rebase assumes you are preparing commits for someone else to review. Here, nobody reviews them but you.
 
@@ -193,7 +193,7 @@ Practical consequences:
 | **origin** | `git@github.com:cv47522/xv6-labs-2026.git` | The GitHub fork, reachable from any network. This is what `labs` in this repository points at.     |
 | **mit**    | `git://g.csail.mit.edu/xv6-labs-2026`      | MIT's publication point. Works only off the corporate network — see [Network constraints](#network-constraints). |
 
-The earlier `~/personal/xv6-labs-2025` clone was removed once the GitHub fork was renamed to `xv6-labs-2026`; it held nothing that the fork did not already have. The fork itself must be kept, since it is the only reachable source of lab starter code.
+The earlier `~/personal/xv6-labs-2025` clone was removed once the GitHub fork was renamed to `xv6-labs-2026`; it held nothing that the fork did not already have. The fork itself **must** be kept, since it is the only reachable source of lab starter code.
 
 The fork carries **one branch per lab and no year suffixes**. `util` and `riscv` are MIT's 2026 publications; `syscall`, `pgtbl`, `traps`, `cow`, `lock`, `fs`, `net`, and `mmap` are still their 2025 branches, because MIT has not published 2026 counterparts yet. Each is replaced in place as its 2026 version appears:
 

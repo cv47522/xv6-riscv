@@ -36,12 +36,44 @@ Every address below was printed by [`ptr`](../user/ptr.c) and [`array`](../user/
 | `0x1000`          | **data/bss** (RW-) | initialized globals (`g`, `a`, `b`) and zeroed ones (`umalloc.c` `freep`) | `user/user.ld` `ALIGN(0x1000)`             |
 | `0x2000`          | **guard page**     | nothing; `PTE_U` cleared, so a touch faults                               | `kernel/exec.c` `uvmclear()`               |
 | `0x3000`–`0x5000` | **stack** (RW-)    | `argv` strings, the `argv[]` array, then `main`'s frame                   | `kernel/exec.c` `kexec()`, `USERSTACK` = 2 |
-| above `0x5000`    | **heap**           | `sbrk()` / `malloc()` growth                                              | `kernel/sysproc.c` `sys_sbrk()`            |
+| `0x5000` onward   | **heap**           | `sbrk()` / `malloc()` growth                                              | `kernel/sysproc.c` `sys_sbrk()`            |
 
 `USERSTACK` is 2 only under `LAB_UTIL` (`kernel/param.h`); otherwise it is 1, and every stack address above shifts down by a page.
 
 > [!WARNING]
 > `main` sits at address `0`, so `func = &main` in `ptr.c` prints `0x0000000000000000`: a valid function pointer that compares equal to a null pointer. Code that tests `if (fn)` would treat it as absent. On Linux the zero page is unmapped exactly to make null dereferences fault; xv6 maps code there.
+
+### Does xv6 have `.rodata`?
+
+**Yes. The map's text row groups sections that share one load segment.** [`user/user.ld`](../user/user.ld) defines `.text`, `.rodata`, `.data`, and `.bss` separately; its `.rodata` output section collects both `.srodata*` and `.rodata*` input sections. In the current `user/_ptr` binary:
+
+| ELF section | Start address | Load segment / user-page permissions                                   |
+| ----------- | ------------- | ---------------------------------------------------------------------- |
+| `.text`     | `0x0`         | First `LOAD`: R-X.                                                     |
+| `.rodata`   | `0x968`       | Same first `LOAD`: R-X.                                                |
+| `.eh_frame` | `0xa30`       | Same first `LOAD`: R-X; unwind metadata.                               |
+| `.data`     | `0x1000`      | Second `LOAD`: RW-.                                                    |
+| `.bss`      | `0x1010`      | Same second `LOAD`: RW-; zero-filled rather than stored as file bytes. |
+
+```bash
+riscv64-linux-gnu-readelf -SW user/_ptr  # Section names and addresses.
+riscv64-linux-gnu-readelf -lW user/_ptr  # LOAD permissions and section-to-segment mapping.
+```
+
+The section flag for `.rodata` does not include execute, but [`kexec()`](../kernel/exec.c) loads **program headers**, not section headers. It passes each `LOAD` header's flags through `flags2perm()` to `uvmalloc()`, which maps readable user pages with those write/execute permissions. Thus these constants are executable at the page level because they share the text load segment, while writes still fault. Linux often gives `.rodata` a separate, non-executable mapping; that separation is not required for the section to exist. Addresses and grouping above describe this binary, not every xv6 program or toolchain.
+
+### Why is the heap above the stack?
+
+[`kexec()`](../kernel/exec.c) builds the low user address range in this order:
+
+1. Load each ELF `LOAD` segment, tracking its end in `sz`, then round that end up to a page boundary.
+2. Append one guard page plus `USERSTACK` stack pages. Clear the guard's user-access bit with `uvmclear()` and put the initial `sp` at the end of the stack reservation.
+3. Copy argument strings and `argv[]` downward within that reservation, then store its upper boundary in `p->sz` and the adjusted `sp` in the trapframe.
+4. On `sbrk(n)`, [`sys_sbrk()`](../kernel/sysproc.c) returns the old `p->sz` and extends that boundary for positive `n`, either through [`growproc()`](../kernel/proc.c) for eager allocation or by reserving the range for lazy allocation.
+
+For the map above, the stack reservation ends at `0x5000`, so the first heap extension starts at **`0x5000`**, above the stack. Calls subtract from `sp` and use the existing stack pages toward `0x3000`; overflow into the `0x2000` guard faults. The stack's **reserved size stays fixed**: allocating more heap does not enlarge it.
+
+This arrangement keeps the low user image, guard, stack, and heap under one size boundary (`p->sz`); the high trampoline/trapframe mappings are separate. It avoids needing a separately growing high-address stack and a moving gap between stack and heap. That explains the layout's simplicity; it is not a RISC-V requirement. The conventional Linux diagram in [Memory Management and Organization](../../operating-system/Memory_Management.md#linux-and-xv6-same-roles-different-layouts) puts the main stack high and the classic heap low so both have room to grow toward the intervening gap. In xv6, they grow **away from their shared boundary**: stack use downward inside its fixed reservation, heap growth upward beyond it. The source of each growth arrow is an address, not the top or bottom of the drawn page.
 
 ## Looking inside a user binary
 
@@ -59,7 +91,7 @@ riscv64-linux-gnu-nm -n user/_cat           # symbols sorted by address
 | **What is unresolved in `cat.o`?** | Relocation records such as `R_RISCV_CALL_PLT read`: `cat.o` calls `read` but does not contain it; the link with `ULIB` fills it in.                                                                                                                 |
 | **Where does `_cat` start?**       | `start address 0x00000000000000ea`, which is `start` in `nm`. The lecture's `0xf6` came from a different build; the address moves whenever code before it changes.                                                                                  |
 | **What is `start`?**               | `user/ulib.c` `start()` runs `exit(main(argc, argv))`. The lecture says it "calls main() and exit(0)"; this tree passes `main`'s return value, which is why `return 0` and `exit(0)` are equivalent (see [AGENTS.md](../AGENTS.md#c-source-style)). |
-| **Where is `buf`?**                | `0000000000001010 B buf`: `B` is `.bss`. The file stores no bytes for it (`filesz 0`, `memsz 0x220` in the second `LOAD` header), so `kexec()` must allocate and zero it.                                                                           |
+| **Where is `buf`?**                | `0000000000001010 B buf`: `B` is `.bss`. The file stores no bytes for it (`filesz 0`, `memsz 0x220` in the second `LOAD` header), so `kexec()` **must** allocate and zero it.                                                                       |
 | **Two `cat`s at once?**            | Both use virtual address `0x0` for text; per-process page tables map them to different physical pages. That is Lecture 4.                                                                                                                           |
 
 The general ELF and `.asm` material belongs to [06-build-artifacts.md](06-build-artifacts.md#what-elf-is); the build graph that produces these files is in [08-makefile-tour.md](08-makefile-tour.md).
@@ -125,7 +157,7 @@ Green nodes hold data (a free page or a cached block); blue nodes are list roots
 | **`(omode & O_WRONLY) \|\| (omode & O_RDWR)`** | writable in either write mode     |
 | **`(omode & O_TRUNC) && ip->type == T_FILE`**  | truncate plain files only         |
 
-Because `O_RDONLY` is `0`, `omode & O_RDONLY` is always false; read-only is detected as "no write bit". Page-table entry flags in `kernel/riscv.h` (`PTE_V`, `PTE_R`, `PTE_W`, `PTE_X`, `PTE_U`) are the lecture's "more interesting examples later".
+Because `O_RDONLY` is `0`, `omode & O_RDONLY` is **always** false; read-only is detected as "no write bit". Page-table entry flags in `kernel/riscv.h` (`PTE_V`, `PTE_R`, `PTE_W`, `PTE_X`, `PTE_U`) are the lecture's "more interesting examples later".
 
 ## Keywords and common bugs
 
@@ -137,10 +169,10 @@ Because `O_RDONLY` is `0`, `omode & O_RDONLY` is always false; read-only is dete
 | **Double free / bad free** | `kfree()` of an unaligned or out-of-range address                      | `panic("kfree")` on a misaligned page or one outside `end`..`PHYSTOP`; a true double free of a valid page is _not_ detected                                                                  |
 | **Uninitialized memory**   | a local, or a page from `kalloc()`                                     | `kalloc()` fills new pages with `5`s; stack locals hold whatever was there                                                                                                                   |
 | **Buffer overflow**        | `s1[4] = 'D'` in [`str.c`](../user/str.c)                              | nothing on the stack: no bounds checks, and no Valgrind or sanitizer in the guest. Only page permissions catch it: `s[4] = 'D'` into a literal faults because text is mapped without `PTE_W` |
-| **Memory leak**            | a `malloc()` never freed                                               | nothing until the process exits; `freeproc()` in `kernel/proc.c` then frees every user page through `proc_freepagetable()`                                                                   |
+| **Memory leak**            | a `malloc()` **never** freed                                           | nothing until the process exits; `freeproc()` in `kernel/proc.c` then frees every user page through `proc_freepagetable()`                                                                   |
 | **Type confusion**         | casting `0x1000` to `struct h *` in [`hwstruct.c`](../user/hwstruct.c) | nothing: the load succeeds if the page is mapped                                                                                                                                             |
 
-The lecture's reference on how far undefined behaviour reaches is [Regehr, _UB in 2016_](https://blog.regehr.org/archives/1393).
+The lecture's reference on how far **undefined behaviour** reaches is [Regehr, _UB in 2016_](https://blog.regehr.org/archives/1393).
 
 ## Homework 2: struct addresses
 
@@ -167,7 +199,7 @@ struct h *h;
 | **`&h->g.c`**     | `0x1000 + 4` = `0x1004`           | yes           | pure offset arithmetic                                                   |
 | **`&h->g.c[10]`** | `h->g.c + 10`                     | no            | needs the pointer stored at `0x1004`; `char` scales by 1                 |
 
-`&` cancels only the final access. `&h->f->a` is `&((*h).f)->a`: the compiler must still load `h->f` to know where `a` is. No padding appears in either ABI because every member's offset is already a multiple of its alignment; [`docs/labs/03-util-memdump.md`](labs/03-util-memdump.md#structure-layout) covers the LP64 alignment rules.
+`&` cancels only the final access. `&h->f->a` is `&((*h).f)->a`: the compiler **must** still load `h->f` to know where `a` is. No padding appears in either ABI because every member's offset is already a multiple of its alignment; [`docs/labs/03-util-memdump.md`](labs/03-util-memdump.md#structure-layout) covers the LP64 alignment rules.
 
 On xv6 the lecture asks "which printed values are guaranteed" and "why did all the prints succeed?" — [`user/hwstruct.c`](../user/hwstruct.c) answers both by running the expressions. The two arithmetic answers are fixed at `0x1018` and `0x1008`. The two loads read `0x1000` and `0x1008`, which in that binary is `umalloc.c`'s zeroed `freep`, so they print `0x0` and `0xA`. They succeed because `0x1000` is the program's own data page; with that page unmapped, `usertrap()` would kill the process.
 
@@ -189,4 +221,4 @@ On xv6 the lecture asks "which printed values are guaranteed" and "why did all t
 
 ### Why is the same local at different addresses in `ptr` and `ptr x yz`?
 
-`kexec()` puts the argument strings and `argv[]` above `main`'s frame, so more or longer arguments push the frame down: `q` is `0x...4F8C` with no arguments and `0x...4F5C` with two. Globals do not move, because the linker fixed them.
+`kexec()` puts the argument strings and `argv[]` above `main`'s frame, so more or longer arguments push the frame down: `q` is `0x...4F8C` with no arguments and `0x...4F5C` with two. Globals **do not** move, because the linker fixed them.

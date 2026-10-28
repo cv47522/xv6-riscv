@@ -29,7 +29,7 @@ Derive the first exercise of MIT's [util lab](https://pdos.csail.mit.edu/6.1810/
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | **Program**            | Write `user/sleep.c`; its host build product `user/_sleep` enters `fs.img` as the guest command `sleep`.               |
 | **Input**              | One command-line argument containing a decimal tick count.                                                             |
-| **Waiting**            | Pass the requested tick count to `pause`; do not poll or count in user space.                                          |
+| **Waiting**            | Pass the requested tick count to `pause`; **do not** poll or count in user space.                                      |
 | **Missing argument**   | Print a diagnostic and finish so the shell can continue. This is an exercise requirement; see the grader limits below. |
 | **Available APIs**     | Use `user/user.h`; there is no host C library.                                                                         |
 | **Build registration** | Add `$U/_sleep` to `UPROGS`; this tree already contains the entry.                                                     |
@@ -46,7 +46,7 @@ The four tests in [`grade-lab-util`](../../grade-lab-util) total **25 points**. 
 | **`sleep, makes syscall`**                    | 10     | `sleep 10`, then `echo FAIL`          | `\$ sleep 10`  | `FAIL`                         |
 | **`sleep, zero and non-numeric args return`** | 5      | `sleep 0`, `sleep z`, then `echo OK0` | `^OK0$`        | `exec .* failed`               |
 
-Only **makes syscall** installs a breakpoint: `stop_breakpoint('sys_pause')` stops the guest at handler entry. The shell's `echo FAIL` can run only after another prompt, so it never runs when the breakpoint stops the test. [The monitor walkthrough under Grader internals](#grader-internals) explains how the harness stops and destroys QEMU.
+Only **makes syscall** installs a breakpoint: `stop_breakpoint('sys_pause')` stops the guest at handler entry. The shell's `echo FAIL` can run only after another prompt, so it **never** runs when the breakpoint stops the test. [The monitor walkthrough under Grader internals](#grader-internals) explains how the harness stops and destroys QEMU.
 
 ### What the grader does not prove
 
@@ -122,7 +122,7 @@ xv6 has no signals, so Linux's signal-based contract does not apply. Each kernel
 > [!NOTE]
 > Only `user/sleep.c` is new. The four layers already exist; read them without changing them for this exercise.
 
-`user/_sleep` runs inside the xv6 guest, so its `ecall` reaches xv6 rather than the host Linux kernel. Host glibc wrappers cannot supply the missing service under `-ffreestanding -nostdlib`; [docs 06](../06-build-artifacts.md#why-you-cannot-use-the-hosts-headers) explains the header and linking failures and [maps the layers onto Linux](../06-build-artifacts.md#where-each-piece-would-live-on-linux).
+`user/_sleep` runs inside the xv6 guest, so its `ecall` reaches xv6 rather than the host Linux kernel. Host glibc wrappers **cannot** supply the missing service under `-ffreestanding -nostdlib`; [docs 06](../06-build-artifacts.md#why-you-cannot-use-the-hosts-headers) explains the header and linking failures and [maps the layers onto Linux](../06-build-artifacts.md#where-each-piece-would-live-on-linux).
 
 ### Names before mechanisms
 
@@ -189,11 +189,11 @@ The C call reaches a user-space stub. Hardware crosses the privilege boundary at
 
 A call to `pause()` and a call to `atoi()` look identical in C and compile to the same `jal` instruction. The difference is what the callee does: `atoi()` in `user/ulib.c` computes and returns in user mode, while `pause` in `user/usys.S` executes `ecall`.
 
-A user program cannot simply `jal sys_pause`, for three reasons that together are the point of a system call:
+A user program **cannot** simply `jal sys_pause`, for three reasons that together are the point of a system call:
 
-1. **Privilege.** `sys_pause()` runs code that needs S-mode, such as sleeping on the scheduler, and U-mode cannot raise its own privilege.
-2. **Mapping.** A process's page table does not map the kernel image at all; `uservec` switches to the separate kernel page table before calling C. The only kernel pages a user page table contains, the trampoline and the trapframe, lack `PTE_U` (`proc_pagetable()` in `kernel/proc.c`), so U-mode cannot touch even those.
-3. **Entry point control.** `ecall` always lands at the address in `stvec`, which only the kernel can set. A user program can ask for a service by number; it can never choose where in the kernel to start executing.
+1. **Privilege.** `sys_pause()` runs code that needs S-mode, such as sleeping on the scheduler, and U-mode **cannot** raise its own privilege.
+2. **Mapping.** A process's page table does not map the kernel image at all; `uservec` switches to the separate kernel page table before calling C. The only kernel pages a user page table contains, the trampoline and the trapframe, lack `PTE_U` (`proc_pagetable()` in `kernel/proc.c`), so U-mode **cannot** touch even those.
+3. **Entry point control.** `ecall` **always** lands at the address in `stvec`, which only the kernel can set. A user program can ask for a service by number; it can **never** choose where in the kernel to start executing.
 
 `ecall` is one kind of **trap**. The same `uservec` and `usertrap()` path also handles device interrupts and exceptions such as page faults, and `usertrap()` tells them apart through `scause`: `8` is an environment call from U-mode, `13` and `15` are load and store page faults, and `devintr()` recognizes interrupt causes.
 
@@ -206,9 +206,9 @@ A user program cannot simply `jal sys_pause`, for three reasons that together ar
 | **`a6`**      | Unused by every xv6 system call   | Saved and restored like any register                                                               | Restored unchanged          |
 | **`a7`**      | `SYS_pause` = 13, set by the stub | `syscall()` reads `trapframe->a7` to index `syscalls[]`                                            | Restored, still 13          |
 
-`a0` does double duty because the RISC-V calling convention already uses it for both the first argument and the return value. The C caller placed `n` in `a0` before the stub ran, and the caller will read the result from `a0` after the stub's `ret`, so the stub never moves either value. `a7` is the argument register the six-argument channel leaves free; [`06-build-artifacts.md`](../06-build-artifacts.md#why-the-system-call-number-goes-in-a7) owns the full reasoning.
+`a0` does double duty because the RISC-V calling convention already uses it for both the first argument and the return value. The C caller placed `n` in `a0` before the stub ran, and the caller will read the result from `a0` after the stub's `ret`, so the stub **never** moves either value. `a7` is the argument register the six-argument channel leaves free; [`06-build-artifacts.md`](../06-build-artifacts.md#why-the-system-call-number-goes-in-a7) owns the full reasoning.
 
-The widths differ at each end. The register and the trapframe slot are 64-bit; `argint()` truncates to `int`, and `sys_pause()` returns `uint64`, which the user-side declaration `int pause(int)` reads back as `int`. That round trip is why a handler's `return -1`, such as a failing `sys_read()`, arrives as the user `int` value `-1`. The **killed path** in the handler walkthrough below explains why `sys_pause()`'s own `-1` never reaches user code.
+The widths differ at each end. The register and the trapframe slot are 64-bit; `argint()` truncates to `int`, and `sys_pause()` returns `uint64`, which the user-side declaration `int pause(int)` reads back as `int`. That round trip is why a handler's `return -1`, such as a failing `sys_read()`, arrives as the user `int` value `-1`. The **killed path** in the handler walkthrough below explains why `sys_pause()`'s own `-1` **never** reaches user code.
 
 ### The stub
 
@@ -234,7 +234,7 @@ The widths differ at each end. The register and the trapframe slot are 64-bit; `
 | **Per process**                      | `p->trapframe` in `struct proc`, `kernel/proc.h`                                                    |
 | **Fixed virtual address**            | `TRAPFRAME = TRAMPOLINE - PGSIZE`, `kernel/memlayout.h`                                             |
 | **Kernel-only mapping**              | `PTE_R \| PTE_W` without `PTE_U`, `proc_pagetable()` in `kernel/proc.c`                             |
-| **Independent of user stack**        | Entry must work even with a garbage user `sp`.                                                      |
+| **Independent of user stack**        | Entry **must** work even with a garbage user `sp`.                                                  |
 | **Kernel fields and user registers** | `prepare_return()` fills the kernel fields; `uservec`/`userret` save/restore the 31 user registers. |
 
 The per-process allocation prevents one process's trap from overwriting a sleeping process's registers. On entry, `uservec` has no free register: it parks user `a0` in `sscratch`, then loads the fixed `TRAPFRAME` address to reach the save area. Keeping that page inaccessible to U-mode prevents user code from reading or forging `kernel_satp`, `kernel_sp`, and `kernel_trap`, which entry code trusts.
@@ -288,7 +288,7 @@ flowchart TD
     class S,X failure
 ```
 
-The loop is “snapshot, wait, recheck.” Here, unlocking means releasing `tickslock`. `sleep()` tests the registered channel under `p->lock`: if `wakeup()` already cleared it, the process does not block; otherwise, it sleeps until made runnable. Publishing `&ticks` before unlocking closes the lost-wakeup gap. Both paths reacquire `tickslock` before rechecking the deadline. Red marks a deliberate stall as well as the killed path; it does not always mean failure.
+The loop is “snapshot, wait, recheck.” Here, unlocking means releasing `tickslock`. `sleep()` tests the registered channel under `p->lock`: if `wakeup()` already cleared it, the process does not block; otherwise, it sleeps until made runnable. Publishing `&ticks` before unlocking closes the lost-wakeup gap. Both paths reacquire `tickslock` before rechecking the deadline. Red marks a deliberate stall as well as the killed path; it does not **always** mean failure.
 
 The helper functions `sleep_prepare()`, `sleep()`, `wakeup()`, and `kkill()` live in [`kernel/proc.c`](../../kernel/proc.c). Hart 0 supplies timer wakeups through `clockintr()` in [`kernel/trap.c`](../../kernel/trap.c). For the side-by-side view of that global counter and one waiting process, [view the SVG](fig/util-sleep-tick-wait.svg) or open [the editable Excalidraw drawing](fig/util-sleep-tick-wait.excalidraw) in Excalidraw. These drawings supplement the inline explanation; use the source quotation below for the complete handler and its edge cases.
 
@@ -326,11 +326,11 @@ sys_pause(void)
 | `argint(0, &n)`                    | Reads argument zero from saved `a0`; see [register roles](#a0-versus-a7).                                                                              |
 | **Negative clamp**                 | Prevents a negative `int` from becoming a huge unsigned wait.                                                                                          |
 | **Shared counter, local snapshot** | `tickslock` protects `ticks`; `ticks0` belongs to this invocation. Both global symbols are defined in `kernel/trap.c` and declared in `kernel/defs.h`. |
-| `while (ticks - ticks0 < n)`       | Every tick wakes all waiters on `&ticks`; each must recheck its own condition. Unsigned subtraction handles counter wraparound.                        |
+| `while (ticks - ticks0 < n)`       | Every tick wakes all waiters on `&ticks`; each **must** recheck its own condition. Unsigned subtraction handles counter wraparound.                    |
 | **Prepare before releasing**       | A wakeup in the gap is remembered by clearing the channel; `sleep()` then returns without blocking.                                                    |
 | **Reacquire before rechecking**    | Every elapsed-tick check runs under `tickslock`.                                                                                                       |
 
-**Killed path:** `kkill()` in [`kernel/proc.c`](../../kernel/proc.c) makes a sleeping victim runnable. The handler may return `-1`, but `usertrap()` in [`kernel/trap.c`](../../kernel/trap.c) sees the kill flag and calls `kexit(-1)` before user-mode return. User code cannot observe or recover from that `-1`.
+**Killed path:** `kkill()` in [`kernel/proc.c`](../../kernel/proc.c) makes a sleeping victim runnable. The handler may return `-1`, but `usertrap()` in [`kernel/trap.c`](../../kernel/trap.c) sees the kill flag and calls `kexit(-1)` before user-mode return. User code **cannot** observe or recover from that `-1`.
 
 The [chapter 9 figure and divergence](../book/ch09-sleep-and-wakeup.md#figures) explain the general prepare/sleep mechanism. The chapter body is still a placeholder; this note keeps the `sys_pause`-specific invariants here.
 
@@ -372,7 +372,7 @@ Every hart takes timer interrupts and may `yield()`, but only hart 0 advances th
 > [!TIP]
 > Use `make CPUS=1 qemu-gdb` when stepping through the trap path. GDB then has one hart to follow, with no other hart executing between your steps.
 
-A hart is neither a process nor a user-level software thread; a physical core may implement several harts. The trapframe follows the process rather than the hart: `sys_pause()` can sleep on hart 1 and resume on hart 2, so the saved user registers must travel with the process, not stay with the hardware.
+A hart is neither a process nor a user-level software thread; a physical core may implement several harts. The trapframe follows the process rather than the hart: `sys_pause()` can sleep on hart 1 and resume on hart 2, so the saved user registers **must** travel with the process, not stay with the hardware.
 
 ## Kernel or user: where code belongs
 
@@ -425,11 +425,11 @@ A hart is neither a process nor a user-level software thread; a physical core ma
 | **Using `printf` for diagnostics**             | Writes to standard output.                                             | Use descriptor 2 to separate diagnostics.                                                                 |
 | **Treating conversion result zero as invalid** | Rejects valid `0` without distinguishing malformed input.              | Read the `atoi()` contract above.                                                                         |
 | **Converting ticks to seconds**                | Scales the requested wait incorrectly.                                 | The syscall already accepts ticks.                                                                        |
-| **Polling `uptime()`**                         | Keeps the process runnable and never reaches `sys_pause`.              | Use kernel-managed waiting.                                                                               |
-| **Omitting `UPROGS`**                          | The shell cannot execute a command missing from `fs.img`.              | This tree already registers `$U/_sleep`.                                                                  |
+| **Polling `uptime()`**                         | Keeps the process runnable and **never** reaches `sys_pause`.          | Use kernel-managed waiting.                                                                               |
+| **Omitting `UPROGS`**                          | The shell **cannot** execute a command missing from `fs.img`.          | This tree already registers `$U/_sleep`.                                                                  |
 | **Using host-library APIs**                    | Missing headers, link failures, or silently incompatible declarations. | [Host-header pitfalls](../06-build-artifacts.md#why-you-cannot-use-the-hosts-headers); use `user/user.h`. |
 
-With no supplied argument, `argv[1]` is the argument vector's null terminator. A fault there can still leave the shell able to execute `echo OK`, which is why the return test cannot stand in for checking the diagnostic yourself.
+With no supplied argument, `argv[1]` is the argument vector's null terminator. A fault there can still leave the shell able to execute `echo OK`, which is why the return test **cannot** stand in for checking the diagnostic yourself.
 
 ## Verifying it
 
@@ -506,7 +506,7 @@ For a stronger check, inspecting the decoded argument is deterministic and, toge
 > `make: 'kernel/kernel' is up to date.` reports that the preflight kernel link needed no work. It does not mean QEMU was skipped, a result was reused, or the grader compared program output already.
 
 1. `run_tests()` calls `gradelib.make()` before filtering test titles, including `sleep`.
-2. Plain `make` uses this Makefile's default target, `kernel/kernel`; if its prerequisites do not require an update, it prints that status.
+2. Plain `make` uses this Makefile's default target, `kernel/kernel`; if its prerequisites **do not** require an update, it prints that status.
 3. Each selected test then starts `qemu-gdb` through `make -s --no-print-directory`, which still updates dependencies such as `fs.img` when needed.
 
 #### Why two tests can have the same Python function name
@@ -527,7 +527,7 @@ The repeated name is still misleading. `register_test()` copies the original fun
 **The monitor uses a small remote-GDB client.** It does not launch the interactive `gdb` command:
 
 1. `Runner.run_qemu()` turns its default target base `qemu` into `qemu-gdb`, whose Makefile recipe starts QEMU halted with `-S` and exposes its GDB stub. `GDBClient` connects to the port returned by `make print-gdbport`.
-2. `shell_script()` watches QEMU output for each `$ ` prompt. It sends `sleep 10` at the first prompt; it can send `echo FAIL` only if another prompt appears.
+2. `shell_script()` watches QEMU output for each `$ ` prompt. It sends `sleep 10` at the first prompt; it can send `echo FAIL` **only if** another prompt appears.
 3. `stop_breakpoint('sys_pause')` scans `kernel/kernel.sym`, parses the address on the line whose symbol equals `sys_pause`, and passes that address to `GDBClient.breakpoint()`.
 4. `breakpoint()` sends remote-protocol packet `Z1,<address>,1`, requesting a hardware breakpoint, and `cont()` later sends `c` to continue the halted machine.
 5. When execution reaches `sys_pause`, QEMU sends a stop-reply packet beginning with `T05`, where signal 5 is the remote protocol's trap stop. `GDBClient.handle_read()` responds by raising `TerminateTest`, and `Runner.__react()` catches that private control-flow exception and ends its event loop.
@@ -566,7 +566,7 @@ Each later lab branch in this repository's `labs` remote builds on one part of t
 
 1. Why does `sys_pause(void)` receive no C parameter when `pause(int)` does, and where is the integer stored across the trap?
 2. What failure occurs if the program reads `argv[1]` when only `argv[0]` exists?
-3. Why must the wait condition be a `while` rather than an `if` when two processes request different delays?
+3. Why **must** the wait condition be a `while` rather than an `if` when two processes request different delays?
 4. How does registering `&ticks` before releasing `tickslock` prevent a lost wakeup?
 5. What happens from `kkill()` through `usertrap()` when the target is already sleeping in `sys_pause()`?
 6. Why does unsigned subtraction handle tick-counter wraparound while a comparison against `ticks0 + n` may not?

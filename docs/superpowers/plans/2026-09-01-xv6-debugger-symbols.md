@@ -444,7 +444,7 @@ At the end of the paragraph after the interactive kernel breakpoint transcript i
 The reusable [console setup and VS Code workflow](../02-build-boot-and-usage.md#debugging-with-vs-code) explain debugger startup, controls, and cleanup; [manually debugging an xv6 user program](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) explains why the existing `sleep.c` breakpoint is unresolved and how to stop at `sleep.c:main` without changing `.vscode`.
 ```
 
-Do not alter the user's current changes to the test and observation table delimiter widths.
+**Do not** alter the user's current changes to the test and observation table delimiter widths.
 
 - [x] **Step 4: Verify navigation targets and preservation of the pre-existing diff**
 

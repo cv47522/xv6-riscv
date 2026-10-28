@@ -142,7 +142,7 @@ The following recipe adds `user/_sleep` to the existing kernel-debugging session
     0x4fe0: "10"
     ```
 
-    Stack and string addresses vary after a rebuild, but the source file, argument count, and argument text should agree. A user backtrace is reliable through `main` and `start`; do not interpret frames beyond the saved entry context as kernel callers because the user-to-kernel transition happens only when the program executes a system-call stub.
+    Stack and string addresses vary after a rebuild, but the source file, argument count, and argument text should agree. A user backtrace is reliable through `main` and `start`; **do not** interpret frames beyond the saved entry context as kernel callers because the user-to-kernel transition happens only when the program executes a system-call stub.
 
 7. Remove the temporary breakpoint and user symbols before returning to kernel-only debugging:
 

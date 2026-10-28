@@ -6,7 +6,7 @@
 
 ---
 
-The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) suggests, among other improvements, "modify the shell to support wait", rated easy. In a Unix shell, `wait` blocks until background jobs started with `&` have finished. This note explains why the existing `user/sh.c` cannot do that at all, which is the whole difficulty, and leaves the change to the reader.
+The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) suggests, among other improvements, "modify the shell to support wait", rated easy. In a Unix shell, `wait` blocks until background jobs started with `&` have finished. This note explains why the existing `user/sh.c` **cannot** do that at all, which is the whole difficulty, and leaves the change to the reader.
 
 > [!IMPORTANT]
 > No solution or pseudocode. `user/sh.c` is quoted only as it stands unmodified in this tree; [the prompt note](08-util-sh-prompt.md) records that quoting rule and the other shell notes. Kernel quotations are not targets.
@@ -149,7 +149,7 @@ _Legend: blue marks long-lived processes, yellow the processes `&` creates, and 
 > [!IMPORTANT]
 > **The shell can wait only for processes it forked itself.** As long as `&` is implemented by an intermediate child, a `wait` builtin in the shell finds no children and returns `-1` at once, however many jobs are running.
 
-That rule creates the second constraint. Once background jobs are the shell's own children, `main()`'s foreground `wait(0)` can return a finished background job instead of the foreground command, because `kwait()` returns whichever child it finds first. The shell would then prompt while the foreground command is still running. A design that makes jobs direct children must also decide which pid each wait is for.
+That rule creates the second constraint. Once background jobs are the shell's own children, `main()`'s foreground `wait(0)` can return a finished background job instead of the foreground command, because `kwait()` returns whichever child it finds first. The shell would then prompt while the foreground command is still running. A design that makes jobs direct children **must** also decide which pid each wait is for.
 
 ## Deriving it
 
@@ -158,15 +158,15 @@ That rule creates the second constraint. Once background jobs are the shell's ow
 | Decision for `user/sh.c`                 | Source-backed question to settle                                                                                                                                            |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Recognize the command**                | `main()` matches `cd` only when it is followed by a space. What does the buffer hold when a user types `wait` alone, and where does the newline sit?                        |
-| **Run it in the right process**          | Which process must call `wait()` for it to find the jobs, and why does the `cd` comment's reasoning apply?                                                                  |
-| **Make jobs children of the shell**      | Where must the fork for `&` happen? Which information does `main()` need before it forks, given that `parsecmd()` currently runs in the child?                              |
+| **Run it in the right process**          | Which process **must** call `wait()` for it to find the jobs, and why does the `cd` comment's reasoning apply?                                                              |
+| **Make jobs children of the shell**      | Where **must** the fork for `&` happen? Which information does `main()` need before it forks, given that `parsecmd()` currently runs in the child?                          |
 | **Parse safely**                         | `parsecmd()` and its helpers call `panic()`, which calls `exit(1)`. What happens to the shell if a parse error occurs in the parent?                                        |
-| **Keep foreground commands synchronous** | Which pid does a foreground `wait` need, and what must happen to a background job reaped while waiting for it?                                                              |
+| **Keep foreground commands synchronous** | Which pid does a foreground `wait` need, and what **must** happen to a background job reaped while waiting for it?                                                          |
 | **Scope `&`**                            | `a & ; b` and `(a &)` run their `BACK` inside further children created by `LIST` and `parseblock()`. Which of these will your `wait` cover, and will you document the rest? |
 
 | Trap                                                    | Observable consequence                                                                                       | Source to inspect                                                                     |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| **Adding `wait` only as a builtin**                     | It always returns immediately: the jobs already belong to `init`.                                            | `reparent()` in [`kernel/proc.c`](../../kernel/proc.c)                                |
+| **Adding `wait` only as a builtin**                     | It **always** returns immediately: the jobs already belong to `init`.                                        | `reparent()` in [`kernel/proc.c`](../../kernel/proc.c)                                |
 | **Running `wait` in a forked child**                    | The child has no children of its own, so `wait()` returns `-1`.                                              | `kwait()` in [`kernel/proc.c`](../../kernel/proc.c)                                   |
 | **Matching `"wait "` with a trailing space**            | Plain `wait` falls through to `exec`, which prints `exec wait failed`.                                       | `main()` in [`user/sh.c`](../../user/sh.c)                                            |
 | **Ignoring the pid from the foreground `wait`**         | A finished background job releases the prompt early, and the grader may type the next command too soon.      | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-harness-depends-on-the-prompt)      |
@@ -193,7 +193,7 @@ That rule creates the second constraint. Once background jobs are the shell's ow
     echo foreground-done
     ```
 
-    With the change, the first `wait` should hold the prompt until the job exits, and the second should return at once. In the last three lines, `foreground-done` must not appear before the five-tick `sleep` has finished, even though the background job is also a child. `Ctrl-p` lists pid, state, and name only, not the parent; a job that should be waited for shows as `sleep` in state `sleep` or `zombie`.
+    With the change, the first `wait` should hold the prompt until the job exits, and the second should return at once. In the last three lines, `foreground-done` **must not** appear before the five-tick `sleep` has finished, even though the background job is also a child. `Ctrl-p` lists pid, state, and name only, not the parent; a job that should be waited for shows as `sleep` in state `sleep` or `zombie`.
 
 3. Quit QEMU with `Ctrl-a x`, then run the suite as the foreground-ordering regression check:
 
@@ -231,7 +231,7 @@ To observe the reparenting directly, stop in the kernel when the intermediate ch
     finish
     ```
 
-The breakpoint is set after boot so that unrelated exits during startup do not stop it. `reparent()` is also called by every later `exit`, so compare `p->pid` with the pids `Ctrl-p` printed. [Docs 09](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) covers stopping in user code instead.
+The breakpoint is set after boot so that unrelated exits during startup **do not** stop it. `reparent()` is also called by every later `exit`, so compare `p->pid` with the pids `Ctrl-p` printed. [Docs 09](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) covers stopping in user code instead.
 
 ## Questions
 

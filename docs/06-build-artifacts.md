@@ -6,7 +6,7 @@
 
 ---
 
-What every file extension in this tree is, who produces it, and why an operating system needs four kinds of file that an ordinary C program never does.
+What every file extension in this tree is, who produces it, and why an operating system needs four kinds of file that an ordinary C program **never** does.
 
 > [!NOTE]
 > The generic four-stage pipeline — preprocess, compile, assemble, link — is already covered in [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md), along with `.o` files, `.d` files, and Makefile mechanics. This page does not re-explain any of it. It covers what is different here, and why.
@@ -36,7 +36,7 @@ Supporting files that are not part of the compile at all:
 | -------------------------------------------------- | ------------------------------------------------------------------- |
 | `gradelib.py`, `test-xv6.py`                       | MIT's grading harness and this repo's CI driver; run on the host    |
 | `grade-lab-*`, `grade-exercises`                   | Python test scripts, extensionless because they are run as commands |
-| `user/findtest.sh`, `sixfive.txt`, `sf-*`          | Lab fixtures copied into `fs.img` as data, never compiled           |
+| `user/findtest.sh`, `sixfive.txt`, `sf-*`          | Lab fixtures copied into `fs.img` as data, **never** compiled       |
 | `.github/workflows/test.yml`                       | CI definition                                                       |
 | `.clang-format`, `.editorconfig`, `.dir-locals.el` | Editor and formatter configuration                                  |
 
@@ -70,14 +70,14 @@ flowchart TD
 
 ## Why a header cannot do these jobs
 
-A `.h` file does exactly one thing: it is text pasted into a `.c` before compilation. Everything else follows from that. It can _declare_ — promise that a symbol exists somewhere — but it cannot define machine code that C has no syntax for, it cannot say where anything lands in memory, and it cannot record a fact discovered while the build ran.
+A `.h` file does exactly one thing: it is text pasted into a `.c` before compilation. Everything else follows from that. It can _declare_ — promise that a symbol exists somewhere — but it **cannot** define machine code that C has no syntax for, it **cannot** say where anything lands in memory, and it **cannot** record a fact discovered while the build ran.
 
 | The job                                                         | Why a `.h` cannot do it                                                                                                                    | What does it here                    |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
 | **Save 14 registers and switch stacks mid-function**            | The compiler owns register allocation and writes its own prologue and epilogue. C has no way to say "swap `sp` and return somewhere else". | `kernel/swtch.S`                     |
 | **Execute `ecall`, `sret`, or write the `satp` register**       | No C construct emits these. They are the instructions that change privilege level and address space.                                       | `kernel/trampoline.S`, `user/usys.S` |
 | **Run before a stack exists**                                   | C code needs `sp` already valid. `_entry` is the code that makes it valid.                                                                 | `kernel/entry.S`                     |
-| **Define 22 near-identical trap stubs**                         | `user/user.h` can _declare_ all 22 — and does. It cannot define them, because the definition is four machine instructions.                 | `user/usys.pl` → `user/usys.S`       |
+| **Define 22 near-identical trap stubs**                         | `user/user.h` can _declare_ all 22 — and does. It **cannot** define them, because the definition is four machine instructions.             | `user/usys.pl` → `user/usys.S`       |
 | **Put the kernel at `0x80000000` and export `etext` and `end`** | Addresses are the linker's business. No C declaration names a load address.                                                                | `kernel/kernel.ld`, `user/user.ld`   |
 | **Record which headers each `.o` really used**                  | That is a fact about a compile that already happened, not something you could write in advance.                                            | `gcc -MD` → `.d`                     |
 | **Show what the compiler actually generated**                   | It is output, not input.                                                                                                                   | `objdump -S` → `.asm`                |
@@ -98,7 +98,7 @@ fork:
  ret
 ```
 
-and write `SYS_fork` rather than the literal `1`. With a lower-case `.s` the preprocessor never runs, `#include` is meaningless, and every call number would have to be hand-copied — free to drift the moment someone renumbers `kernel/syscall.h`.
+and write `SYS_fork` rather than the literal `1`. With a lower-case `.s` the preprocessor **never** runs, `#include` is meaningless, and every call number would have to be hand-copied — free to drift the moment someone renumbers `kernel/syscall.h`.
 
 ### Why generate `usys.S` instead of writing it
 
@@ -131,7 +131,7 @@ fork:             # a label: the address that the name `fork` refers to
  ret              # return to whoever called fork()
 ```
 
-What is _absent_ matters as much as what is present: the stub never touches `a0` through `a5`. The C caller already left the arguments there, following the calling convention, and `ecall` does not disturb them — so the kernel finds them exactly where it expects. The stub's only job is to say _which_ system call this is.
+What is _absent_ matters as much as what is present: the stub **never** touches `a0` through `a5`. The C caller already left the arguments there, following the calling convention, and `ecall` does not disturb them — so the kernel finds them exactly where it expects. The stub's only job is to say _which_ system call this is.
 
 ### Instructions
 
@@ -263,7 +263,7 @@ sequenceDiagram
 
 **ELF** — **E**xecutable and **L**inkable **F**ormat — is the container Unix systems have used since the early 1990s for object files, shared libraries, and executables. Every `.o` in this tree is an ELF file, and so is `kernel/kernel`, and so is every `user/_name`.
 
-The useful mental image is a shipping container with a packing list bolted to the door. The cargo is machine code and initialized data. The packing list — the ELF headers — records where each crate must be unloaded to, how large it is, whether it may be written or executed, and which crate to open first.
+The useful mental image is a shipping container with a packing list bolted to the door. The cargo is machine code and initialized data. The packing list — the ELF headers — records where each crate **must** be unloaded to, how large it is, whether it may be written or executed, and which crate to open first.
 
 `readelf -h kernel/kernel` prints the cover page of that list:
 
@@ -284,7 +284,7 @@ Four of those fields carry the story:
 | --------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Magic**       | `7f 45 4c 46` = `\x7F` `E` `L` `F` | The four bytes every ELF file starts with. `kernel/elf.h` calls this `ELF_MAGIC` and `kernel/exec.c` rejects anything else                               |
 | **Type**        | `EXEC`                             | A fixed-address executable, not a `DYN`/PIE one. Nothing relocates it at load time because there is no dynamic loader — hence `-fno-pie` in the Makefile |
-| **Machine**     | `RISC-V`                           | Output of the cross compiler. Your x86 host cannot execute a byte of it                                                                                  |
+| **Machine**     | `RISC-V`                           | Output of the cross compiler. Your x86 host **cannot** execute a byte of it                                                                              |
 | **Entry point** | `0x80000000`                       | The address of `_entry`, put there by `ENTRY( _entry )` in `kernel/kernel.ld`                                                                            |
 
 After the header come the **program headers**, one per segment, and they are the part a loader actually acts on. `readelf -lW kernel/kernel` shows three, of which exactly one is loadable:
@@ -300,7 +300,7 @@ After the header come the **program headers**, one per segment, and they are the
 
 ### Why xv6 parses ELF itself
 
-`kernel/elf.h` re-declares the format in about 40 lines, and `kexec()` in `kernel/exec.c` walks it by hand. This is not gratuitous duplication of the host's `<elf.h>`: `exec()` runs inside the kernel, reading a file out of `fs.img`, on a machine with no library and no loader beneath it. Anything it needs, it must contain.
+`kernel/elf.h` re-declares the format in about 40 lines, and `kexec()` in `kernel/exec.c` walks it by hand. This is not gratuitous duplication of the host's `<elf.h>`: `exec()` runs inside the kernel, reading a file out of `fs.img`, on a machine with no library and no loader beneath it. Anything it needs, it **must** contain.
 
 The loop is short enough to follow in one read:
 
@@ -313,7 +313,7 @@ The loop is short enough to follow in one read:
 | `uvmalloc` + `loadseg` at `ph.vaddr`      | Allocate pages in the new page table and copy the segment in                              |
 | `p->trapframe->epc = elf.entry`           | Set the initial PC, so `sret` lands on `start()` in `user/ulib.c` rather than on `main()` |
 
-xv6 uses a fraction of the format and ignores the rest. There is no dynamic linking, no relocation processing, no runtime symbol resolution, and no interpreter — the `.debug_*` and `.symtab` sections that `mkfs` faithfully copies into `fs.img` are simply never looked at by the kernel. They exist for `objdump`, which brings us to the next two files.
+xv6 uses a fraction of the format and ignores the rest. There is no dynamic linking, no relocation processing, no runtime symbol resolution, and no interpreter — the `.debug_*` and `.symtab` sections that `mkfs` faithfully copies into `fs.img` are simply **never** looked at by the kernel. They exist for `objdump`, which brings us to the next two files.
 
 ### `.asm` versus `.sym`
 
@@ -330,7 +330,7 @@ Both are produced from the same ELF on every link, both are pure output, and the
 
 ### What a panic is, and what it prints
 
-**`panic()`** is the kernel's assert. It is what the kernel calls when it detects a condition it has no defined way to continue from — a buffer cache with no free buffers, a log write outside a transaction, a trap it cannot attribute to any device. All of [`kernel/printk.c`](../kernel/printk.c):
+**`panic()`** is the kernel's assert. It is what the kernel calls when it detects a condition it has no defined way to continue from — a buffer cache with no free buffers, a log write outside a transaction, a trap it **cannot** attribute to any device. All of [`kernel/printk.c`](../kernel/printk.c):
 
 ```c
 void
@@ -351,7 +351,7 @@ panic(char *s)
 | Set `panicked`, which parks every _other_ hart forever inside `uartputc_sync` ([`kernel/uart.c`](../kernel/uart.c)) so nothing can overwrite the message | Reboot, unwind, or return — it is `__attribute__((noreturn))` in `kernel/defs.h` and ends in `for(;;);` |
 | Stop the machine dead while leaving QEMU running, so gdb can still attach                                                                                    | Kill only the faulting process. A panic is the entire kernel giving up                                  |
 
-There are 62 `panic()` call sites across 13 files in `kernel/`, and the string is always a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
+There are 62 `panic()` call sites across 13 files in `kernel/`, and the string is **always** a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
 
 ```bash
 $ grep -rn 'panic("bget: no buffers")' kernel/
@@ -448,9 +448,9 @@ Three places have to agree on it, and a mismatch in any one produces a machine t
 Two consequences that look unrelated until you know the address:
 
 - **`-mcmodel=medany`.** The default RISC-V code model, `medlow`, assumes every symbol sits within ±2 GiB of address 0. The kernel's symbols sit _at_ 2 GiB and above, so they are unreachable that way. `medany` emits PC-relative references instead, which work wherever the code is placed. That is the entire reason for the flag in `CFLAGS`.
-- **`-m 128M`.** `QEMUOPTS` gives the machine 128 MiB, and `PHYSTOP` is `KERNBASE + 128 * 1024 * 1024`. Raise one without the other and `kalloc` will hand out pages that do not exist.
+- **`-m 128M`.** `QEMUOPTS` gives the machine 128 MiB, and `PHYSTOP` is `KERNBASE + 128 * 1024 * 1024`. Raise one without the other and `kalloc` will hand out pages that **do not** exist.
 
-User programs are a separate story, and the contrast is the clearest illustration of what a page table buys you. `user/user.ld` starts at `. = 0x0;` — every user program is linked at virtual address zero, and they all get it, because each process has its own page table and `kexec()` maps its segments into a fresh empty address space. Only physical addresses have to be unique; virtual ones do not.
+User programs are a separate story, and the contrast is the clearest illustration of what a page table buys you. `user/user.ld` starts at `. = 0x0;` — every user program is linked at virtual address zero, and they all get it, because each process has its own page table and `kexec()` maps its segments into a fresh empty address space. Only physical addresses have to be unique; virtual ones **do not**.
 
 ## Why you cannot use the host's headers
 
@@ -495,7 +495,7 @@ $ dpkg -S /usr/riscv64-linux-gnu/include/unistd.h
 libc6-dev-riscv64-cross: /usr/riscv64-linux-gnu/include/unistd.h
 ```
 
-Installing it deliberately would be `sudo apt-get install libc6-dev-riscv64-cross`, and you will almost never need to: apt honours `Recommends` by default, so the cross compiler brings the sysroot along. Only an install run with `--no-install-recommends` would leave it out. That is not a nuisance either — a cross compiler with no target C library would be useless for every purpose except this one. It is simply the reason the next section is surprising.
+Installing it deliberately would be `sudo apt-get install libc6-dev-riscv64-cross`, and you will almost **never** need to: apt honours `Recommends` by default, so the cross compiler brings the sysroot along. Only an install run with `--no-install-recommends` would leave it out. That is not a nuisance either — a cross compiler with no target C library would be useless for every purpose except this one. It is simply the reason the next section is surprising.
 
 ### The surprise: it compiles
 
@@ -520,7 +520,7 @@ undefined reference to `perror'
 undefined reference to `stdout'
 ```
 
-Those five have no implementation, because glibc is never linked in. But look at what is _missing_ from that list — `fork`, `getpid`, `wait`, and `exit` all resolved. They resolved to xv6's own stubs in `user/usys.S`, reached through **glibc's declarations**.
+Those five have no implementation, because glibc is **never** linked in. But look at what is _missing_ from that list — `fork`, `getpid`, `wait`, and `exit` all resolved. They resolved to xv6's own stubs in `user/usys.S`, reached through **glibc's declarations**.
 
 > [!CAUTION]
 > That is the real hazard, and it is worse than a build failure. A program using `#include <stdio.h>` and `int n = printf(...)` — glibc declares `printf` returning `int`, xv6's returns `void` — compiles _and links cleanly_ against `ULIB`, producing a binary that reads a register glibc's prototype promised and xv6's implementation never set. Nothing warns you. The header being absent would be the safe outcome; the header being present and wrong is not.
@@ -585,7 +585,7 @@ Linux gives you a restaurant built around that hatch. xv6 gives you the hatch.
 | **"Why did that come back wrong?"** | `errno`, `perror("fork")`, `strerror`                                  | `-1`. That is the entire message                                          |
 | **The menu**                        | 2,851 functions                                                        | 41                                                                        |
 
-The point of the comparison is that the kitchen and the hatch are identical. Everything glibc adds is front-of-house. When the earlier link error resolved `fork` and `getpid` but not `execlp` and `perror`, that was the analogy playing out precisely: the dishes exist in both kitchens, and the staff who would have found them for you do not.
+The point of the comparison is that the kitchen and the hatch are identical. Everything glibc adds is front-of-house. When the earlier link error resolved `fork` and `getpid` but not `execlp` and `perror`, that was the analogy playing out precisely: the dishes exist in both kitchens, and the staff who would have found them for you **do not**.
 
 > [!NOTE]
 > Do not push it further than that. Real kitchens do not have privilege levels, and the trampoline page — mapped at the same address in every address space so the page-table switch does not saw off the branch it is sitting on — has no counterpart in any restaurant. The analogy is good for locating _which layer_ a missing feature belongs to, and for nothing else.
@@ -627,7 +627,7 @@ The shape is identical; only the fillings differ. Layer by layer:
 | ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | **Where the name is declared** | `<unistd.h>`, shipped with glibc                               | `user/user.h`, a file in this repository                                                          |
 | **What supplies convenience**  | glibc: `$PATH` search, variadic argument lists, buffered stdio | Nothing. `ULIB` is four objects and adds no convenience layer                                     |
-| **The trap stub**              | A glibc wrapper you never see                                  | `user/usys.S`, generated from `user/usys.pl`                                                      |
+| **The trap stub**              | A glibc wrapper you **never** see                              | `user/usys.S`, generated from `user/usys.pl`                                                      |
 | **The instruction**            | `ecall` (or `syscall` on x86-64)                               | `ecall`                                                                                           |
 | **Kernel entry**               | `sys_execve`                                                   | `sys_exec`, which calls `kexec()` in `kernel/exec.c`                                              |
 | **Where the binary is found**  | Your filesystem, via `$PATH`                                   | `fs.img`, by exact name — see [02](02-build-boot-and-usage.md#adding-and-running-a-user-exercise) |
@@ -670,7 +670,7 @@ user/ex1copy.o: user/ex1copy.c kernel/types.h kernel/stat.h user/user.h
 
 The leading `-` means "silently skip if absent", so a freshly cleaned tree with no `.d` files still builds.
 
-`-include` is one of six Make features this build uses that a simple project never needs; the rest are catalogued in [08-makefile-tour.md](08-makefile-tour.md#make-features-this-file-uses-that-a-simple-one-does-not).
+`-include` is one of six Make features this build uses that a simple project **never** needs; the rest are catalogued in [08-makefile-tour.md](08-makefile-tour.md#make-features-this-file-uses-that-a-simple-one-does-not).
 
 > [!CAUTION]
 > Without dependency tracking, editing `kernel/param.h` — where `NPROC`, `NOFILE`, and `USERSTACK` live — would rebuild nothing. `make` would report everything up to date, and you would boot a kernel still compiled with the old constants. That is the worst failure a build system can produce, because it looks exactly like your change having no effect.
@@ -746,7 +746,7 @@ lrwxrwxrwx 1 root root     6 Apr 29  2024 /sbin/mkfs.ext4 -> mke2fs
 -rwxr-xr-x 1 root root 43408 Mar  6 18:00 /sbin/mkfs.minix
 ```
 
-`/sbin/mkfs` is a thin dispatcher from util-linux — `mkfs -t ext4 …` just execs `mkfs.ext4`. The real programs ship per filesystem: `e2fsprogs` provides `mkfs.ext4`, `xfsprogs` provides `mkfs.xfs`, `dosfstools` provides `mkfs.vfat`. xv6's is plain `mkfs/mkfs` because xv6 has exactly one filesystem type and never needed the suffix.
+`/sbin/mkfs` is a thin dispatcher from util-linux — `mkfs -t ext4 …` just execs `mkfs.ext4`. The real programs ship per filesystem: `e2fsprogs` provides `mkfs.ext4`, `xfsprogs` provides `mkfs.xfs`, `dosfstools` provides `mkfs.vfat`. xv6's is plain `mkfs/mkfs` because xv6 has exactly one filesystem type and **never** needed the suffix.
 
 The analogy holds for half of what the tool does, and the half that fails is the interesting one:
 
@@ -816,7 +816,7 @@ Linux's tree runs to tens of millions of lines across those directories. The poi
 
 ## The same build, side by side
 
-The direct answer to "why not just the plain workflow": every row below is a place where having no operating system underneath you changes what the build must produce.
+The direct answer to "why not just the plain workflow": every row below is a place where having no operating system underneath you changes what the build **must** produce.
 
 | Concern             | Ordinary hosted C project            | xv6                                                                                |
 | ------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- |
@@ -824,8 +824,8 @@ The direct answer to "why not just the plain workflow": every row below is a pla
 | **Startup**         | `crt0` from libc runs before `main`  | You write it: `kernel/entry.S`, then `kernel/start.c`                              |
 | **Load address**    | The OS loader chooses                | Fixed at `0x80000000` by `kernel/kernel.ld`; QEMU jumps straight there             |
 | **Library**         | libc, linked automatically           | `ULIB` — four objects you compile, under `-nostdlib -ffreestanding`                |
-| **System calls**    | libc wrappers you never see          | `user/usys.S`, generated from `user/usys.pl`                                       |
-| **Headers**         | System headers plus a few of yours   | 18 shared headers, which is why `.d` files are mandatory here                      |
+| **System calls**    | libc wrappers you **never** see      | `user/usys.S`, generated from `user/usys.pl`                                       |
+| **Headers**         | System headers plus a few of yours   | 18 shared headers, which is why `.d` files are **mandatory** here                  |
 | **Privileged code** | None; the CPU never leaves user mode | Four hand-written `.S` files for traps, context switch, and boot                   |
 | **Debug artifacts** | gdb against the source               | `.asm` and `.sym`, because there is no OS beneath you to ask                       |
 | **Final output**    | One executable                       | A kernel ELF, one user ELF per `UPROGS` entry, and a filesystem image holding them |

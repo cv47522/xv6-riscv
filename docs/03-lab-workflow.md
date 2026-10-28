@@ -90,7 +90,7 @@ MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) 
     git commit -am "wip(util): find walks one directory level"
     ```
 
-4. **Spread the work over multiple days.** Do not start a lab the night before a deadline. A bug in an operating system kernel can manifest in bewildering ways, and understanding one often needs more thinking time than typing time.
+4. **Spread the work over multiple days.** **Do not** start a lab the night before a deadline. A bug in an operating system kernel can manifest in bewildering ways, and understanding one often needs more thinking time than typing time.
 
 Where an exercise needed more understanding than typing, the derivation is written up under [labs/](labs/) — one note per exercise, covering the existing code the exercise forces you to read and the decisions the implementation reduces to, and stopping short of the solution.
 
@@ -134,7 +134,7 @@ Two things to note. Failures leave the full QEMU transcript in `xv6.out.<testnam
 | **30** | `exec` — basic, multiple args, via sh script                                   |
 | **1**  | `time` — reads `time.txt`, the hours you spent                                 |
 
-The last four of those are the 2026 corner tests. They are what a solution that passes the older, looser checks most often fails: a `sleep` that hangs on `sleep 0`, a `sixfive` that cannot read standard input, a `memdump` that reads past the end of short input, and a `find` that recurses into `.` and reports the same file many times.
+The last four of those are the 2026 corner tests. They are what a solution that passes the older, looser checks most often fails: a `sleep` that hangs on `sleep 0`, a `sixfive` that **cannot** read standard input, a `memdump` that reads past the end of short input, and a `find` that recurses into `.` and reports the same file many times.
 
 The last one is why a full-marks run still fails if you have not created `time.txt`. Write a number into it:
 
@@ -155,7 +155,7 @@ git push origin lab-util-done
 
 Tags are not pushed by `git push` alone — they need to be named explicitly, or `git push origin --tags` for all of them.
 
-Afterwards you can always recover that state:
+Afterwards you can **always** recover that state:
 
 ```bash
 git diff lab-util-done                    # everything you have done since
@@ -180,7 +180,7 @@ make clean
 
 In this consolidated repository you work on `study`, not on a branch called `util`, so that check will prompt you to confirm. Answering `y` is correct here.
 
-This matters only if you are submitting to Gradescope as an enrolled student. For self-study, `make grade` is the whole feedback loop.
+This matters **only if** you are submitting to Gradescope as an enrolled student. For self-study, `make grade` is the whole feedback loop.
 
 ## Compatibility note
 

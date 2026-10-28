@@ -6,7 +6,7 @@
 
 ---
 
-The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) lists several improvements to `user/sh.c`. This note covers the first, rated moderate: do not print `$ ` while the shell is reading commands from a file. It also owns the material the other shell notes share: how the grader depends on the prompt, and how these notes quote `user/sh.c`.
+The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) lists several improvements to `user/sh.c`. This note covers the first, rated moderate: **do not** print `$ ` while the shell is reading commands from a file. It also owns the material the other shell notes share: how the grader depends on the prompt, and how these notes quote `user/sh.c`.
 
 | Shell improvement       | Note                                                           |
 | ----------------------- | -------------------------------------------------------------- |

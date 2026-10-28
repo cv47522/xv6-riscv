@@ -35,7 +35,7 @@ The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2
 | When                | Read                                                                                                               | Why it matters here                                                                   |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
 | **Read first**      | [`08-util-sh-prompt.md`](08-util-sh-prompt.md)                                                                     | `getcmd()`, the input-source test, and the grader's reliance on `$ `.                 |
-| **Read first**      | [`09-util-sh-wait.md`](09-util-sh-wait.md#main-and-the-back-case-line-by-line)                                     | `main()` quoted in full, the `cd` builtin, and why some commands must not fork.       |
+| **Read first**      | [`09-util-sh-wait.md`](09-util-sh-wait.md#main-and-the-back-case-line-by-line)                                     | `main()` quoted in full, the `cd` builtin, and why some commands **must not** fork.   |
 | **Read first**      | [`book/ch01-operating-system-interfaces.md`](../book/ch01-operating-system-interfaces.md#creating-a-process-kfork) | `kfork()` copies the parent's memory, which decides what a child can see.             |
 | **Use when needed** | [`05-syscall-reference.md`](../05-syscall-reference.md#memory)                                                     | `sbrk`, and therefore what `malloc()` in `user/umalloc.c` can grow into.              |
 | **Use when needed** | [`10-util-sh-tab-completion.md`](10-util-sh-tab-completion.md#consoleintr-line-by-line)                            | The console driver, which holds a line until Enter and echoes every byte it receives. |
@@ -79,7 +79,7 @@ gets(char *buf, int max)
 | **`buf[i++] = c` before the test** | The newline is part of the stored line. A typical entry ends in `\n` followed by `\0`.                     |
 | **Loop ends at 99 bytes**          | A longer line is split: the first 99 bytes have no newline, and the remainder arrives as the next command. |
 | **`cc < 1`**                       | End of input or an error. `getcmd()` treats an empty result as end of input.                               |
-| **`buf[i] = '\0'`**                | The line is always a C string, whatever ended it.                                                          |
+| **`buf[i] = '\0'`**                | The line is **always** a C string, whatever ended it.                                                      |
 
 `gets()` reads one byte per system call, but on the console every byte of the line has already been released together by `consoleread()`, so the loop does not wait between characters. From a file, as in `sh < script`, the same loop reads the file one byte at a time.
 
@@ -116,13 +116,13 @@ The shell's single `buf` is written by several pieces of code, in two processes:
 | **Bound the storage**              | Will you keep a fixed number of 100-byte slots, or `malloc()` each line? What happens at the limit: drop the oldest, or stop recording?                                            |
 | **Choose what is recorded**        | Blank lines, `cd`, the listing command, a recalled command, and lines from `sh < script`: which belong in the history?                                                             |
 | **List it from the right process** | Reading history works in a forked child, because `kfork()` copied it. Would running the listing through `runcmd()` let `history > file` or `history \| grep x` work?               |
-| **Re-run from the right process**  | If a recalled command is `cd d`, which process must see its text before any fork, and how does it reach the same dispatch as a typed line?                                         |
+| **Re-run from the right process**  | If a recalled command is `cd d`, which process **must** see its text before any fork, and how does it reach the same dispatch as a typed line?                                     |
 | **Persist or not**                 | Should history survive `Ctrl-d` and the replacement shell from `init`? If it is written to a file, in which directory, given that the shell's current directory changes with `cd`? |
 
 | Trap                                                  | Observable consequence                                                                                               | Source to inspect                                                                                  |
 | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | **Storing a pointer to `buf`**                        | Every entry shows the latest command, or an empty string after `memset()`.                                           | `getcmd()` in [`user/sh.c`](../../user/sh.c)                                                       |
-| **Recording inside the forked child**                 | Entries vanish when the child exits; the shell's own list never grows.                                               | [`book/ch01`](../book/ch01-operating-system-interfaces.md#creating-a-process-kfork)                |
+| **Recording inside the forked child**                 | Entries vanish when the child exits; the shell's own list **never** grows.                                           | [`book/ch01`](../book/ch01-operating-system-interfaces.md#creating-a-process-kfork)                |
 | **Recording after `parsecmd()` in the shell process** | `nulterminate()` has split the line, so the entry ends at the first word.                                            | `nulterminate()` in [`user/sh.c`](../../user/sh.c)                                                 |
 | **Re-running a recalled `cd` through `fork1()`**      | The child execs a program named `cd`, which does not exist: `exec cd failed` appears and the directory is unchanged. | `main()` in [`user/sh.c`](../../user/sh.c)                                                         |
 | **Copying with `strcpy` into a too-small slot**       | Adjacent entries are overwritten; there is no bounded copy in `user/user.h`.                                         | [`user/user.h`](../../user/user.h)                                                                 |

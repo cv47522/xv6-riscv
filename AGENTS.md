@@ -2,10 +2,10 @@
 
 ## Documentation Visual Readability
 
-- Use a visualization only when it makes an important relationship materially easier to understand than prose or a short list. Do not add one merely because a section is long.
-- Preserve every technical detail when restructuring documentation. A visual may reorganize or front-load information, but it must not silently simplify away invariants, failure behavior, exceptions, values, or source references.
+- Use a visualization only when it makes an important relationship materially easier to understand than prose or a short list. **Do not** add one merely because a section is long.
+- Preserve every technical detail when restructuring documentation. A visual may reorganize or front-load information, but it **must not** silently simplify away invariants, failure behavior, exceptions, values, or source references.
 - Layer complex explanations when necessary: lead with a compact visual overview, then retain the detailed explanation immediately below it.
-- Keep nuanced causal reasoning in prose. Do not cram paragraph-sized explanations into Mermaid nodes or oversized table cells.
+- Keep nuanced causal reasoning in prose. **Do not** cram paragraph-sized explanations into Mermaid nodes or oversized table cells.
 - Prefer the smallest visual that matches the information shape:
 
 | Information shape                                                      | Preferred presentation                |
@@ -18,9 +18,9 @@
 | **Hierarchy, nesting, or parent/child relationships**                  | Tree or flowchart                     |
 | **Critical invariant or deliberate exception**                         | GitHub-style callout                  |
 
-- Use callouts deliberately: `NOTE` for context or invariants, `TIP` for practical workflow advice, `IMPORTANT` for decisions readers must preserve, `WARNING` for likely mistakes, and `CAUTION` for destructive or difficult-to-recover consequences. Do not use callouts as decoration or as a substitute for ordinary exposition.
+- Use callouts deliberately: `NOTE` for context or invariants, `TIP` for practical workflow advice, `IMPORTANT` for decisions readers **must** preserve, `WARNING` for likely mistakes, and `CAUTION` for destructive or difficult-to-recover consequences. **Do not** use callouts as decoration or as a substitute for ordinary exposition.
 - In tables that compare or summarize named items, bold the first-column value unless it is a raw identifier, command, path, URL, or value readers need to copy exactly.
-- In Mermaid diagrams, label every phase and outcome so meaning survives monochrome rendering. Use color consistently, and never make color the only carrier of meaning.
+- In Mermaid diagrams, label every phase and outcome so meaning survives monochrome rendering. Use color consistently, and **never** make color the only carrier of meaning.
 - Use the repository's light-theme Mermaid palette consistently: request `#fff0f0`, decision or routing `#f0f0ff`, data movement `#f0fff0`, processing `#fffff0`, commit `#f0ffff`, and stall or failure `#ffd9d9`.
 - Keep diagrams focused. If a diagram needs dense prose, many cross-links, or more than a quick glance to decode, split it or return the detail to prose.
 - Preserve existing effective comprehension aids. Tables, examples, summaries, and callouts are not redundant when they help readers orient, compare, or retain information.
@@ -28,19 +28,19 @@
 ## C Source Style
 
 - Match `.clang-format`, which is what `make fmt` enforces: the return type of a top-level function goes on its own line (`BreakAfterReturnType: TopLevelDefinitions`) and its opening brace on the next (`BraceWrapping.AfterFunction: true`). Writing `int main(void) {` is not a style choice here; it is a change clang-format reverses.
-- Never run `make fmt` to fix one file. It reformats every source under `kernel/`, `user/`, and `mkfs/`, and a whole-tree reformat makes the next lab merge conflict on nearly every file.
+- **Never** run `make fmt` to fix one file. It reformats every source under `kernel/`, `user/`, and `mkfs/`, and a whole-tree reformat makes the next lab merge conflict on nearly every file.
 - There is no host C library. The Makefile compiles with `-ffreestanding -nostdlib`, and `user/user.h` is the complete set of functions a user program can call, so `<stdlib.h>`, `EXIT_SUCCESS`, and `FILE *` streams do not exist.
 - `return 0` and `exit(0)` are equivalent in user programs: `start()` in `user/ulib.c` does `exit(main(argc, argv))`. Prefer `exit()` on error paths, where its `__attribute__((noreturn))` declaration carries information, and match the surrounding file otherwise.
 - Keep new user programs and their build products directly under `user/`. Nested directories break `mkfs` imports, the `-include user/*.d` dependency glob, and `clean`'s single-level wildcards — see [docs/02-build-boot-and-usage.md](docs/02-build-boot-and-usage.md).
-- Do not restructure the build for tidiness. The Makefile is merged from the lab branches, so layout changes convert every future lab merge into a conflict on it.
+- **Do not** restructure the build for tidiness. The Makefile is merged from the lab branches, so layout changes convert every future lab merge into a conflict on it.
 
 ## Source Comment Formatting
 
 The documentation visual-readability rules above apply inside `.c` and `.h` comments too. C has no Markdown renderer, so the same information shapes are built out of ASCII. `.clang-format` sets `ReflowComments: Never`, which means hand alignment survives `make fmt` — and equally, that nothing will fix an over-long line for you.
 
 - Use `/* ... */` for a comment spanning multiple lines and `//` for a comment that fits on one line. Apply this to all C sources, headers, and C examples in Markdown, including teaching headers, Q/A blocks, tables, and diagrams. Put each block delimiter on its own line, prefix body lines with ` *`, and preserve internal alignment. Move a one-line annotation before code to the end of that line rather than letting `//` hide the code that follows.
-- Keep the native syntax in other languages: `#` in assembly, shell, Python, Perl, and Makefiles; HTML comments in Markdown; and `/* ... */` in linker scripts, which do not accept `//`. Do not edit generated artifacts to change their comment style.
-- Never nest block comments or put a literal closing delimiter inside one. Never end a `//` line with a backslash, which would splice the following line into the comment.
+- Keep the native syntax in other languages: `#` in assembly, shell, Python, Perl, and Makefiles; HTML comments in Markdown; and `/* ... */` in linker scripts, which **do not** accept `//`. **Do not** edit generated artifacts to change their comment style.
+- **Never** nest block comments or put a literal closing delimiter inside one. **Never** end a `//` line with a backslash, which would splice the following line into the comment.
 - Keep tooling directives such as `// clang-format off` and `// clang-format on` as standalone single-line comments, separated from prose blocks, so the tool still recognizes them.
 - Choose the smallest structure that matches the information shape, exactly as in Markdown: an aligned table for repeated fields or per-argument rules, a numbered or bulleted list for ordered steps, a top-to-bottom ASCII diagram for a data path, and prose only for the two or three points that genuinely need causal reasoning.
 - Give a long teaching header banner rules and an ALL-CAPS section title, matching the style already used in the [Makefile](Makefile):
@@ -68,24 +68,24 @@ The documentation visual-readability rules above apply inside `.c` and `.h` comm
 - Draw diagrams top-to-bottom rather than left-to-right. A vertical flow fits the column budget, and it matches the order the statements below it execute.
 - Keep every line at 79 columns or fewer, including comment delimiters and the ` *` prefix. Verify with `awk 'length > 79 {print FNR": "length}' <file>` rather than by eye.
 - Use ASCII only — no box-drawing characters or other Unicode. The same comment has to stay readable in `objdump -S` output, in gdb's `layout src`, and in a terminal without UTF-8.
-- Anchor claims to a file, the way the notes do: write `kernel/sysfile.c` or `p->ofile[NOFILE] in kernel/proc.h`, never "the kernel does this somewhere".
-- Split the labour between the banner comment and `docs/`. The header is the quick reference someone reads with the code open; the note under `docs/` is the long form. Cross-link by path instead of duplicating text, so the two cannot drift.
-- Keep comments inside a function body short and about the _why_. The banner block carries the teaching; a body comment explains one decision the code cannot state itself.
+- Anchor claims to a file, the way the notes do: write `kernel/sysfile.c` or `p->ofile[NOFILE] in kernel/proc.h`, **never** "the kernel does this somewhere".
+- Split the labour between the banner comment and `docs/`. The header is the quick reference someone reads with the code open; the note under `docs/` is the long form. Cross-link by path instead of duplicating text, so the two **cannot** drift.
+- Keep comments inside a function body short and about the _why_. The banner block carries the teaching; a body comment explains one decision the code **cannot** state itself.
 
 ## Book Notes
 
 - Apply the visual-readability rules to `docs/book/*.md` while preserving the ownership model in `docs/book/README.md`: OSTEP notes own portable concepts, and xv6 notes own this tree's implementation.
 - Keep each chapter's standard sections unless the chapter has no relevant content for one: `What xv6 actually does`, `Divergences`, `Code walked through`, `Questions I had`, and `Lab connection`.
-- Use one or two purposeful visuals per substantive chapter by default. Add more only when the chapter contains additional relationships that cannot be scanned effectively in prose.
+- Use one or two purposeful visuals per substantive chapter by default. Add more only when the chapter contains additional relationships that **cannot** be scanned effectively in prose.
 - Preserve detailed source-symbol explanations near their visual overview. A chapter diagram is an entry point into the explanation, not a replacement for implementation evidence.
-- Leave placeholder chapters structurally minimal until substantive content exists; do not decorate empty scaffolding.
+- Leave placeholder chapters structurally minimal until substantive content exists; **do not** decorate empty scaffolding.
 
 ## Lab Notes
 
 `docs/labs/<NN>-<lab>-<exercise>.md` holds one note per 6.1810 lab exercise that needs deriving rather than transcribing. `docs/prompts/derive-lab-exercise.md` is the procedure; the rules below are what a note has to satisfy however it was produced.
 
-- **Keep the solution out of every section except one marked spoiler.** Every fenced `c` block in a lab note must be a contiguous, verbatim quotation from an existing non-target source and must cite that source. The exercise's target file gets a contract table, a decision checklist, and a trap table instead.
-- **Exception: a solution walkthrough after the exercise passes.** Once the target file exists in this tree and passes its `grade-lab-<lab>` tests, the note may end with one `## Solution walkthrough` section that opens with a `> [!CAUTION]` spoiler callout. That section links to the target file, may quote it verbatim with a citation, and may carry diagrams of its algorithm, memory, and resources. Every section before it stays solution-free, so the note still works as a derivation guide for someone who stops at the callout. The check below catches unmatched lines, but it cannot prove contiguity or exclude a completed solution, so inspect every block manually too:
+- **Keep the solution out of every section except one marked spoiler.** Every fenced `c` block in a lab note **must** be a contiguous, verbatim quotation from an existing non-target source and **must** cite that source. The exercise's target file gets a contract table, a decision checklist, and a trap table instead.
+- **Exception: a solution walkthrough after the exercise passes.** Once the target file exists in this tree and passes its `grade-lab-<lab>` tests, the note may end with one `## Solution walkthrough` section that opens with a `> [!CAUTION]` spoiler callout. That section links to the target file, may quote it verbatim with a citation, and may carry diagrams of its algorithm, memory, and resources. Every section before it stays solution-free, so the note still works as a derivation guide for someone who stops at the callout. The check below catches unmatched lines, but it **cannot** prove contiguity or exclude a completed solution, so inspect every block manually too:
 
     ````bash
     awk '/^```c$/{f=1;next} /^```/{f=0} f && NF' docs/labs/<note>.md |
@@ -102,7 +102,7 @@ The documentation visual-readability rules above apply inside `.c` and `.h` comm
 - Keep one authoritative contract table and one account of the grader's assertions and limits per exercise; link back from derivation, troubleshooting, and verification. Remove repeated explanations, not useful navigation, source evidence, worked examples, or concept loans whose destination is still a placeholder. Preserve or update incoming section links when moving material.
 - Keep the section order: what the exercise asks, the code to read first, a walkthrough of the function it turns on, the concept underneath, the derivation, verification, then questions. Add an analogy only when it materially helps, and name where it breaks down.
 - Keep optional harness internals and debugging detail beside verification, after the derivation. Link reusable grading mechanics to `docs/03`; retain exercise-specific evidence and caveats in the note.
-- Two diagrams is the working budget, not a quota — one for which file contributes what, one for the control flow being explained. A third is justified only when it carries a relationship neither of the others does, such as a byte-level data layout alongside a control-flow figure; it is never justified for restating a table. Every authored diagram uses the repository palette, with the legend stated once beneath the first. Choose its format using [Lab figure formats](#lab-figure-formats).
+- Two diagrams is the working budget, not a quota — one for which file contributes what, one for the control flow being explained. A third is justified only when it carries a relationship neither of the others does, such as a byte-level data layout alongside a control-flow figure; it is **never** justified for restating a table. Every authored diagram uses the repository palette, with the legend stated once beneath the first. Choose its format using [Lab figure formats](#lab-figure-formats).
 - Apply the scan-layer rule in [docs/prompts/derive-lab-exercise.md](docs/prompts/derive-lab-exercise.md#step-3a---apply-the-scan-layer-rule): no section opens with a dense paragraph, every visual keeps the causal reasoning in prose directly below it, and the note has to survive a read that skips every prose sentence.
 - Verify names against this tree before citing them. The clock-tick system call is `pause`, not `sleep`, and `kernel/printf.c` is `kernel/printk.c`; a note that sends the reader grepping for an upstream symbol has failed at its one job.
 - Register every new note in `docs/labs/README.md`, and run `docs/book/check-notes.sh` before claiming it is done.
@@ -119,7 +119,7 @@ Choose the information shape first using [Documentation Visual Readability](#doc
 - Prefer Mermaid for new logical diagrams. Use Excalidraw when its layout teaches something the automatic graph would lose; a simple memory map may still be clearer as a table.
 - Write action labels as concise, complete sentences that identify who acts and what it does. Name the source file, execution mode, or owning component in the node or enclosing group when the location matters. Phrase decisions as complete questions and label their outcomes. Define abbreviations such as U-mode and S-mode before the first figure uses them; link to the glossary for the fuller explanation.
 - Keep numeric results and source symbols in code form inside labels: write `returns 0` or `returns -1`, not words for those values. Complete sentences should preserve the reader's direct connection to the source.
-- Preserve an effective existing figure. Convert only for a concrete readability or maintenance benefit, never solely for uniformity. Keep its invariants, exceptions, values, and source citations in the replacement or adjacent text; do not keep two embedded versions of the same explanation.
-- When an inline overview has a retained Excalidraw detail view, add nearby links to both its viewable SVG and editable `.excalidraw` source. Say what extra relationship or layout the drawing shows and that the source opens in Excalidraw. Keep the note's required details inline; the supplemental drawing must not become a second, conflicting specification.
+- Preserve an effective existing figure. Convert only for a concrete readability or maintenance benefit, **never** solely for uniformity. Keep its invariants, exceptions, values, and source citations in the replacement or adjacent text; **do not** keep two embedded versions of the same explanation.
+- When an inline overview has a retained Excalidraw detail view, add nearby links to both its viewable SVG and editable `.excalidraw` source. Say what extra relationship or layout the drawing shows and that the source opens in Excalidraw. Keep the note's required details inline; the supplemental drawing **must not** become a second, conflicting specification.
 - For an Excalidraw figure, keep the editable source and linked SVG together, link the source from the caption, and update both when the figure changes. For Mermaid, keep the source inline. Render changed figures and inspect labels, branches, layout, and contrast before claiming visual verification.
 - Neither format may disclose the target solution or its ordered algorithm outside the [solution walkthrough](#lab-notes) section. Elsewhere, diagrams explain existing non-target code or relationships, subject to the same no-solution boundary as prose.

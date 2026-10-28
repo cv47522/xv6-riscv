@@ -51,7 +51,7 @@ flowchart LR
 | Call           | Number            | Group       | One line                                                |
 | -------------- | ----------------- | ----------- | ------------------------------------------------------- |
 | **`fork()`**   | `SYS_fork` = 1    | Process     | Duplicate this process.                                 |
-| **`exit()`**   | `SYS_exit` = 2    | Process     | End this process with a status. Never returns.          |
+| **`exit()`**   | `SYS_exit` = 2    | Process     | End this process with a status. **Never** returns.      |
 | **`wait()`**   | `SYS_wait` = 3    | Process     | Block until a child exits; collect its status.          |
 | **`pipe()`**   | `SYS_pipe` = 4    | Files       | Create a pipe and two descriptors for it.               |
 | **`read()`**   | `SYS_read` = 5    | Files       | Read up to n bytes from a descriptor.                   |
@@ -78,18 +78,18 @@ flowchart LR
 | Call         | Declared as                       | On success                                      | On failure                                                     | Implemented in                    |
 | ------------ | --------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- | --------------------------------- |
 | **`fork`**   | `int fork(void)`                  | The child's pid in the parent; `0` in the child | `-1` — no free `proc` slot (`NPROC` = 64) or no memory to copy | `kernel/proc.c` `kfork()`         |
-| **`exit`**   | `int exit(int)`                   | Does not return                                 | Cannot fail                                                    | `kernel/proc.c` `kexit()`         |
+| **`exit`**   | `int exit(int)`                   | Does not return                                 | **Cannot** fail                                                | `kernel/proc.c` `kexit()`         |
 | **`wait`**   | `int wait(int *)`                 | The pid of one exited child                     | `-1` — the caller has no children, or was killed while waiting | `kernel/proc.c` `kwait()`         |
 | **`kill`**   | `int kill(int)`                   | `0` — a process with that pid was found         | `-1` — no such pid                                             | `kernel/proc.c` `kkill()`         |
 | **`exec`**   | `int exec(const char *, char **)` | Does not return                                 | `-1` — bad path, bad ELF, too many arguments, or out of memory | `kernel/exec.c` `kexec()`         |
-| **`getpid`** | `int getpid(void)`                | This process's pid                              | Cannot fail                                                    | `kernel/sysproc.c` `sys_getpid()` |
+| **`getpid`** | `int getpid(void)`                | This process's pid                              | **Cannot** fail                                                | `kernel/sysproc.c` `sys_getpid()` |
 
 Four behaviours are easy to get wrong:
 
 - **`fork` returns twice, from one call site.** The child's saved `a0` is overwritten with zero in `kfork()`; there is no second return path in the code, only two saved register sets.
-- **`wait` accepts a null pointer.** `kwait()` tests `addr != 0` before copying, so `wait(0)` is legal when you do not want the status. Otherwise pass the address of an `int`, which receives what the child passed to `exit()`.
+- **`wait` accepts a null pointer.** `kwait()` tests `addr != 0` before copying, so `wait(0)` is legal when you **do not** want the status. Otherwise pass the address of an `int`, which receives what the child passed to `exit()`.
 - **`kill` does not kill.** It sets `p->killed` and makes the target runnable if it was sleeping. The process actually dies the next time it enters or leaves the kernel, so a `kill` followed immediately by an assumption of death is a race.
-- **`exec` returning is always an error.** `user/sh.c` prints `exec %s failed` on the line _after_ the call for exactly this reason. `argv` must be null-terminated and hold at most `MAXARG` (32) entries.
+- **`exec` returning is always an error.** `user/sh.c` prints `exec %s failed` on the line _after_ the call for exactly this reason. `argv` **must** be null-terminated and hold at most `MAXARG` (32) entries.
 
 > [!NOTE]
 > The kernel-side names carry a `k` prefix — `kfork`, `kexec`, `kwait`, `kexit` — where the book and OSTEP use the bare POSIX names. See [the naming table](book/00-ostep-concordance.md#system-call-naming).
@@ -119,7 +119,7 @@ Four behaviours are easy to get wrong:
 | `ino`   | `uint`   | Inode number — the second-to-last column in `ls`          |
 | `type`  | `short`  | `T_DIR` = 1, `T_FILE` = 2, `T_DEVICE` = 3                 |
 | `nlink` | `short`  | Names pointing at this inode; `link` and `unlink` move it |
-| `size`  | `uint64` | Bytes; always `0` for a device                            |
+| `size`  | `uint64` | Bytes; **always** `0` for a device                        |
 
 ## Directories and paths
 
@@ -131,7 +131,7 @@ Four behaviours are easy to get wrong:
 | **`chdir`**  | `int chdir(const char *)`               | `0`        | `-1` — no such path, or it is not a directory                         | `kernel/sysfile.c` `sys_chdir()`  |
 | **`mknod`**  | `int mknod(const char *, short, short)` | `0`        | `-1` — the name exists, or a path component is missing                | `kernel/sysfile.c` `sys_mknod()`  |
 
-- Paths are capped at `MAXPATH` (128) bytes and each name component at `DIRSIZ` (14) — `kernel/param.h` and `kernel/fs.h`. The 14-byte limit is why a user program's guest name must be short.
+- Paths are capped at `MAXPATH` (128) bytes and each name component at `DIRSIZ` (14) — `kernel/param.h` and `kernel/fs.h`. The 14-byte limit is why a user program's guest name **must** be short.
 - **`link` makes a hard link, and there are no symbolic links.** Both names index one inode, and `nlink` counts them; `unlink` frees the inode only when the count reaches zero and nothing has it open.
 - **`mknod` is how `console` exists.** `user/init.c` calls `mknod("console", CONSOLE, 0)` at boot, which is why `ls` shows it as type 3 with size 0.
 - **`cd` is not here.** `chdir` changes the calling process's `p->cwd`, so a shell that forked first would change only the child's directory and then lose it. `user/sh.c` special-cases `cd` in `main()` before forking.
@@ -161,8 +161,8 @@ The raw call takes **two** arguments in this tree: the byte delta, and a mode fr
 | Call         | Declared as        | On success                     | On failure                                  | Implemented in                    |
 | ------------ | ------------------ | ------------------------------ | ------------------------------------------- | --------------------------------- |
 | **`pause`**  | `int pause(int)`   | `0` after n clock ticks        | `-1` — the process was killed while waiting | `kernel/sysproc.c` `sys_pause()`  |
-| **`uptime`** | `int uptime(void)` | Clock ticks since boot         | Cannot fail                                 | `kernel/sysproc.c` `sys_uptime()` |
-| **`sync`**   | `int sync(void)`   | `0` once the log has committed | Cannot fail                                 | `kernel/log.c` `sys_sync()`       |
+| **`uptime`** | `int uptime(void)` | Clock ticks since boot         | **Cannot** fail                             | `kernel/sysproc.c` `sys_uptime()` |
+| **`sync`**   | `int sync(void)`   | `0` once the log has committed | **Cannot** fail                             | `kernel/log.c` `sys_sync()`       |
 
 - **`pause` is this tree's `sleep`.** Upstream names the clock-tick call `sleep`; here that name belongs to the kernel's sleep/wakeup primitive, so the system call is `pause`. The `util` lab's `sleep` is a _user program_ built on top of it — which is why `grade-lab-util` breaks on `sys_pause`, not `sys_sleep`.
 - A negative argument to `pause` is clamped to zero rather than rejected.
@@ -170,7 +170,7 @@ The raw call takes **two** arguments in this tree: the byte delta, and a mode fr
 
 ## Not system calls, but in the same header
 
-Everything below `// ulib.c` in `user/user.h` runs entirely in user space. It matters because these do not trap, cannot be traced as system calls, and are linked in from `ULIB` rather than dispatched by the kernel.
+Everything below `// ulib.c` in `user/user.h` runs entirely in user space. It matters because these **do not** trap, **cannot** be traced as system calls, and are linked in from `ULIB` rather than dispatched by the kernel.
 
 | Function                                                | Provided by      | Note                                                                                                                                                                                   |
 | ------------------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -268,7 +268,7 @@ Reaching for `<unistd.h>` to get the POSIX spelling of any of these is a trap wo
 
 ## Verifying this file
 
-[`book/check-notes.sh`](book/check-notes.sh) checks this reference against the tree on every run, in both directions: every `entry("...")` in `user/usys.pl` must appear here, and every `SYS_*` number quoted here must match `kernel/syscall.h`. A call added to the tree without a row here fails the check, and so does a stale number.
+[`book/check-notes.sh`](book/check-notes.sh) checks this reference against the tree on every run, in both directions: every `entry("...")` in `user/usys.pl` **must** appear here, and every `SYS_*` number quoted here **must** match `kernel/syscall.h`. A call added to the tree without a row here fails the check, and so does a stale number.
 
 ```bash
 docs/book/check-notes.sh

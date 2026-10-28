@@ -12,11 +12,11 @@ Portable, agent-neutral. Copy this whole file into any coding agent, replace the
 
 **Target lecture:** `<REPLACE ME — e.g. "lecture 3", or "l-os.txt">`
 
-If the target is empty, ask which lecture. Do not infer it from `conf/lab.mk` or recently edited files.
+If the target is empty, ask which lecture. **Do not** infer it from `conf/lab.mk` or recently edited files.
 
 ---
 
-You are closing out one 6.1810 lecture that the learner has studied: its practice code is written (or partly written), its homework may be answered, and nothing is committed yet. The job has five parts, always in this order: protect the archive, place the concepts, review the practice code, record the homework, update progress. [`../10-c-in-xv6.md`](../10-c-in-xv6.md) is the reference result for Lecture 2; read it before writing anything.
+You are closing out one 6.1810 lecture that the learner has studied: its practice code is written (or partly written), its homework may be answered, and nothing is committed yet. The job has five parts, **always** in this order: protect the archive, place the concepts, review the practice code, record the homework, update progress. [`../10-c-in-xv6.md`](../10-c-in-xv6.md) is the reference result for Lecture 2; read it before writing anything.
 
 > **First, read `AGENTS.md` at the repository root**, then the `AGENTS.md` of every sibling repository you will edit (`../c-programming/`, `../operating-system/`). Each owns its own prose and commit rules; this prompt does not repeat them.
 
@@ -70,7 +70,7 @@ Run [`add-lecture-exercise.md`](add-lecture-exercise.md) once per practice progr
 | Symptom                                            | Check                                                                                                                                                         |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **The staged program does not compile**            | Practice programs build with `STRICT_CFLAGS` (`-Wextra -pedantic`). Run `make fs.img` before anything else.                                                   |
-| **A comment transcript does not match a real run** | Every transcript and address in the header comes from Step 6 of that prompt, never from the host or from memory.                                              |
+| **A comment transcript does not match a real run** | Every transcript and address in the header comes from Step 6 of that prompt, **never** from the host or from memory.                                          |
 | **A program changed the lecture's demo**           | A global moved into a local changes which segment the demo shows. Keep the lecture's point unless the change teaches more, and say which.                     |
 | **A commented-out entry in `LAB_PRACTICE_PROGS`**  | A `#` line ending in `\` inside a continued Makefile variable continues the comment. Remove it, and track the missing program in `STUDY-PROGRESS.md` instead. |
 
@@ -106,6 +106,6 @@ git status --short; git -C ../c-programming status --short
 git -C ../operating-system status --short
 ```
 
-Check every relative link you added, especially links that cross into a sibling repository (`../../c-programming/` from `docs/`, `../xv6-riscv/docs/` from a sibling). Do not commit unless the user asks; when they do, each repository gets its own commit following its own `AGENTS.md`.
+Check every relative link you added, especially links that cross into a sibling repository (`../../c-programming/` from `docs/`, `../xv6-riscv/docs/` from a sibling). **Do not** commit unless the user asks; when they do, each repository gets its own commit following its own `AGENTS.md`.
 
 Report what changed per repository, what you fixed in the learner's work and why, which claims were measured, and what remains open.

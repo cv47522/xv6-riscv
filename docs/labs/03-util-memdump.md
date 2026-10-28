@@ -24,7 +24,7 @@ MIT's [`memdump` exercise](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html
 | **`S`**                    | Reads the current region directly through its first NUL or the valid boundary, whichever comes first.                                                                                                                 |
 | **Output and environment** | Values use the required representations, runtime pointer values may vary, and only `user/user.h` plus local integer aliases are available.                                                                            |
 
-The format is a small language over successive parts of the region. Its characters are not `printf` conversions and do not begin with `%`.
+The format is a small language over successive parts of the region. Its characters are not `printf` conversions and **do not** begin with `%`.
 
 | Format  | Data item described by the 2026 handout                 | Printed interpretation                                             | Fixed-width bytes needed before access |
 | ------- | ------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------- |
@@ -35,7 +35,7 @@ The format is a small language over successive parts of the region. Its characte
 | **`s`** | The next 8 bytes, which contain a pointer to a C string | The string reached through that stored pointer                     | 8                                      |
 | **`S`** | The remaining valid bytes beginning at the cursor       | Bytes through the first NUL or through the end of the valid region | Variable                               |
 
-For every fixed-width item, too few remaining bytes must produce `memdump: not enough data for 'X'` and stop, where `X` is the current format character. `S` is deliberately different: absence of a NUL within the valid region is not permission to read farther, so it prints only the bytes still covered by `len`.
+For every fixed-width item, too few remaining bytes **must** produce `memdump: not enough data for 'X'` and stop, where `X` is the current format character. `S` is deliberately different: absence of a NUL within the valid region is not permission to read farther, so it prints only the bytes still covered by `len`.
 
 ### What the local grader checks
 
@@ -57,7 +57,7 @@ The three tests in [`grade-lab-util`](../../grade-lab-util) total **25 points**.
 
 [`assert_lines_match()`](../../gradelib.py) applies `re.match()` to each line and removes a required expression after a match. Lines can arrive in any order, and matching one command's output can satisfy another command's expectation. Start-only patterns permit trailing text; only the `$`-anchored values above require an exact line.
 
-The 2026 checks require the full eight-byte `p` value and a shortage diagnostic, but piped `S` data is followed by convenient zero-fill in the starter. Correct-looking text therefore cannot prove that the scan respected `len`. [Verification](#verifying-it) distinguishes that coincidence from a useful boundary check.
+The 2026 checks require the full eight-byte `p` value and a shortage diagnostic, but piped `S` data is followed by convenient zero-fill in the starter. Correct-looking text therefore **cannot** prove that the scan respected `len`. [Verification](#verifying-it) distinguishes that coincidence from a useful boundary check.
 
 ## Prerequisites
 
@@ -109,7 +109,7 @@ _The figure maps the original handout starter, not the added local edge probes. 
 > [!IMPORTANT]
 > Each caller supplies the valid extent while it still knows the original object: the five examples pass `sizeof(object)`, standard input passes the accumulated byte count `n`, and the `argc > 2` usage path never calls `memdump()`.
 
-The current local `main()` also includes four `Edge` probe groups on its no-argument path; [verification](#verifying-it) explains what they test. Inside `memdump()`, `sizeof(data)` would measure only the pointer. The extent must therefore cross the call boundary as `len`, remain paired with the cursor, and justify each access before it occurs.
+The current local `main()` also includes four `Edge` probe groups on its no-argument path; [verification](#verifying-it) explains what they test. Inside `memdump()`, `sizeof(data)` would measure only the pointer. The extent **must** therefore cross the call boundary as `len`, remain paired with the cursor, and justify each access before it occurs.
 
 ## `memmove()` as the existing byte walker
 
@@ -234,7 +234,7 @@ The RISC-V compiler lays out the starter's `struct sss` in declaration order wit
 | **15-22** | 8     | `bytes`         | `strcpy` writes `78 79 7a 7a 79 00` for `xyzzy` and its NUL; the final two array bytes remain indeterminate because `example` was not zero-initialized. |
 | **23**    | 1     | Tail padding    | An indeterminate padding byte, not a declared member.                                                                                                   |
 
-The declaration-to-offset mapping is implementation-defined, not a universal serialization format. [`structure_size_padding_bytes.c`](../../../c-programming/notes/src/main/custom_data_types/structures/structure_size_padding_bytes.c) owns the longer alignment and padding explanation.
+The declaration-to-offset mapping is **implementation-defined**, not a universal serialization format. [`structure_size_padding_bytes.c`](../../../c-programming/notes/src/main/custom_data_types/structures/structure_size_padding_bytes.c) owns the longer alignment and padding explanation.
 
 ### Array initialization
 
@@ -263,7 +263,7 @@ Examples 4 and 5 pass the _same_ structure address and get different answers, be
 | **`pihcS`**  | 8, 4, 2, 1, then to NUL  | Follows the members exactly: `ptr`, `num1`, `num2`, `byte`, then `bytes`.     |
 | **`sccccc`** | 8, then 1, 1, 1, 1, 1    | Follows `ptr` as a string pointer, then reads five bytes that ignore members. |
 
-Those five `c` items cross a member boundary: four come from `num1` (`w`, `o`, `r`, `l`) and the fifth is the low byte of `num2` (`d`). That is the point of the example — the format describes bytes to consume, and never asks the compiler for member names or types.
+Those five `c` items cross a member boundary: four come from `num1` (`w`, `o`, `r`, `l`) and the fifth is the low byte of `num2` (`d`). That is the point of the example — the format describes bytes to consume, and **never** asks the compiler for member names or types.
 
 ### Why 512 bytes
 
@@ -295,7 +295,7 @@ The 512-byte capacity follows `user/cat.c` and `user/wc.c`; it is a convention, 
 | **Unknown format policy**    | The handout and grader specify no diagnostic, movement, or status; choose and record a conservative behavior.                                                                              |
 | **Complete `p` output**      | Compare `%x` with `%lx` in `user/printf.c`; derive which conversion preserves the required `6867666564636261` and what the truncated line would be.                                        |
 
-For the string-output decision, [docs 05](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) records why local `strlen()` and `%s` cannot enforce `len` and which hosted-C alternatives are unavailable. Use the local declarations when looking for an output primitive with an explicit byte count.
+For the string-output decision, [docs 05](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) records why local `strlen()` and `%s` **cannot** enforce `len` and which hosted-C alternatives are unavailable. Use the local declarations when looking for an output primitive with an explicit byte count.
 
 ### Traps
 
@@ -345,11 +345,11 @@ $ echo abcdefgh | memdump z
 | **`memdump`**                       | Built-in direct and indirect strings, structure fields, and cross-field characters.                                                                                               |
 | **`deadc0de` cases**                | Little-endian mixed widths and the complete 8-byte `p` value.                                                                                                                     |
 | **`echo a \| memdump i`**           | A two-byte input reaches the required short-item diagnostic.                                                                                                                      |
-| **`echo abcdefgh \| memdump Sc`**   | Nine valid bytes contain no NUL; `S` exhausts them and the following `c` must report a shortage. This is an accounting check, not proof of bounded scanning.                      |
+| **`echo abcdefgh \| memdump Sc`**   | Nine valid bytes contain no NUL; `S` exhausts them and the following `c` **must** report a shortage. This is an accounting check, not proof of bounded scanning.                  |
 | **`echo abcdefgh \| memdump z`**    | Check the chosen unknown-format policy against its source documentation; the handout does not define it.                                                                          |
 | **In-region NUL, then a directive** | The original handout and grader omit it; the local `Edge 2` group probes the recorded continuation policy. Distinct trailing bytes expose cursor errors and a literal NUL output. |
 
-The `Sc` pipe case can display the right string even if an unbounded scan reaches zero-fill beyond `len`. The later shortage checks cursor and remaining-length accounting, but cannot prove that the earlier scan stayed in bounds. The nonzero filler in [Edge 1](#local-boundary-probes) removes that coincidence.
+The `Sc` pipe case can display the right string even if an unbounded scan reaches zero-fill beyond `len`. The later shortage checks cursor and remaining-length accounting, but **cannot** prove that the earlier scan stayed in bounds. The nonzero filler in [Edge 1](#local-boundary-probes) removes that coincidence.
 
 Exit QEMU with `Ctrl-a` then `x`, then run the focused grader:
 
@@ -357,7 +357,7 @@ Exit QEMU with `Ctrl-a` then `x`, then run the focused grader:
 ./grade-lab-util memdump
 ```
 
-The two example tests share `test_memdump_examples`, so their failure logs share `xv6.out.memdump_examples`; a later failure can overwrite it, and a later pass can remove it. The bounds test uses `xv6.out.memdump_corner`. [The sleep note](01-util-sleep.md#why-two-tests-can-have-the-same-python-function-name) owns the registration mechanism. No kernel gdb recipe is useful here because the behavior being derived is user-space object traversal; inspect the generated `user/memdump.asm` only if a target-specific load width or alignment question remains.
+The two example tests share `test_memdump_examples`, so their failure logs share `xv6.out.memdump_examples`; a later failure can overwrite it, and a later pass can remove it. The bounds test uses `xv6.out.memdump_corner`. [The sleep note](01-util-sleep.md#why-two-tests-can-have-the-same-python-function-name) owns the registration mechanism. No kernel gdb recipe is useful here because the behavior being derived is user-space object traversal; inspect the generated `user/memdump.asm` **only if** a target-specific load width or alignment question remains.
 
 ### Why a short echo can hide an overread
 
@@ -376,9 +376,9 @@ One successful short-input probe therefore does not establish the bounded-`S` co
 | **Edge 1**                    | A nonterminated region followed by nonzero filler exposes a scan that ignores `len`. A counted copy leaves the filler intact; `strcpy()` would insert a misleading terminator.                    |
 | **Edge 2**                    | An in-region NUL followed by distinct bytes distinguishes direct string termination, NUL output, and cursor advancement when another directive follows. Repeated bytes could mask a cursor error. |
 | **Edge 3**                    | `Sc` with an extent of 3 over `"ab"` places NUL inside the region; a later fixed-width item then tests the recorded consumption policy. An extent of 2 would test region exhaustion instead.      |
-| **Edge 4**                    | A zero-length `S` region must be handled without reading even one byte.                                                                                                                           |
+| **Edge 4**                    | A zero-length `S` region **must** be handled without reading even one byte.                                                                                                                       |
 
-These are current local checks in [`main()`](../../user/memdump.c), not extra grader assertions or a required continuation policy for every implementation. The important distinction is whether NUL falls inside the valid extent or just beyond it: only the former exposes writing NUL as data, while zero-fill can hide an unbounded scan in the latter. Do not add target-body code to this note to explain the probes.
+These are current local checks in [`main()`](../../user/memdump.c), not extra grader assertions or a required continuation policy for every implementation. The important distinction is whether NUL falls inside the valid extent or just beyond it: only the former exposes writing NUL as data, while zero-fill can hide an unbounded scan in the latter. **Do not** add target-body code to this note to explain the probes.
 
 ## Questions
 

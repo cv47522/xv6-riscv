@@ -9,4 +9,4 @@ Read `docs/prompts/close-lecture.md` in this repository and follow it exactly, i
 
 **Target:** $ARGUMENTS
 
-If the target is empty, ask before doing anything else. Do not infer it from `conf/lab.mk` or recently edited files.
+If the target is empty, ask before doing anything else. **Do not** infer it from `conf/lab.mk` or recently edited files.

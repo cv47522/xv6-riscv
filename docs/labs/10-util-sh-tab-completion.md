@@ -6,7 +6,7 @@
 
 ---
 
-The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) suggests "modify the shell to support tab completion", rated easy. The shell part is small; the obstacle is that `user/sh.c` never sees the Tab key until the user presses Enter, because the kernel's console driver holds input until a line is complete. This note explains that driver, where the handout's remark that "you may have to modify the kernel" applies, and the decisions either route leaves.
+The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) suggests "modify the shell to support tab completion", rated easy. The shell part is small; the obstacle is that `user/sh.c` **never** sees the Tab key until the user presses Enter, because the kernel's console driver holds input until a line is complete. This note explains that driver, where the handout's remark that "you may have to modify the kernel" applies, and the decisions either route leaves.
 
 > [!IMPORTANT]
 > No solution or pseudocode. `user/sh.c` is quoted only as it stands unmodified; [the prompt note](08-util-sh-prompt.md) records that rule. The kernel quotation is the unchanged `consoleintr()`. If you choose the kernel route, `kernel/console.c` becomes a target too, so the quotation shows only its current state.
@@ -20,13 +20,13 @@ The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2
 
 | Aspect             | Requirement or local convention                                                                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Target**         | Handout: modify `user/sh.c`. The handout permits kernel changes when a feature needs them; this one does if completion must happen when Tab is pressed.                  |
+| **Target**         | Handout: modify `user/sh.c`. The handout permits kernel changes when a feature needs them; this one does if completion **must** happen when Tab is pressed.              |
 | **Behavior**       | Handout: support tab completion. Conventional meaning: a partially typed word is extended to a unique matching name, and the user can keep typing before pressing Enter. |
 | **Candidates**     | Not specified. Command names, file operands, or both are your scope decision.                                                                                            |
 | **Ambiguity**      | Not specified. Several matches may list candidates, extend to a common prefix, or do nothing.                                                                            |
-| **Other programs** | Repository requirement if you change the kernel: `cat`, `grep`, `ex1copy`, and every other console reader must keep working.                                             |
+| **Other programs** | Repository requirement if you change the kernel: `cat`, `grep`, `ex1copy`, and every other console reader **must** keep working.                                         |
 | **Prompt**         | Required by the grader: keep the console prompt exactly `$ `. See [the harness dependency](08-util-sh-prompt.md#the-harness-depends-on-the-prompt).                      |
-| **Kernel style**   | If you edit `kernel/console.c`, match `.clang-format` by hand; never run `make fmt` for one file ([AGENTS.md](../../AGENTS.md#c-source-style)).                          |
+| **Kernel style**   | If you edit `kernel/console.c`, match `.clang-format` by hand; **never** run `make fmt` for one file ([AGENTS.md](../../AGENTS.md#c-source-style)).                      |
 
 ### What the grader checks
 
@@ -168,7 +168,7 @@ By the time the shell can see the Tab, the user has already pressed Enter and th
 > [!IMPORTANT]
 > **A user-space-only shell sees Tab only after Enter.** Any design that completes while the user is still typing needs the kernel to release input at a Tab, or to deliver keys one at a time, and that change affects every program that reads the console.
 
-Two consequences of the indices matter for any kernel route. First, once bytes before a Tab are released, `cons.w` moves past them, so the backspace guard stops the user from erasing them; the shell that consumed them must provide that editing, or accept the limitation. Second, the shell must itself write any completion text it adds, because the kernel echoes only bytes that arrived from the UART; the completed characters are not in `cons.buf` and will never be read back.
+Two consequences of the indices matter for any kernel route. First, once bytes before a Tab are released, `cons.w` moves past them, so the backspace guard stops the user from erasing them; the shell that consumed them **must** provide that editing, or accept the limitation. Second, the shell **must** itself write any completion text it adds, because the kernel echoes only bytes that arrived from the UART; the completed characters are not in `cons.buf` and will **never** be read back.
 
 ## Deriving it
 
@@ -179,7 +179,7 @@ Two consequences of the indices matter for any kernel route. First, once bytes b
 | **Choose the route**         | Will completion happen at Enter, using only `user/sh.c`, or when Tab is pressed, which needs `kernel/console.c` to release input on Tab? What does each route cost the user?       |
 | **Scope the kernel change**  | If Tab releases input, does it do so for every reader, or only when the shell asks? Which programs in `user/` would see a shorter `read()` than before, and does any of them care? |
 | **Echo policy**              | Should `consoleintr()` still echo a Tab it releases, given that the shell will print the completion?                                                                               |
-| **Stop reading at Tab**      | `gets()` stops only at `\n` or `\r`. What would it do after the kernel returns `e`, `c`, and a Tab, and which loop must the shell use instead?                                     |
+| **Stop reading at Tab**      | `gets()` stops only at `\n` or `\r`. What would it do after the kernel returns `e`, `c`, and a Tab, and which loop **must** the shell use instead?                                 |
 | **Keep the partial line**    | After completion, where does the text typed so far live, and how is it joined with the bytes of the next `read()` within `buf`'s 100 bytes?                                        |
 | **Build the candidate list** | Which directory supplies command names, given that `exec` resolves names from the current directory? Which supplies file operands?                                                 |
 | **Resolve ambiguity**        | With several matches, will you extend to the common prefix, list them and reprint the prompt and partial line, or do nothing?                                                      |
@@ -187,13 +187,13 @@ Two consequences of the indices matter for any kernel route. First, once bytes b
 | Trap                                                      | Observable consequence                                                                                                             | Source to inspect                                                                |
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **Waiting for a Tab in `gets()` without a kernel change** | Nothing happens on Tab; the line arrives only after Enter, with the Tab embedded.                                                  | [The wakeup test](#consoleintr-line-by-line)                                     |
-| **Keeping `gets()` after making Tab release input**       | `gets()` reads past the Tab and blocks for the rest of the line, so the shell never completes.                                     | [`user/ulib.c`](../../user/ulib.c)                                               |
-| **Expecting Backspace to erase completed text**           | The driver refuses: completed text was never in `cons.buf`, and the released prefix is behind `cons.w`.                            | `consoleintr()` backspace guard                                                  |
+| **Keeping `gets()` after making Tab release input**       | `gets()` reads past the Tab and blocks for the rest of the line, so the shell **never** completes.                                 | [`user/ulib.c`](../../user/ulib.c)                                               |
+| **Expecting Backspace to erase completed text**           | The driver refuses: completed text was **never** in `cons.buf`, and the released prefix is behind `cons.w`.                        | `consoleintr()` backspace guard                                                  |
 | **Completing commands from `/`**                          | After `cd a`, the completed name still fails with `exec ... failed`, because lookup is relative to `a`.                            | `namex()` in [`kernel/fs.c`](../../kernel/fs.c)                                  |
 | **Treating `de.name` as a C string**                      | A 14-byte name has no terminator, so prefix comparison reads past the record.                                                      | [`04-util-find.md`](04-util-find.md#record-names-versus-c-strings)               |
 | **Writing the completion to fd 1**                        | A shell started as `sh > log` sends the completion into `log` instead of the terminal; `getcmd()` writes interactive text to fd 2. | `getcmd()` in [`user/sh.c`](../../user/sh.c)                                     |
-| **Altering the prompt to redraw a line**                  | `$ ` must still appear exactly, or the grader stalls.                                                                              | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-harness-depends-on-the-prompt) |
-| **Breaking script shells**                                | `sh < findtest.sh` reads a file, where a Tab is ordinary whitespace; completion must not trigger there.                            | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-concept-underneath)            |
+| **Altering the prompt to redraw a line**                  | `$ ` **must** still appear exactly, or the grader stalls.                                                                          | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-harness-depends-on-the-prompt) |
+| **Breaking script shells**                                | `sh < findtest.sh` reads a file, where a Tab is ordinary whitespace; completion **must not** trigger there.                        | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-concept-underneath)            |
 
 ## Verifying it
 
@@ -260,7 +260,7 @@ The shell was already asleep inside one `consoleread()` call when the breakpoint
 1. Which three conditions in `consoleintr()` move `cons.w`, and which index does `consoleread()` compare with `cons.r` before sleeping?
 2. Why does the terminal cursor move when you press Tab, before any user program has run?
 3. After the kernel releases `ec` and a Tab to the shell, why can Backspace no longer erase the `c`? Name the guard.
-4. Which characters must the shell write to the console itself after completing `ec` to `echo`, and why will they never be read back from `cons.buf`?
+4. Which characters **must** the shell write to the console itself after completing `ec` to `echo`, and why will they **never** be read back from `cons.buf`?
 5. Failure scenario: the kernel releases input at Tab, but the shell still calls `gets()`. Where does the shell block?
 6. Failure scenario: after `cd d`, completion offers names from `/`. What does running the completed command print, and which function in [`kernel/fs.c`](../../kernel/fs.c) explains it?
 7. If Tab releases input for every reader, what does `cat` print when you type `a`, Tab, `b`, Enter? Is any output lost or only split across reads?

@@ -41,7 +41,7 @@ $ make -p -n | grep -m1 DEFAULT_GOAL
 .DEFAULT_GOAL := kernel/kernel
 ```
 
-So a bare `make` compiles and links the kernel and **stops**. It builds no user programs and no filesystem image, because nothing in the kernel's dependency chain mentions them. That is occasionally what you want — it is the fastest way to check that a kernel edit still compiles — but it is never enough to boot. `make qemu` is the real entry point.
+So a bare `make` compiles and links the kernel and **stops**. It builds no user programs and no filesystem image, because nothing in the kernel's dependency chain mentions them. That is occasionally what you want — it is the fastest way to check that a kernel edit still compiles — but it is **never** enough to boot. `make qemu` is the real entry point.
 
 ## Every target, and when you type it
 
@@ -183,14 +183,14 @@ Phases 2 and 4 are where `make` earns its keep on rebuilds: everything is keyed 
 | **`OBJS`**       | Explicit list                          | Every kernel object. `entry.o` is first because `kernel.ld` places it at `0x80000000`                                 |
 | **`OBJS_KCSAN`** | Explicit list                          | Five objects the race detector must not instrument — they run before the kernel is ready, or _are_ what it depends on |
 | **`TOOLPREFIX`** | `$(shell …)` probe                     | The cross-toolchain prefix, e.g. `riscv64-linux-gnu-`. Override on the command line if yours is unusual               |
-| **`CFLAGS`**     | Accumulated with `+=` across ~60 lines | The freestanding RISC-V compile. Read the annotated block in the Makefile once, then never again                      |
+| **`CFLAGS`**     | Accumulated with `+=` across ~60 lines | The freestanding RISC-V compile. Read the annotated block in the Makefile once, then **never** again                  |
 | **`XCFLAGS`**    | `-DSOL_$(LABUPPER) -DLAB_$(LABUPPER)`  | The subset of flags that host-compiled code (`mkfs`, `notxv6/`) also needs                                            |
 | **`LDFLAGS`**    | `-z max-page-size=4096`                | Stops the linker aligning segments to its default, much larger page size                                              |
 | **`ULIB`**       | Four objects                           | xv6's entire C library. Linked into every user program                                                                |
 | **`UPROGS`**     | Explicit list + per-lab additions      | Which programs get built _and_ copied into `fs.img`                                                                   |
 | **`UEXTRA`**     | Per-lab only                           | Non-executable files that still belong in the image (`findtest.sh` and the `sixfive` fixtures)                        |
 | **`CPUS`**       | `3`, or `1` under `LAB=fs`             | Emulated harts. `make CPUS=1 qemu` makes scheduling deterministic while debugging                                     |
-| **`GDBPORT`**    | `id -u % 5000 + 25000`                 | A per-user gdb stub port, so shared machines do not collide                                                           |
+| **`GDBPORT`**    | `id -u % 5000 + 25000`                 | A per-user gdb stub port, so shared machines **do not** collide                                                       |
 | **`QEMUOPTS`**   | Accumulated with `+=`                  | The machine definition: RAM at `0x80000000`, no firmware, `fs.img` as a virtio disk                                   |
 
 ## Three link steps, three flag sets
@@ -270,7 +270,7 @@ fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
 	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)
 ```
 
-The prerequisite list and the argument list are the same list. That is the whole reason a program missing from `UPROGS` still compiles and still fails at runtime with `exec … failed`: it was never an argument, so it was never imported.
+The prerequisite list and the argument list are the same list. That is the whole reason a program missing from `UPROGS` still compiles and still fails at runtime with `exec … failed`: it was **never** an argument, so it was **never** imported.
 
 ## Make features this file uses that a simple one does not
 
@@ -322,10 +322,10 @@ The comparison below is against [`operating-system/codes/Makefile`](../../operat
 | **Default goal**          | `all`, which prints a usage message         | `kernel/kernel`, which links the kernel                                                                               |
 | **Source discovery**      | `wildcard` and `find`                       | Explicit `OBJS` and `UPROGS` lists                                                                                    |
 | **`.c` → `.o`**           | Explicit pattern rule into `obj/`           | Kernel: explicit rule. User: Make's **built-in** rule                                                                 |
-| **Compile and link**      | One `gcc` command per program               | Always two steps, and `ld` is invoked directly                                                                        |
+| **Compile and link**      | One `gcc` command per program               | **Always** two steps, and `ld` is invoked directly                                                                    |
 | **Linker script**         | None                                        | Two, `kernel.ld` and `user.ld`, plus a third spelling for `_forktest`                                                 |
 | **Build products**        | Out of tree, in `obj/` and `bin/`           | Flat, beside each source — [and deliberately so](02-build-boot-and-usage.md#why-sources-and-build-products-stay-flat) |
-| **Header tracking**       | None                                        | `-MD` plus `-include */*.d`, mandatory here                                                                           |
+| **Header tracking**       | None                                        | `-MD` plus `-include */*.d`, **mandatory** here                                                                       |
 | **Intermediates kept by** | `.SECONDARY`                                | `.PRECIOUS`                                                                                                           |
 | **Configuration**         | Command-line variables (`FILE=…`)           | A tracked file, `conf/lab.mk`                                                                                         |
 | **Conditional content**   | `ifndef FILE` guards only                   | Twenty `ifeq ($(LAB),…)` blocks, one set per lab, adding objects, programs, and flags                                 |
@@ -378,7 +378,7 @@ Nothing else. The built-in `.c` → `.o` rule and the `_%` link rule cover the r
 
 ### Add a kernel source file
 
-Add `$K/newfile.o` to `OBJS`. Put it in `OBJS_KCSAN` instead only if it must run before the kernel is initialised or is itself part of the locking or printing machinery. Position matters only for `entry.o`.
+Add `$K/newfile.o` to `OBJS`. Put it in `OBJS_KCSAN` instead **only if** it **must** run before the kernel is initialised or is itself part of the locking or printing machinery. Position matters only for `entry.o`.
 
 ### Add a system call
 

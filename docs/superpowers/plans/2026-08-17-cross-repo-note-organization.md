@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **Never hard-wrap Markdown prose.** Each paragraph is one continuous line. Do not reflow paragraphs outside the lines being changed.
+- **Never hard-wrap Markdown prose.** Each paragraph is one continuous line. **Do not** reflow paragraphs outside the lines being changed.
 - **Restate, never transcribe.** No xv6 book text or OSTEP text is copied into a note.
 - **Symbol names lead, line numbers follow.** Write `` `kernel/proc.c` `kfork()` ``, not `kernel/proc.c:259`, except where the reference is to a comment or a specific instruction.
 - **All code paths in the concordance are repo-relative from the xv6-riscv root** (`kernel/proc.c`, `user/sh.c`), because `check-notes.sh` resolves them that way.
@@ -358,7 +358,7 @@ Expected: exit 1 with **exactly 2 problems**, both of which clear in Task 3:
 FAILED — 2 problem(s).
 ```
 
-The README now links to a concordance that Task 3 has not created yet, so the link check reports it — that is correct behaviour, not a defect to work around. Do not create a stub concordance to silence it. The chapter check must be silent; if any `FAIL: chapter` line remains, Step 2 was applied incompletely.
+The README now links to a concordance that Task 3 has not created yet, so the link check reports it — that is correct behaviour, not a defect to work around. **Do not** create a stub concordance to silence it. The chapter check **must** be silent; if any `FAIL: chapter` line remains, Step 2 was applied incompletely.
 
 - [ ] **Step 7: Commit**
 
@@ -494,7 +494,7 @@ Expected: `All checks passed.` and exit 0. Both Task 2 failures clear: the conco
 
 If `check_symbols` reports a missing symbol, fix the concordance rather than the check — every symbol in the table above was confirmed present by grep at planning time, so a failure means a typo was introduced in transcription.
 
-Note that the `Exercise` column is deliberately unchecked: it cites `../operating-system/codes/` and `../ostep-homework/`, which do not resolve against this repository.
+Note that the `Exercise` column is deliberately unchecked: it cites `../operating-system/codes/` and `../ostep-homework/`, which **do not** resolve against this repository.
 
 - [ ] **Step 3: Commit**
 
@@ -537,7 +537,7 @@ MSG
 
 **Interfaces:**
 - Consumes: the shape and case vocabulary from Task 2, the concordance from Task 3.
-- Produces: thirteen files matching `docs/book/ch[0-9][0-9]-*.md`, each with a resolving theory link. Task 5 overwrites `ch01-operating-system-interfaces.md`; Task 6's backlinks point at these paths, so they must exist first.
+- Produces: thirteen files matching `docs/book/ch[0-9][0-9]-*.md`, each with a resolving theory link. Task 5 overwrites `ch01-operating-system-interfaces.md`; Task 6's backlinks point at these paths, so they **must** exist first.
 
 - [ ] **Step 1: Generate the stubs**
 
@@ -643,13 +643,13 @@ MSG
 
 - [ ] **Step 1: Read the source**
 
-Read `../xv6-riscv-book/unix.tex` in full, and re-read `../operating-system/The_Process_Abstraction.md` §7 (`## 7. The Process API: fork / exec / wait (Ch 5)`, line 576 onward) so you know exactly what is already explained and must not be repeated.
+Read `../xv6-riscv-book/unix.tex` in full, and re-read `../operating-system/The_Process_Abstraction.md` §7 (`## 7. The Process API: fork / exec / wait (Ch 5)`, line 576 onward) so you know exactly what is already explained and **must not** be repeated.
 
 - [ ] **Step 2: Write the note**
 
 Keep the stub's header, `[toc]`, and theory blockquote. Remove the placeholder blockquote. Fill the sections:
 
-**`## What xv6 actually does`** — the mandatory section, and the bulk of the note. Cover, in xv6's terms and with the code anchors named:
+**`## What xv6 actually does`** — the **mandatory** section, and the bulk of the note. Cover, in xv6's terms and with the code anchors named:
 
 - Process creation and the fork/exec split as *this kernel* implements it: `kernel/proc.c` `kfork()` copying the address space via `kernel/vm.c` `uvmcopy()`, and `kernel/exec.c` `kexec()` replacing it.
 - File descriptors as an indirection table: `kernel/file.c` `filealloc()`, the `ofile` array in `struct proc` (`kernel/proc.h`), and why `kfork()` duplicating that array is what makes shell redirection work.
@@ -724,7 +724,7 @@ MSG
 - Modify (in `../operating-system/`): `The_Process_Abstraction.md`, `Paging.md`, `Address_Spaces_And_Translation.md`, `CPU_Scheduling.md`, `Introduction_to_Operating_Systems.md`, `Memory_Management.md`, `Swapping_And_VM_Systems.md`, `IO_Devices_And_Disks.md`, `Concurrency_Threads_And_Locks.md`, `Condition_Variables_And_Semaphores.md`, `File_Systems.md`, `Crash_Consistency_And_Journaling.md`, `Concurrency_Bugs_And_Events.md`
 
 **Interfaces:**
-- Consumes: the thirteen stub paths created in Task 4. Every backlink target must already exist.
+- Consumes: the thirteen stub paths created in Task 4. Every backlink target **must** already exist.
 - Produces: nothing consumed by later tasks. This is the final task.
 
 > [!CAUTION]
@@ -742,7 +742,7 @@ Keep this. Step 5 diffs against it to prove nothing unrelated was swept in.
 
 - [ ] **Step 2: Append the line to the four notes that already have the section**
 
-Each of these has a `## Related Notes` section. Append one bullet to the end of that section's list — do not touch anything else in the file.
+Each of these has a `## Related Notes` section. Append one bullet to the end of that section's list — **do not** touch anything else in the file.
 
 `The_Process_Abstraction.md`:
 
@@ -889,7 +889,7 @@ Expected: `All checks passed.`
 
 **Spec coverage.** Ownership rule → Task 2 Step 4. Three cases → Tasks 2 and 3. Concordance → Task 3. Chapter-note shape → Task 2 Step 4, applied in Tasks 4 and 5. Backlinks → Task 6. Terminology rule → **gap, see below.** Link mechanics → Task 2 Step 4, enforced by Task 1. Chapter map correction → Task 2. Per-chapter procedure → Task 2 Step 4. Divergence handling → Task 3 appendix, applied in Task 5.
 
-**Known gap:** the spec's Terminology section (one definition per term; `04-terminology.md` may gloss and link but never redefine) has no task. It is deliberately deferred — there is nothing to deduplicate until a chapter note introduces a term that collides, and Chapter 1 introduces none. Add it to the chapter-note procedure when the first collision appears, rather than auditing `04-terminology.md` speculatively now.
+**Known gap:** the spec's Terminology section (one definition per term; `04-terminology.md` may gloss and link but **never** redefine) has no task. It is deliberately deferred — there is nothing to deduplicate until a chapter note introduces a term that collides, and Chapter 1 introduces none. Add it to the chapter-note procedure when the first collision appears, rather than auditing `04-terminology.md` speculatively now.
 
 **Placeholder scan:** clean. Every step carries runnable content or exact prose. Task 5 is the one step whose output is authored rather than pasted, so it specifies required sections, required code anchors, the two forbidden moves, and two mechanical checks in place of a literal body.
 

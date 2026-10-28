@@ -20,7 +20,7 @@ Tick these off as you go, and link each to its notes file once written.
 | **4**  | Traps and system calls        | `ecall`, trampoline, trapframe         | mixed    | [ch04](ch04-traps-and-system-calls.md)        |
 | **5**  | Page faults                   | COW, lazy allocation, demand paging    | loan     | [ch05](ch05-page-faults.md)                   |
 | **6**  | Interrupts and device drivers | UART, PLIC, virtio disk                | loan     | [ch06](ch06-interrupts-and-device-drivers.md) |
-| **7**  | Locking                       | Spinlocks, races, deadlock             | loan     | [ch07](ch07-locking.md)                       |
+| **7**  | Locking                       | Spinlocks, races, **deadlock**         | loan     | [ch07](ch07-locking.md)                       |
 | **8**  | Scheduling                    | Context switching, `swtch.S`           | linked   | [ch08](ch08-scheduling.md)                    |
 | **9**  | Sleep and Wakeup              | Sleep/wakeup, condition variables      | loan     | [ch09](ch09-sleep-and-wakeup.md)              |
 | **10** | File system                   | Inodes, the buffer cache               | loan     | [ch10](ch10-file-system.md)                   |
@@ -42,7 +42,7 @@ ch13-summary.md
 
 The rule that keeps these notes short is ownership: **`../operating-system/` owns portable concepts; this directory owns xv6's realization of them.** When placement is unclear, apply one test:
 
-Diagram colors used throughout these notes: blue marks decisions or routing, green marks data movement, yellow marks processing, cyan marks commits or stored results, and red marks stalls or failures. Labels always carry the same meaning without color.
+Diagram colors used throughout these notes: blue marks decisions or routing, green marks data movement, yellow marks processing, cyan marks commits or stored results, and red marks stalls or failures. Labels **always** carry the same meaning without color.
 
 ```mermaid
 flowchart TD
@@ -109,7 +109,7 @@ flowchart LR
 [ostep-x]: ../../../operating-system/<Note>.md#<anchor>
 ```
 
-`What xv6 actually does` is the only mandatory section.
+`What xv6 actually does` is the only **mandatory** section.
 
 The opening blockquote has one variant per case, and picking the wrong one sends the reader somewhere useless — a `linked` blockquote on a `loan` chapter points at a file that says only `Placeholder — not yet written`:
 
@@ -139,7 +139,7 @@ Only chapters that actually diverge carry the section, and it links the concorda
 Two conventions keep them honest:
 
 - **Cite by source and label, never by number** — `` `lock.tex`, `fig:race` ``. LaTeX assigns figure numbers at build time, so any number written here would be a guess that silently rots.
-- **Nothing load-bearing lives in alt text.** Alt text is invisible to everyone reading the page normally, so a field name, a bit width, or an address that appears only there is hidden from almost every reader. Alt text gets one short line describing the shape of the image, for a reader who cannot see it at all; everything worth knowing goes in the caption below, where both audiences get it.
+- **Nothing load-bearing lives in alt text.** Alt text is invisible to everyone reading the page normally, so a field name, a bit width, or an address that appears only there is hidden from almost every reader. Alt text gets one short line describing the shape of the image, for a reader who **cannot** see it at all; everything worth knowing goes in the caption below, where both audiences get it.
 - **Caption every figure in three moves:** the book's own caption in quotes, then what is actually drawn — the labels, the bit widths, the addresses — then why a reader of _this_ note is looking at it: which symbol to open, which lab touches it, or which detail this tree does differently.
 
 That second half is where a figure earns its place. [ch09](ch09-sleep-and-wakeup.md#figures) is the model: the book's figure is shown, then immediately contradicted, because this tree closes the lost-wakeup race by a different mechanism than the published book does.

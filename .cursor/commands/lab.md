@@ -8,4 +8,4 @@ Read `docs/prompts/derive-lab-exercise.md` in this repository and follow it exac
 
 **Target:** whatever was typed after this command in the chat
 
-If the target is empty, ask before doing anything else. Do not infer it from `conf/lab.mk` or recently edited files.
+If the target is empty, ask before doing anything else. **Do not** infer it from `conf/lab.mk` or recently edited files.

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Explain precisely why the focused sleep grader accepts the current missing-argument message, why its duplicate Python function names do not discard a test, how its symbolic breakpoint monitor stops QEMU, and how to reproduce the breakpoint workflow both in a terminal and in VS Code.
+Explain precisely why the focused sleep grader accepts the current missing-argument message, why its duplicate Python function names **do not** discard a test, how its symbolic breakpoint monitor stops QEMU, and how to reproduce the breakpoint workflow both in a terminal and in VS Code.
 
 ## Documentation ownership
 

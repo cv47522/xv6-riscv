@@ -32,7 +32,7 @@ The book sources are Copyright (c) 2006-2024 Russ Cox, Frans Kaashoek, and Rober
 
 Chapters 5, 6, 11, 12, and 13 carry no figure because the book gives them none.
 
-Two upstream figures are deliberately absent: `bufrace.svg` and `deadlock.svg`. Neither is `\includegraphics`'d by any `.tex` file, so they are leftovers rather than figures of the current edition, and copying them here would imply a place in the book they do not have.
+Two upstream figures are deliberately absent: `bufrace.svg` and `deadlock.svg`. Neither is `\includegraphics`'d by any `.tex` file, so they are leftovers rather than figures of the current edition, and copying them here would imply a place in the book they **do not** have.
 
 ## The figures that are redrawn instead
 
@@ -43,7 +43,7 @@ Rather than commit a figure nobody can regenerate, the chapter notes redraw thes
 | Upstream source     | Book caption                                                      | Redrawn in                                       | As                       |
 | ------------------- | ------------------------------------------------------------------- | ------------------------------------------------ | ------------------------ |
 | `fig/trap.tex`      | Outline of how a trap from user code is handled.                  | [ch04](../ch04-traps-and-system-calls.md)        | Mermaid flowchart        |
-| `fig/order.tex`     | (deadlock from inverted lock order)                               | [ch07](../ch07-locking.md)                       | Side-by-side code        |
+| `fig/order.tex`     | (**deadlock** from inverted lock order)                           | [ch07](../ch07-locking.md)                       | Side-by-side code        |
 | `fig/switch.pdf`    | Switching from one user process to another.                       | [ch08](../ch08-scheduling.md)                    | Mermaid sequence diagram |
 | `fig/switch.tex`    | `swtch()` always has the scheduler thread as source or destination. | [ch08](../ch08-scheduling.md)                    | Mermaid sequence diagram |
 | `fig/sleep.tex`     | Overlapping locks to avoid lost wake-up                           | [ch09](../ch09-sleep-and-wakeup.md)              | Annotated code block     |

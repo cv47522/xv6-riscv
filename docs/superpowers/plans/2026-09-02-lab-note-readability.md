@@ -2,7 +2,7 @@
 
 **Goal:** Make the utility lab notes easy to scan without removing technical detail, add prerequisite maps to every utility exercise note, and provide a focused hosted-C example for the byte-memory functions used by the memdump exercise.
 
-**Constraints:** Preserve the required lab-note section order, do not include a memdump solution or pseudocode, keep every Markdown prose paragraph on one physical line, use no more than two purposeful diagrams per lab note, and leave unrelated worktree changes untouched.
+**Constraints:** Preserve the required lab-note section order, **do not** include a memdump solution or pseudocode, keep every Markdown prose paragraph on one physical line, use no more than two purposeful diagrams per lab note, and leave unrelated worktree changes untouched.
 
 ## Task 1: Strengthen the authoring prompts
 
@@ -43,7 +43,7 @@ Restructure dense concept sections with compact tables, lists, callouts, and one
 - Modify: `/home/wahsieh/personal/c-programming/C_Pointers.md`
 - Modify: `/home/wahsieh/personal/c-programming/C_Pointer_Arithmetic.md`
 
-Demonstrate exact byte counts, byte-wise inspection, `memset`, non-overlapping `memcpy`, overlapping `memmove`, and `memcmp` without relying on undefined behavior. Register the example where readers already look for memory-block and byte-pointer material.
+Demonstrate exact byte counts, byte-wise inspection, `memset`, non-overlapping `memcpy`, overlapping `memmove`, and `memcmp` without relying on **undefined behavior**. Register the example where readers already look for memory-block and byte-pointer material.
 
 ## Task 5: Verify structure, links, source safety, and builds
 
