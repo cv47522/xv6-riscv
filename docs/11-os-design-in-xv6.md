@@ -44,7 +44,11 @@ The lecture names two defences: hardware controls on user instructions, and a ca
 The first two are faults: the hardware stops the instruction, `usertrap()` in `kernel/trap.c` finds no handler for that `scause`, and calls `setkilled()`. The last two **never** fault, because the kernel itself performs the check and turns a hostile request into an ordinary error return. That split is the lecture's pair of defences made concrete.
 
 > [!NOTE]
-> `TRAMPOLINE` (`0x3FFFFFF000`) and `TRAPFRAME` (`0x3FFFFFE000`) are **mapped in every user page table**. `proc_pagetable()` in `kernel/proc.c` maps them with `PTE_R | PTE_X` and `PTE_R | PTE_W` but never `PTE_U`, so isolation here is a permission bit, not a missing mapping. The ch02 figure in [book/ch02-operating-system-organization.md](book/ch02-operating-system-organization.md#figures) draws the same two slivers under `MAXVA`.
+> `TRAMPOLINE` (`0x3FFFFFF000`) and `TRAPFRAME` (`0x3FFFFFE000`) are **mapped in every user page table**. `proc_pagetable()` in `kernel/proc.c` maps them with `PTE_R | PTE_X` and `PTE_R | PTE_W` but never `PTE_U`, so isolation here is a permission bit, not a missing mapping.
+
+![A tall column divided into labelled bands, spanning one process's virtual address space](book/fig/as.svg)
+
+_“Layout of a process's virtual address space” — [book figure](book/fig/README.md), `first.tex` `fig:as`, also captioned in [ch02](book/ch02-operating-system-organization.md#figures). Bottom to top from 0: **user text and data**, **user stack**, a large **heap**, then two thin bands under `MAXVA`, **trapframe** and **trampoline**. Those two slivers are the targets of `isolate kload` and `isolate kcopy`: the drawing places them inside the user's own address space, and the table above shows that being mapped there still does not make them reachable, because neither carries `PTE_U`._
 
 The `kcopy` case matters more than it looks. The trapframe holds this process's saved registers, including the `epc` that `usertrap()` returns to. If `walkaddr()` in `kernel/vm.c` did not test `PTE_U`, a `read()` with that destination would let a user choose the kernel's next return address. `piperead()` in `kernel/pipe.c` returns `-1` before advancing `nread`, which is why the following `read()` into a real buffer still gets `"hi"`.
 
@@ -79,6 +83,10 @@ This section holds two concepts **on loan**: the OSTEP notes cover user/kernel m
 | **Monolithic**  | All system calls, the file system, and drivers: one program. | Subsystems cooperate easily (one cache for file system and VM), but interactions are complex and drivers are not isolated. |
 | **Microkernel** | A small kernel; services run as user processes.              | Less code in the TCB limits damage from bugs; services talk by message instead of by function call.                        |
 
+![Two ellipses in user space above a red dividing line, both connected down to a thin box in kernel space](book/fig/mkernel.svg)
+
+_“A microkernel with a file-system server” — [book figure](book/fig/README.md), `first.tex` `fig:mkernel`. Two user processes, `shell` and `File server`, sit above the red user/kernel line; their connection dips through a thin `Microkernel` box and is labelled **Send message**. This is the table's second row drawn out: the file system has moved out of the TCB into user space, so a shell's `read` becomes two messages through the kernel instead of one system call into it. Compare [Lecture 1's figure](12-os-overview-in-xv6.md#what-a-system-call-does-step-by-step), where the same request is a single arrow into one large kernel._
+
 xv6 is monolithic: every file in `kernel/` is linked into one `kernel/kernel` binary, so the kernel interface is exactly the system-call interface. The lecture's aside, that a strongly typed language such as Singularity's can isolate processes without hardware modes, is the alternative xv6 does not take.
 
 ## The machine xv6 runs on
@@ -96,6 +104,10 @@ The lecture models the board as a 4-core SiFive HiFive Unleashed with 128 MB of 
 | **Kernel source** | small enough to understand by semester end | 23 `.c` files, 4 `.S` files, 7,041 lines including headers (`wc -l kernel/*.[chS]`) |
 
 The lecture's "emulation" sketch, a loop that reads, decodes, and executes one instruction against a `uint64 reg[32]` array, is what QEMU does for each of the emulated harts. `-bios none` means no firmware runs first: QEMU jumps straight to `_entry` in machine mode. Why the kernel is linked at that address is in [06-build-artifacts.md](06-build-artifacts.md#why-the-kernel-is-linked-at-0x80000000).
+
+![Two tall columns, kernel virtual on the left and physical on the right, joined by dotted lines](book/fig/xv6_layout.svg)
+
+_“On the left, xv6's kernel virtual address space; on the right, the RISC-V physical address space that xv6 expects to see.” — [book figure](book/fig/README.md), `mem.tex` `fig:xv6_layout`, also captioned in [ch03](book/ch03-page-tables.md#figures). Bottom to top: the devices QEMU's `virt` machine provides, `PLIC` at `0x0C000000`, `UART0` at `0x10000000`, and the virtio disk at `0x10001000`, then RAM from `KERNBASE` (`0x80000000`) to `PHYSTOP` (`0x88000000`) holding kernel text, data, and free memory, with the trampoline and guard-separated kernel stacks at the top. It is the table above as a memory map: `-m 128M` is why `PHYSTOP` is `KERNBASE + 128 * 1024 * 1024` in `kernel/memlayout.h`, `_entry` is the first byte of the kernel text band, and `fs.img` is reached through the virtio registers, not through RAM._
 
 ## From boot to the first process
 

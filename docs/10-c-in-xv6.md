@@ -15,6 +15,7 @@ The companion to Lecture 2, [_programming xv6 in C_](../lectures/l-c.txt), and H
 
 | Lecture topic              | Generic C (read when needed)                                                                                                   | xv6-specific, in this note                                                                                                       | Practice                                |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Why C?**                 | —                                                                                                                              | [Why C, as this tree shows it](#why-c-as-this-tree-shows-it)                                                                     | —                                       |
 | **Memory layout**          | [Memory Management and Organization](../../operating-system/Memory_Management.md#memory-segments-overview)                     | [The user address space](#the-user-address-space)                                                                                | [`user/ptr.c`](../user/ptr.c)           |
 | **From `cat.c` to `_cat`** | [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md)                                                         | [Looking inside a user binary](#looking-inside-a-user-binary); ELF in [06-build-artifacts.md](06-build-artifacts.md#what-elf-is) | —                                       |
 | **Pointers**               | [C_Pointers.md](../../c-programming/C_Pointers.md), [C_Pointer_Declarations.md](../../c-programming/C_Pointer_Declarations.md) | [`argv` and the calling convention](#argv-and-the-calling-convention)                                                            | [`user/ptr.c`](../user/ptr.c)           |
@@ -26,9 +27,24 @@ The companion to Lecture 2, [_programming xv6 in C_](../lectures/l-c.txt), and H
 | **`static`, `void`**       | [Storage Class Specifiers](../../operating-system/Memory_Management.md#storage-class-specifiers)                               | [Keywords and common bugs](#keywords-and-common-bugs)                                                                            | —                                       |
 | **Common C bugs**          | [C_Valgrind.md](../../c-programming/C_Valgrind.md), [C_Dynamic_Memory.md](../../c-programming/C_Dynamic_Memory.md)             | [Keywords and common bugs](#keywords-and-common-bugs)                                                                            | [`user/str.c`](../user/str.c)           |
 
+## Why C, as this tree shows it
+
+The lecture opens with reasons for writing a kernel in C. The language-level argument is general; this table shows only where each claim is visible in this tree. The lecture's "why not?" — incorrect and insecure code is easy to write — is mapped onto xv6 in [Keywords and common bugs](#keywords-and-common-bugs).
+
+| Lecture claim                            | Where this tree shows it                                                                                                                                                                                                                                            |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Easy mapping to RISC-V instructions**  | `user/cat.asm` (`objdump -S`) interleaves each line of `cat.c` with the few instructions compiled from it; see [Looking inside a user binary](#looking-inside-a-user-binary).                                                                                       |
+| **C types map onto hardware structures** | `kernel/uart.c` names 16550 register bits as masks (`LSR_TX_IDLE` is `(1 << 5)`), reaches registers through a `volatile unsigned char *` in `Reg()`, and enables interrupts with `WriteReg(IER, IER_TX_ENABLE \| IER_RX_ENABLE)`.                                   |
+| **Minimal runtime**                      | No host C library: the Makefile compiles with `-ffreestanding` and `-nostdlib`, every user program links only `ULIB` (`ulib.o`, `usys.o`, `printf.o`, `umalloc.o`; plus `statistics.o` under `LAB=lock`), and `start()` in `user/ulib.c` is the whole startup code. |
+| **Explicit memory management**           | No garbage collector: the kernel hands out pages with `kalloc()` and `kfree()` in `kernel/kalloc.c`, and user programs get memory from `malloc()` and `free()` in `user/umalloc.c`, which grow the heap with `sbrk()`.                                              |
+
 ## The user address space
 
-Every address below was printed by [`ptr`](../user/ptr.c) and [`array`](../user/array.c) in this tree with `LAB=util`; the shape is the book's Figure 3.4, captioned in [ch03](book/ch03-page-tables.md#figures).
+Every address below was printed by [`ptr`](../user/ptr.c) and [`array`](../user/array.c) in this tree with `LAB=util`; the shape is the book's figure below, also captioned in [ch03](book/ch03-page-tables.md#figures).
+
+![A tall column for a user address space, with an exploded panel opening the stack region](book/fig/processlayout.svg)
+
+_“A process's user address space, with its initial stack.” — [book figure](book/fig/README.md), `mem.tex` `fig:processlayout`. From 0 up: **text** (R-XU), **data**, a **guard page**, the **stack**, the **heap** (R-WU), unused space, then **trapframe** (R-W-) and **trampoline** (RX--) under `MAXVA`; the exploded panel shows the stack's top as the argument strings, a zero marking the end of `argv`, and the `argv[]` pointers below them. Read it as the overview and the table below as this build's evidence: the drawing's lower regions are the table's rows with real addresses, except that it draws one stack page where `LAB_UTIL` gives two. The table stops at the heap because the two top pages lack `U`, so no user program can print from them; [Lecture 3](11-os-design-in-xv6.md#where-the-boundary-is-enforced) attacks exactly those pages. The exploded panel is exactly what [`argv` and the calling convention](#argv-and-the-calling-convention) builds step by step._
 
 | Address           | Region             | What lands there                                                          | Set by                                     |
 | ----------------- | ------------------ | ------------------------------------------------------------------------- | ------------------------------------------ |
@@ -38,7 +54,8 @@ Every address below was printed by [`ptr`](../user/ptr.c) and [`array`](../user/
 | `0x3000`–`0x5000` | **stack** (RW-)    | `argv` strings, the `argv[]` array, then `main`'s frame                   | `kernel/exec.c` `kexec()`, `USERSTACK` = 2 |
 | `0x5000` onward   | **heap**           | `sbrk()` / `malloc()` growth                                              | `kernel/sysproc.c` `sys_sbrk()`            |
 
-`USERSTACK` is 2 only under `LAB_UTIL` (`kernel/param.h`); otherwise it is 1, and every stack address above shifts down by a page.
+> [!NOTE]
+> `USERSTACK` is 2 only under `LAB_UTIL` (`kernel/param.h`); otherwise it is 1, and every stack address above shifts down by a page.
 
 > [!WARNING]
 > `main` sits at address `0`, so `func = &main` in `ptr.c` prints `0x0000000000000000`: a valid function pointer that compares equal to a null pointer. Code that tests `if (fn)` would treat it as absent. On Linux the zero page is unmapped exactly to make null dereferences fault; xv6 maps code there.
@@ -60,7 +77,13 @@ riscv64-linux-gnu-readelf -SW user/_ptr  # Section names and addresses.
 riscv64-linux-gnu-readelf -lW user/_ptr  # LOAD permissions and section-to-segment mapping.
 ```
 
-The section flag for `.rodata` does not include execute, but [`kexec()`](../kernel/exec.c) loads **program headers**, not section headers. It passes each `LOAD` header's flags through `flags2perm()` to `uvmalloc()`, which maps readable user pages with those write/execute permissions. Thus these constants are executable at the page level because they share the text load segment, while writes still fault. Linux often gives `.rodata` a separate, non-executable mapping; that separation is not required for the section to exist. Addresses and grouping above describe this binary, not every xv6 program or toolchain.
+**Why `.rodata` is executable here, but not writable:**
+
+1. The section flag for `.rodata` does not include execute, but [`kexec()`](../kernel/exec.c) loads **program headers**, not section headers.
+2. It passes each `LOAD` header's flags through `flags2perm()` to `uvmalloc()`, which maps readable user pages with those write/execute permissions.
+3. These constants share the text load segment, so they are executable at the page level, while writes still fault.
+
+Linux often gives `.rodata` a separate, non-executable mapping; that separation is not required for the section to exist. Addresses and grouping above describe this binary, not every xv6 program or toolchain.
 
 ### Why is the heap above the stack?
 
@@ -71,9 +94,24 @@ The section flag for `.rodata` does not include execute, but [`kexec()`](../kern
 3. Copy argument strings and `argv[]` downward within that reservation, then store its upper boundary in `p->sz` and the adjusted `sp` in the trapframe.
 4. On `sbrk(n)`, [`sys_sbrk()`](../kernel/sysproc.c) returns the old `p->sz` and extends that boundary for positive `n`, either through [`growproc()`](../kernel/proc.c) for eager allocation or by reserving the range for lazy allocation.
 
-For the map above, the stack reservation ends at `0x5000`, so the first heap extension starts at **`0x5000`**, above the stack. Calls subtract from `sp` and use the existing stack pages toward `0x3000`; overflow into the `0x2000` guard faults. The stack's **reserved size stays fixed**: allocating more heap does not enlarge it.
+For the map above, the stack reservation ends at **`0x5000`**, the shared boundary from which stack use and heap growth move in opposite directions:
 
-This arrangement keeps the low user image, guard, stack, and heap under one size boundary (`p->sz`); the high trampoline/trapframe mappings are separate. It avoids needing a separately growing high-address stack and a moving gap between stack and heap. That explains the layout's simplicity; it is not a RISC-V requirement. The conventional Linux diagram in [Memory Management and Organization](../../operating-system/Memory_Management.md#linux-and-xv6-same-roles-different-layouts) puts the main stack high and the classic heap low so both have room to grow toward the intervening gap. In xv6, they grow **away from their shared boundary**: stack use downward inside its fixed reservation, heap growth upward beyond it. The source of each growth arrow is an address, not the top or bottom of the drawn page.
+| Operation       | Direction from the boundary                                                               | Limit or failure behavior                                    |
+| --------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Stack use**   | Calls subtract from `sp` and use the existing stack pages toward `0x3000`.                | Overflow into the `0x2000` guard faults.                     |
+| **Heap growth** | The first heap extension starts at `0x5000`, above the stack, and grows upward beyond it. | Allocating more heap does not enlarge the stack reservation. |
+
+> [!IMPORTANT]
+> The stack's **reserved size stays fixed**. Each growth arrow starts at an address, not the top or bottom of the drawn page.
+
+This arrangement keeps the low user image, guard, stack, and heap under one size boundary (`p->sz`); the high trampoline/trapframe mappings are separate. It avoids needing a separately growing high-address stack and a moving gap between stack and heap. That explains the layout's simplicity; it is not a RISC-V requirement.
+
+| Layout                         | Stack and heap placement                                 | Relationship between growth directions                                                                                  |
+| ------------------------------ | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **xv6**                        | The stack occupies its fixed reservation below the heap. | They grow **away from their shared boundary**: stack use downward within the reservation, heap growth upward beyond it. |
+| **Conventional Linux diagram** | The main stack is high and the classic heap is low.      | Both have room to grow toward the intervening gap.                                                                      |
+
+The Linux comparison is illustrated in [Memory Management and Organization](../../operating-system/Memory_Management.md#linux-and-xv6-same-roles-different-layouts).
 
 ## Looking inside a user binary
 
@@ -105,7 +143,23 @@ The general ELF and `.asm` material belongs to [06-build-artifacts.md](06-build-
 3. Set `p->trapframe->a1 = sp`, the address of that array.
 4. Return `argc` as the system call's result, which lands in `a0`.
 
-The RISC-V calling convention ([riscv-calling.pdf](https://pdos.csail.mit.edu/6.1810/2026/readings/riscv-calling.pdf)) passes the first two integer arguments in `a0` and `a1`, so `start(argc, argv)` receives them unchanged. `ptr x yz` prints `argv[0]=...4FF0 "ptr"`, `argv[1]=...4FE0 "x"`, `argv[2]=...4FD0 "yz"`, and `argv[3]=0x0000000000000000`: the strings 16 bytes apart, the array below them. The book's Figure 3.4 draws the same panel.
+The RISC-V calling convention ([riscv-calling.pdf](https://pdos.csail.mit.edu/6.1810/2026/readings/riscv-calling.pdf)) passes the first two integer arguments in `a0` and `a1`, so `start(argc, argv)` receives them unchanged:
+
+| Register | Argument | How `kexec()` supplies it                                        |
+| -------- | -------- | ---------------------------------------------------------------- |
+| `a0`     | `argc`   | Returns the argument count as the system call's result.          |
+| `a1`     | `argv`   | Stores the address of the string-address array in the trapframe. |
+
+For `ptr x yz`, the printed values are:
+
+| Array entry | Printed address      | String                 |
+| ----------- | -------------------- | ---------------------- |
+| `argv[0]`   | `...4FF0`            | `"ptr"`                |
+| `argv[1]`   | `...4FE0`            | `"x"`                  |
+| `argv[2]`   | `...4FD0`            | `"yz"`                 |
+| `argv[3]`   | `0x0000000000000000` | Terminator; no string. |
+
+The strings are 16 bytes apart, with the array below them. The book's Figure 3.4 draws the same panel.
 
 ## Strings in `ulib.c`
 
@@ -114,7 +168,16 @@ The RISC-V calling convention ([riscv-calling.pdf](https://pdos.csail.mit.edu/6.
 | **`strlen()`** | array index  | `for (n = 0; s[n]; n++)`                                        |
 | **`strcmp()`** | pointer walk | `while (*p && *p == *q) p++, q++;` then `(uchar)*p - (uchar)*q` |
 
-Both stop at the terminating `0`, which is the only length a C string carries. `struct dirent` in `kernel/fs.h` is the exception that proves it: `name[DIRSIZ]` with `DIRSIZ` = 14 is marked `__attribute__((nonstring))` because a 14-byte name has no room for the `0`. The `ls.c` `T_DIR` case and [`ex9ls`](07-exercises.md#ex9ls--a-directory-is-a-file) copy it into a `DIRSIZ + 1` buffer for that reason.
+Both stop at the terminating `0`, which is the only length a C string carries.
+
+> [!WARNING]
+> A directory entry's name is not necessarily a C string.
+
+| Directory-name detail                                                                                                         | Consequence                                          |
+| ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `struct dirent` in `kernel/fs.h` has `name[DIRSIZ]`, with `DIRSIZ` = 14.                                                      | A 14-byte name has no room for the terminating `0`.  |
+| `name` is marked `__attribute__((nonstring))`.                                                                                | It explicitly allows that non-string representation. |
+| The `ls.c` `T_DIR` case and [`ex9ls`](07-exercises.md#ex9ls--a-directory-is-a-file) copy the name into a `DIRSIZ + 1` buffer. | The extra byte leaves room for the terminator.       |
 
 ## Two kernel lists
 
@@ -144,11 +207,35 @@ Green nodes hold data (a free page or a cached block); blue nodes are list roots
 | **`kmem.freelist`** | `struct run`, stored _inside_ the free 4096-byte page | `kfree()` prepends                                             | `kalloc()` takes the front      | Only the front is ever touched, so one `next` pointer is enough and the list costs no memory.          |
 | **`bcache.head`**   | `struct buf`, `prev` and `next` in `kernel/buf.h`     | `brelse()` moves a buffer to the front when `refcnt` reaches 0 | `bget()` recycles from the back | Moving an arbitrary node to the front needs its predecessor, which only `prev` gives in constant time. |
 
-`brelse()` unlinks with `b->next->prev = b->prev; b->prev->next = b->next;`, then splices `b` in after `bcache.head`. The sentinel means neither step needs an empty-list special case.
+When moving a buffer, `brelse()`:
+
+1. Unlinks it with `b->next->prev = b->prev; b->prev->next = b->next;`.
+2. Splices `b` in after `bcache.head`.
+
+The sentinel means neither step needs an empty-list special case.
 
 ## Flags in `fcntl.h`
 
-`kernel/fcntl.h` defines `O_RDONLY` `0x000`, `O_WRONLY` `0x001`, `O_RDWR` `0x002`, `O_CREATE` `0x200`, and `O_TRUNC` `0x400`: one bit each except `O_RDONLY`, which is the absence of the write bits. User code combines them with `|` (`O_CREATE|O_RDWR` in `user/usertests.c`), and `sys_open()` in `kernel/sysfile.c` tests them with `&`:
+The lecture's bit widths are this toolchain's LP64 sizes. `riscv64-linux-gnu-gcc -dM -E` predefines `__CHAR_BIT__` 8, `__SIZEOF_INT__` 4, `__SIZEOF_LONG__` 8, `__SIZEOF_POINTER__` 8, and `_LP64`; the Makefile passes `-march=rv64gc` and no `-mabi`, so the default 64-bit ABI applies:
+
+| Type        | Bits |
+| ----------- | ---- |
+| **`char`**  | 8    |
+| **`int`**   | 32   |
+| **`long`**  | 64   |
+| **pointer** | 64   |
+
+`kernel/fcntl.h` defines the flags:
+
+| Flag       | Value   |
+| ---------- | ------- |
+| `O_RDONLY` | `0x000` |
+| `O_WRONLY` | `0x001` |
+| `O_RDWR`   | `0x002` |
+| `O_CREATE` | `0x200` |
+| `O_TRUNC`  | `0x400` |
+
+Each uses one bit except `O_RDONLY`, which is the absence of the write bits. User code combines them with `|` (`O_CREATE|O_RDWR` in `user/usertests.c`), and `sys_open()` in `kernel/sysfile.c` tests them with `&`:
 
 | Test in `sys_open()`                           | Meaning                           |
 | ---------------------------------------------- | --------------------------------- |
@@ -157,7 +244,10 @@ Green nodes hold data (a free page or a cached block); blue nodes are list roots
 | **`(omode & O_WRONLY) \|\| (omode & O_RDWR)`** | writable in either write mode     |
 | **`(omode & O_TRUNC) && ip->type == T_FILE`**  | truncate plain files only         |
 
-Because `O_RDONLY` is `0`, `omode & O_RDONLY` is **always** false; read-only is detected as "no write bit". Page-table entry flags in `kernel/riscv.h` (`PTE_V`, `PTE_R`, `PTE_W`, `PTE_X`, `PTE_U`) are the lecture's "more interesting examples later".
+> [!WARNING]
+> Because `O_RDONLY` is `0`, `omode & O_RDONLY` is always false; read-only is detected as "no write bit".
+
+Page-table entry flags in `kernel/riscv.h` (`PTE_V`, `PTE_R`, `PTE_W`, `PTE_X`, `PTE_U`) are the lecture's "more interesting examples later".
 
 ## Keywords and common bugs
 
@@ -199,9 +289,21 @@ struct h *h;
 | **`&h->g.c`**     | `0x1000 + 4` = `0x1004`           | yes           | pure offset arithmetic                                                   |
 | **`&h->g.c[10]`** | `h->g.c + 10`                     | no            | needs the pointer stored at `0x1004`; `char` scales by 1                 |
 
-`&` cancels only the final access. `&h->f->a` is `&((*h).f)->a`: the compiler **must** still load `h->f` to know where `a` is. No padding appears in either ABI because every member's offset is already a multiple of its alignment; [`docs/labs/03-util-memdump.md`](labs/03-util-memdump.md#structure-layout) covers the LP64 alignment rules.
+> [!IMPORTANT]
+> `&` cancels only the final access. `&h->f->a` is `&((*h).f)->a`: the compiler must still load `h->f` to know where `a` is.
 
-On xv6 the lecture asks "which printed values are guaranteed" and "why did all the prints succeed?" — [`user/hwstruct.c`](../user/hwstruct.c) answers both by running the expressions. The two arithmetic answers are fixed at `0x1018` and `0x1008`. The two loads read `0x1000` and `0x1008`, which in that binary is `umalloc.c`'s zeroed `freep`, so they print `0x0` and `0xA`. They succeed because `0x1000` is the program's own data page; with that page unmapped, `usertrap()` would kill the process.
+No padding appears in either ABI because every member's offset is already a multiple of its alignment; [`docs/labs/03-util-memdump.md`](labs/03-util-memdump.md#structure-layout) covers the LP64 alignment rules.
+
+On xv6 the lecture asks "which printed values are guaranteed" and "why did all the prints succeed?" — [`user/hwstruct.c`](../user/hwstruct.c) answers both by running the expressions:
+
+| Expression    | xv6 result | What determines it                                        |
+| ------------- | ---------- | --------------------------------------------------------- |
+| `&h->g.d[2]`  | `0x1018`   | Fixed offset arithmetic.                                  |
+| `&h->g.c`     | `0x1008`   | Fixed offset arithmetic.                                  |
+| `&h->f->a`    | `0x0`      | Loads the pointer stored at `0x1000`.                     |
+| `&h->g.c[10]` | `0xA`      | Loads the pointer stored at `0x1008`, then adds 10 bytes. |
+
+The two loads read `0x1000` and `0x1008`, which in that binary is `umalloc.c`'s zeroed `freep`, so they print `0x0` and `0xA`. They succeed because `0x1000` is the program's own data page; with that page unmapped, `usertrap()` would kill the process.
 
 ### Where the first draft went wrong
 
@@ -217,8 +319,28 @@ On xv6 the lecture asks "which printed values are guaranteed" and "why did all t
 
 ### Why does `b` sit below `a` in `array`?
 
-`a` is declared first, but `nm -n user/_array` shows `b` at `0x1000` and `a` at `0x1010`. C does not define the order of separate globals. Here GCC's small-data rule decides it: objects of at most 8 bytes go to `.sdata` (`objdump -t user/array.o` shows `b`, 3 bytes, there) and larger ones to `.data` (`a`, 12 bytes). `user/user.ld` places `*(.sdata .sdata.*)` first, then `ALIGN(16)`, then `*(.data .data.*)`, which also explains the 13-byte gap after `b`. Only members _inside_ one struct keep declaration order.
+`a` is declared first, but `nm -n user/_array` shows the reverse address order:
+
+| Global | Size     | Input section (`objdump -t user/array.o`) | Linked address |
+| ------ | -------- | ----------------------------------------- | -------------- |
+| `b`    | 3 bytes  | `.sdata`                                  | `0x1000`       |
+| `a`    | 12 bytes | `.data`                                   | `0x1010`       |
+
+Two rules explain the result:
+
+1. **GCC's small-data rule:** objects of at most 8 bytes go to `.sdata`, and larger ones go to `.data`.
+2. **Linker ordering:** `user/user.ld` places `*(.sdata .sdata.*)` first, then `ALIGN(16)`, then `*(.data .data.*)`. The alignment also explains the 13-byte gap after `b`.
+
+> [!NOTE]
+> C does not define the order of separate globals. Only members _inside_ one struct keep declaration order.
 
 ### Why is the same local at different addresses in `ptr` and `ptr x yz`?
 
-`kexec()` puts the argument strings and `argv[]` above `main`'s frame, so more or longer arguments push the frame down: `q` is `0x...4F8C` with no arguments and `0x...4F5C` with two. Globals **do not** move, because the linker fixed them.
+`kexec()` puts the argument strings and `argv[]` above `main`'s frame, so more or longer arguments push the frame down:
+
+| Invocation                 | Address of local `q` |
+| -------------------------- | -------------------- |
+| `ptr` (no arguments)       | `0x...4F8C`          |
+| `ptr x yz` (two arguments) | `0x...4F5C`          |
+
+Globals **do not** move, because the linker fixed them.
