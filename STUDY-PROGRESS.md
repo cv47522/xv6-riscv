@@ -61,7 +61,7 @@ Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance 
 
 Main texts are below. FAQs, examples, and the UART manual follow in the extras table.
 
-- [x] **Lecture 01 · 2026-09-09** — [Introduction](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview.txt) / [local](lectures/l-overview.txt)
+- [x] **Lecture 01 · 2026-09-09** — [Introduction](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview.txt) / [local](lectures/l-overview.txt) · [notes](docs/12-os-overview-in-xv6.md) · [practice](#lecture-1-example-practice)
 - [x] **Lecture 02 · 2026-09-14** — [C in xv6](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c.txt) / [local](lectures/l-c.txt) · studied 2026-10-27 · [notes](docs/10-c-in-xv6.md) · [practice](#lecture-2-example-practice)
 - [ ] **Lecture 03 · 2026-09-16** — [OS design](https://pdos.csail.mit.edu/6.1810/2026/lec/l-os.txt) / [local](lectures/l-os.txt) · draft [notes](docs/11-os-design-in-xv6.md) and [practice](#lecture-3-example-practice); not yet studied
 - [ ] **Lecture 04 · 2026-09-21** — [Page tables](https://pdos.csail.mit.edu/6.1810/2026/lec/l-vm.txt) / [local](lectures/l-vm.txt)

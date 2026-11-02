@@ -8,8 +8,15 @@
 
 The companion to Lecture 3, [_OS design_](../lectures/l-os.txt). The lecture's question is how a kernel isolates programs that it **must** assume are malicious; this note answers it with this tree's code, measured addresses, and two practice programs that attack the boundary and record what refuses them.
 
-> [!NOTE]
-> Ownership follows the [book notes rule](book/README.md): [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#user-mode-vs-kernel-mode) owns user/kernel mode, traps, and system-call numbers as portable ideas; [05-syscall-reference.md](05-syscall-reference.md#what-a-system-call-actually-is-here) owns the stub-to-`sys_*` dispatch path; [06-build-artifacts.md](06-build-artifacts.md#why-the-system-call-number-goes-in-a7) owns `ecall` and `a7`; [ch04](book/ch04-traps-and-system-calls.md) will own the trap path. This note owns only what Lecture 3 adds on top: where the boundary is enforced in this tree, how the first process gets across it, and what `fork` and `exec` do when user input is hostile.
+Use this ownership map to find the explanation you need, following the [book notes rule](book/README.md):
+
+| Explanation                                                   | Owning note                                                                                                                  |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Portable user/kernel mode, traps, and system-call numbers** | [The Process Abstraction](../../operating-system/The_Process_Abstraction.md#user-mode-vs-kernel-mode).                       |
+| **Stub-to-`sys_*` dispatch**                                  | [05-syscall-reference.md](05-syscall-reference.md#what-a-system-call-actually-is-here).                                      |
+| **`ecall` and `a7`**                                          | [06-build-artifacts.md](06-build-artifacts.md#why-the-system-call-number-goes-in-a7).                                        |
+| **The kernel trap path**                                      | [ch04](book/ch04-traps-and-system-calls.md), when written.                                                                   |
+| **Lecture 3's additions in this tree**                        | This note: where the boundary is enforced, how the first process crosses it, and how `fork` and `exec` handle hostile input. |
 
 > [!IMPORTANT]
 > **Status: draft study notes.** Lecture 3 is not yet marked studied in [STUDY-PROGRESS.md](../STUDY-PROGRESS.md#lectures), and Homework 3 is unanswered. Measurements below are from this tree's `LAB=util` build on 2026-10-28.
@@ -41,20 +48,40 @@ The lecture names two defences: hardware controls on user instructions, and a ca
 | **`badsys`**: `ecall` with `a7` = 99               | `syscall()` bounds-checks `a7` against `syscalls[]`                 | Kernel prints `unknown sys call 99`; the call returns `-1` |
 | **`kcopy`**: `read()` from a pipe into `TRAPFRAME` | `copyout()` calls `walkaddr()`, which rejects a PTE without `PTE_U` | `read()` returns `-1`; the two pipe bytes are not consumed |
 
-The first two are faults: the hardware stops the instruction, `usertrap()` in `kernel/trap.c` finds no handler for that `scause`, and calls `setkilled()`. The last two **never** fault, because the kernel itself performs the check and turns a hostile request into an ordinary error return. That split is the lecture's pair of defences made concrete.
+The results divide into the lecture's two defences:
+
+- **Hardware faults (`csr`, `kload`):** hardware stops the instruction. `usertrap()` in `kernel/trap.c` has no applicable handler for these cases and calls `setkilled()`.
+- **Kernel checks (`badsys`, `kcopy`):** these attempts **never** fault. Kernel code detects the invalid request and returns an ordinary error.
 
 > [!NOTE]
 > `TRAMPOLINE` (`0x3FFFFFF000`) and `TRAPFRAME` (`0x3FFFFFE000`) are **mapped in every user page table**. `proc_pagetable()` in `kernel/proc.c` maps them with `PTE_R | PTE_X` and `PTE_R | PTE_W` but never `PTE_U`, so isolation here is a permission bit, not a missing mapping.
 
 ![A tall column divided into labelled bands, spanning one process's virtual address space](book/fig/as.svg)
 
-_“Layout of a process's virtual address space” — [book figure](book/fig/README.md), `first.tex` `fig:as`, also captioned in [ch02](book/ch02-operating-system-organization.md#figures). Bottom to top from 0: **user text and data**, **user stack**, a large **heap**, then two thin bands under `MAXVA`, **trapframe** and **trampoline**. Those two slivers are the targets of `isolate kload` and `isolate kcopy`: the drawing places them inside the user's own address space, and the table above shows that being mapped there still does not make them reachable, because neither carries `PTE_U`._
+_“Layout of a process's virtual address space” — [book figure](book/fig/README.md), `first.tex` `fig:as`; also captioned in [ch02](book/ch02-operating-system-organization.md#figures)._
 
-The `kcopy` case matters more than it looks. The trapframe holds this process's saved registers, including the `epc` that `usertrap()` returns to. If `walkaddr()` in `kernel/vm.c` did not test `PTE_U`, a `read()` with that destination would let a user choose the kernel's next return address. `piperead()` in `kernel/pipe.c` returns `-1` before advancing `nread`, which is why the following `read()` into a real buffer still gets `"hi"`.
+Read the bands **bottom to top**, starting at address 0:
+
+1. User text and data.
+2. User stack.
+3. A large heap region.
+4. Trapframe, then trampoline: two thin bands immediately below `MAXVA`.
+
+The last two bands are the targets of `isolate kcopy` and `isolate kload`, respectively. They are inside the user's own virtual address space, but neither mapping carries `PTE_U`: **mapped does not mean user-accessible**. The attack table above records the resulting refusals.
+
+Why `kcopy` matters:
+
+- **Protected state:** the trapframe holds this process's saved registers, including `epc`, the user instruction address that the kernel will resume. Without `walkaddr()`'s `PTE_U` test in `kernel/vm.c`, a `read()` into that page could corrupt the saved return state.
+- **Failure preserves the pipe bytes:** `piperead()` in `kernel/pipe.c` returns `-1` before advancing `nread`. A following `read()` into a real buffer therefore still gets `"hi"`.
 
 ## A system call is a number
 
-Lecture 3's observation is that `fork()` does not call a kernel function: the stub in `user/usys.S` executes `li a7, SYS_fork` and `ecall`, and `syscall()` in `kernel/syscall.c` uses `a7` to index `syscalls[]`. The mechanics are in [05-syscall-reference.md](05-syscall-reference.md#what-a-system-call-actually-is-here); this tree's numbers for the calls the lecture walks through come from `kernel/syscall.h`:
+Lecture 3's observation: a user call to `fork()` reaches the kernel through a **number**, rather than an ordinary function call into kernel code.
+
+1. The stub in `user/usys.S` executes `li a7, SYS_fork`, then `ecall`.
+2. `syscall()` in `kernel/syscall.c` uses saved `a7` to index `syscalls[]`.
+
+The full mechanics belong to [05-syscall-reference.md](05-syscall-reference.md#what-a-system-call-actually-is-here). The numbers below come from this tree's `kernel/syscall.h`:
 
 | Call       | Number | Kernel entry | Does the work                                    |
 | ---------- | ------ | ------------ | ------------------------------------------------ |
@@ -62,7 +89,12 @@ Lecture 3's observation is that `fork()` does not call a kernel function: the st
 | **`exec`** | 7      | `sys_exec()` | `kexec()` in `kernel/exec.c`                     |
 | **`sync`** | 22     | `sys_sync()` | the highest number in the table; 99 has no entry |
 
-`syscall()` accepts `num` only when `num > 0 && num < NELEM(syscalls) && syscalls[num]`. Any other value reaches the `printk("%d %s: unknown sys call %d\n", ...)` branch and sets `a0` to `-1`, which is the `5 isolate: unknown sys call 99` line in `isolate badsys`. Because `usys.S` hard-codes `a7` per stub, reaching an unused number needs the hand-written `ecall` in `rawsyscall()`.
+| Dispatch condition                                  | Result                                                                        |
+| --------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `num > 0 && num < NELEM(syscalls) && syscalls[num]` | Call the registered handler.                                                  |
+| **Any other value**                                 | Run `printk("%d %s: unknown sys call %d\n", ...)` and set saved `a0` to `-1`. |
+
+The second row produces `5 isolate: unknown sys call 99` in `isolate badsys`. Each generated `usys.S` stub hard-codes its own `a7`, so `rawsyscall()` uses a hand-written `ecall` to try an unused number.
 
 > [!WARNING]
 > The lecture's naming convention, `k<syscallname>()`, holds only for process calls. This tree has `kfork()`, `kexec()`, `kexit()`, `kwait()`, and `kkill()`; file calls go from `sys_read()` to `fileread()`, not to a `kread()`. The full rename table is in [the concordance appendix](book/00-ostep-concordance.md#system-call-naming).
@@ -71,7 +103,8 @@ The lecture also suggests editing `syscall()` to print a trace of every system c
 
 ## Kernel organization and trust
 
-This section holds two concepts **on loan**: the OSTEP notes cover user/kernel mode but have no section on the threat model or kernel organization, and Lecture 12 reads about microkernels. Move them when an owning note exists.
+> [!NOTE]
+> **Concepts on loan:** the OSTEP notes cover user/kernel mode but do not yet own the threat model or kernel organization. These two concepts stay here until an owning note exists; Lecture 12 reads about microkernels.
 
 | Assumption      | Lecture 3's position                                                 | Consequence in this tree                                                                                     |
 | --------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -85,9 +118,20 @@ This section holds two concepts **on loan**: the OSTEP notes cover user/kernel m
 
 ![Two ellipses in user space above a red dividing line, both connected down to a thin box in kernel space](book/fig/mkernel.svg)
 
-_“A microkernel with a file-system server” — [book figure](book/fig/README.md), `first.tex` `fig:mkernel`. Two user processes, `shell` and `File server`, sit above the red user/kernel line; their connection dips through a thin `Microkernel` box and is labelled **Send message**. This is the table's second row drawn out: the file system has moved out of the TCB into user space, so a shell's `read` becomes two messages through the kernel instead of one system call into it. Compare [Lecture 1's figure](12-os-overview-in-xv6.md#what-a-system-call-does-step-by-step), where the same request is a single arrow into one large kernel._
+_“A microkernel with a file-system server” — [book figure](book/fig/README.md), `first.tex` `fig:mkernel`._
 
-xv6 is monolithic: every file in `kernel/` is linked into one `kernel/kernel` binary, so the kernel interface is exactly the system-call interface. The lecture's aside, that a strongly typed language such as Singularity's can isolate processes without hardware modes, is the alternative xv6 does not take.
+| Figure feature                                   | How to read it                                                                                    |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| **`shell` and `File server` above the red line** | Both are user processes. The file system runs outside the privileged kernel.                      |
+| **Thin `Microkernel` box below the line**        | The kernel mediates communication between those processes.                                        |
+| **Connection labelled “Send message”**           | The connection dips through the microkernel instead of calling the file system inside the kernel. |
+
+For a schematic `read` request/reply exchange, the shell sends a request through the kernel to the server, and the server sends a reply through the kernel to the shell: **two messages**. This illustrates the microkernel row above; the figure does not specify every message a real file-system protocol might require. Compare [Lecture 1's figure](12-os-overview-in-xv6.md#what-a-system-call-does-step-by-step), where the request is a single system-call arrow into one large kernel.
+
+Moving the file system to user space removes it from the privileged kernel's TCB and limits its authority. It does not make the server irrelevant to security: file-system integrity can still depend on trusting that service.
+
+- **xv6's choice:** every file in `kernel/` links into one `kernel/kernel` binary. It is monolithic, and its user-facing kernel interface is the system-call interface.
+- **The lecture's alternative:** a strongly typed language, such as Singularity's, can provide process isolation without hardware modes. xv6 does not take that approach.
 
 ## The machine xv6 runs on
 
@@ -103,37 +147,63 @@ The lecture models the board as a 4-core SiFive HiFive Unleashed with 128 MB of 
 | **Kernel binary** | `ls -l kernel/kernel`                      | 276,264 bytes                                                                       |
 | **Kernel source** | small enough to understand by semester end | 23 `.c` files, 4 `.S` files, 7,041 lines including headers (`wc -l kernel/*.[chS]`) |
 
-The lecture's "emulation" sketch, a loop that reads, decodes, and executes one instruction against a `uint64 reg[32]` array, is what QEMU does for each of the emulated harts. `-bios none` means no firmware runs first: QEMU jumps straight to `_entry` in machine mode. Why the kernel is linked at that address is in [06-build-artifacts.md](06-build-artifacts.md#why-the-kernel-is-linked-at-0x80000000).
+The lecture's emulation sketch is a useful model for each emulated hart:
+
+1. Read the next instruction.
+2. Decode it.
+3. Execute its effect on state such as a `uint64 reg[32]` register array.
+
+`-bios none` omits a separate firmware image. QEMU still executes a small reset stub before transferring to `_entry` in machine mode; `_entry` is the kernel's first instruction, not necessarily the first instruction seen when attaching GDB at reset. Why the kernel is linked there is in [06-build-artifacts.md](06-build-artifacts.md#why-the-kernel-is-linked-at-0x80000000).
 
 ![Two tall columns, kernel virtual on the left and physical on the right, joined by dotted lines](book/fig/xv6_layout.svg)
 
-_“On the left, xv6's kernel virtual address space; on the right, the RISC-V physical address space that xv6 expects to see.” — [book figure](book/fig/README.md), `mem.tex` `fig:xv6_layout`, also captioned in [ch03](book/ch03-page-tables.md#figures). Bottom to top: the devices QEMU's `virt` machine provides, `PLIC` at `0x0C000000`, `UART0` at `0x10000000`, and the virtio disk at `0x10001000`, then RAM from `KERNBASE` (`0x80000000`) to `PHYSTOP` (`0x88000000`) holding kernel text, data, and free memory, with the trampoline and guard-separated kernel stacks at the top. It is the table above as a memory map: `-m 128M` is why `PHYSTOP` is `KERNBASE + 128 * 1024 * 1024` in `kernel/memlayout.h`, `_entry` is the first byte of the kernel text band, and `fs.img` is reached through the virtio registers, not through RAM._
+_“On the left, xv6's kernel virtual address space; on the right, the RISC-V physical address space that xv6 expects to see.” — [book figure](book/fig/README.md), `mem.tex` `fig:xv6_layout`; also captioned in [ch03](book/ch03-page-tables.md#figures)._
+
+Read the devices and RAM **bottom to top**:
+
+| Region                                      | Address / placement                                                       | Connection to this build                                                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **PLIC**                                    | `0x0C000000`                                                              | QEMU `virt` interrupt controller.                                                                                         |
+| **UART0**                                   | `0x10000000`                                                              | Console device registers.                                                                                                 |
+| **Virtio disk**                             | `0x10001000`                                                              | `fs.img` is reached through device registers, not as RAM contents.                                                        |
+| **RAM: kernel text, data, and free memory** | `KERNBASE` (`0x80000000`) through the exclusive `PHYSTOP` (`0x88000000`). | `_entry` begins the kernel text band. `-m 128M` matches `PHYSTOP = KERNBASE + 128 * 1024 * 1024` in `kernel/memlayout.h`. |
+| **High kernel virtual mappings**            | Trampoline and kernel stacks at the top of the virtual column.            | Unmapped guard pages separate kernel stacks.                                                                              |
+
+The two columns distinguish virtual placement from the physical machine map; high virtual mappings do not add physical RAM above `PHYSTOP`.
 
 ## From boot to the first process
 
-Lecture 3 traces `main()` → `userinit()` → `forkret()` → `/init`. The path starts two steps earlier, in machine mode:
+> [!TIP]
+> **Assembly new to you?** Start with the [assembly course](../../assembly-language/README.md), then its [readiness checks](../../assembly-language/docs/08-readiness-and-next-steps.md). This section is an overview, not a line-by-line tutorial. The [boot-study proposal](boot/README.md) specifies the missing lessons and source coverage.
+
+Lecture 3 traces `main()` → `userinit()` → `forkret()` → `/init`. The path starts two steps earlier, in machine mode. M-mode means machine mode, S-mode supervisor mode, and U-mode user mode; a hart is a hardware thread with its own register state (see the [glossary](04-terminology.md)).
 
 ```mermaid
+---
+config:
+  flowchart:
+    wrappingWidth: 420
+---
 flowchart TD
-    A["kernel/entry.S: _entry sets a per-hart stack and calls start()"] --> B["kernel/start.c: start() sets mstatus.MPP to S-mode and mepc to main, then executes mret"]
-    B --> C["kernel/main.c: main() on hart 0 initializes devices, memory, the process table, and traps"]
-    C --> D["kernel/proc.c: userinit() takes a slot with allocproc() and marks it RUNNABLE"]
-    D --> E["kernel/proc.c: scheduler() swtch()es to the new process's context"]
-    E --> F["kernel/proc.c: forkret() runs fsinit(), then kexec(&quot;/init&quot;)"]
-    F --> G["kernel/trampoline.S: userret enters U-mode at the ELF entry"]
-    G --> H["user/init.c: init opens the console as fd 0, dups 1 and 2, then forks and execs sh"]
+    A["kernel/entry.S (M-mode)<br/>_entry prepares each hart's stack and calls start()."] --> B["kernel/start.c (M-mode to S-mode)<br/>start() sets MPP and mepc, then executes mret."]
+    B --> C["kernel/main.c (S-mode)<br/>Hart 0 initializes devices, memory, processes, and traps."]
+    C --> D["kernel/proc.c (S-mode)<br/>userinit() calls allocproc() and marks the slot RUNNABLE."]
+    D --> E["kernel/proc.c and kernel/swtch.S (S-mode)<br/>scheduler() switches into the process's context."]
+    E --> F["kernel/proc.c (S-mode, first process)<br/>forkret() runs fsinit(), then kexec(&quot;/init&quot;)."]
+    F --> G["kernel/trampoline.S (S-mode to U-mode)<br/>userret enters the program at its ELF entry."]
+    G --> H["user/init.c (U-mode)<br/>init opens fd 0, dups 1 and 2, then forks and execs sh."]
 
-    classDef processing fill:#fffff0,stroke:#cc6
-    classDef routing fill:#f0f0ff,stroke:#66c
-    classDef commit fill:#f0ffff,stroke:#6cc
-    classDef movement fill:#f0fff0,stroke:#6c6
+    classDef processing fill:#fffff0,stroke:#996600,color:#111
+    classDef routing fill:#f0f0ff,stroke:#6666aa,color:#111
+    classDef commit fill:#f0ffff,stroke:#336666,color:#111
+    classDef movement fill:#f0fff0,stroke:#336633,color:#111
     class A,C processing
     class B,E,G routing
     class D commit
     class F,H movement
 ```
 
-Yellow nodes do setup work, blue nodes switch privilege mode or context, the cyan node commits a new process-table entry, and green nodes load a program image. M-mode is RISC-V machine mode, S-mode is supervisor mode, and U-mode is user mode; the lecture mostly ignores M-mode, and so does xv6 after `mret`.
+Legend: yellow means setup, blue a mode/context transition, cyan stored process state, and green loading or launching a program. `start()` selects S-mode in `mstatus.MPP` and `main` in `mepc`; `mret` performs that transfer. The lecture mostly ignores M-mode, and so does xv6 after this transfer. Every hart eventually runs `scheduler()`; the full initialization shown here belongs to hart 0.
 
 | Symbol      | Address (`nm -n kernel/kernel`) | Role in the path                                  |
 | ----------- | ------------------------------- | ------------------------------------------------- |
@@ -147,8 +217,17 @@ Yellow nodes do setup work, blue nodes switch privilege mode or context, the cya
 
 Two details the lecture compresses:
 
-1. `userinit()` does not load any code. It only allocates a slot, sets `p->cwd`, and marks it `RUNNABLE`; `allocproc()` already pointed `p->context.ra` at `forkret`. The first `kexec()` happens inside `forkret()`, guarded by `static int first`, because `fsinit()` may sleep and so **must** run in a process context, not in `main()`.
-2. `/init` gets descriptors 0, 1, and 2 by opening `console` once and calling `dup(0)` twice. If `open()` fails it first runs `mknod("console", CONSOLE, 0)`, since a fresh `fs.img` may not hold the device file yet. Every later process inherits those three descriptors through `fork`.
+| Stage                 | What it actually establishes                                                   | Why the distinction matters                                                          |
+| --------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `allocproc()`         | Sets `p->context.ra` to `forkret`.                                             | The first context switch has a kernel destination.                                   |
+| `userinit()`          | Allocates the slot, sets `p->cwd`, and marks it `RUNNABLE`; **loads no code**. | A runnable kernel context is not yet a loaded user program.                          |
+| **First `forkret()`** | Under `static int first`, runs `fsinit()` before the first `kexec()`.          | `fsinit()` may sleep, so it **must** run in process context rather than in `main()`. |
+
+For `/init`'s console descriptors, the order is:
+
+1. Open `console`. If that fails, call `mknod("console", CONSOLE, 0)` and retry the open: a fresh `fs.img` may lack the device file.
+2. Use the opened descriptor as fd 0, then call `dup(0)` twice for fds 1 and 2.
+3. Let later processes inherit the three descriptors through `fork`.
 
 ## `fork`, `kfork`, and a full table
 
@@ -175,11 +254,25 @@ forkfill: fork works again
 | **Already in use**       | 3     | `init`, `sh`, and `forkfill` itself                              |
 | **Children before `-1`** | 61    | measured, and the same on a second run once the first was reaped |
 
-`allocproc()` returns `0`, `kfork()` returns `-1`, and the kernel keeps running. A slot comes back only when the parent's `wait()` reaches `freeproc()`; an exited child that nobody reaps still holds its slot as a `ZOMBIE`. One user can therefore exhaust the table for everyone, which is the "resource isolation" problem the lecture lists and xv6 does not solve: it has no per-user process limit.
+| Event                               | Result                                                                           |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| **No process slot is available**    | `allocproc()` returns `0`, `kfork()` returns `-1`, and the kernel keeps running. |
+| **A child exits but is not reaped** | It remains a `ZOMBIE` and still occupies its slot.                               |
+| **The parent reaps that child**     | The parent's `wait()` reaches `freeproc()`, making the slot available again.     |
+
+One user can therefore exhaust the table for everyone. This is the lecture's **resource isolation** problem: xv6 has no per-user process limit.
 
 ## `exec` treats the file as hostile
 
-`sys_exec()` in `kernel/sysfile.c` copies the path with `argstr()` and each argument with `fetchaddr()` and `fetchstr()` into kernel pages, failing once `argv` would need more than `MAXARG` (32) slots including its terminating `0`, before it calls `kexec()`. Every user pointer is therefore read through the same `PTE_U`-checked path that `isolate kcopy` hits. `kexec()` then refuses an ELF file that could make it write outside the new image:
+Before calling `kexec()`, `sys_exec()` in `kernel/sysfile.c` checks and copies user-supplied inputs:
+
+| Input                             | How it is copied / checked                                                                 |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Executable path**               | `argstr()` copies the path into kernel storage.                                            |
+| **Argument pointers and strings** | `fetchaddr()` reads pointers; `fetchstr()` copies strings into kernel pages.               |
+| **Argument count**                | Reject an `argv` needing more than `MAXARG` (32) slots, **including** its terminating `0`. |
+
+These user-pointer reads require `PTE_U`, just as the destination check in `isolate kcopy` does. `kexec()` then rejects ELF input that could make it write outside the new image:
 
 | Check in `kexec()`                   | It rejects                                                              |
 | ------------------------------------ | ----------------------------------------------------------------------- |
@@ -189,7 +282,12 @@ forkfill: fork works again
 | **`ph.vaddr % PGSIZE != 0`**         | a segment that does not start on a page boundary                        |
 | **`sp < stackbase`**                 | arguments that would overflow the `USERSTACK` pages into the guard page |
 
-The wrap-around check is the one the lecture's "don't be tricked into overwriting kernel memory" points at: without it, a huge `memsz` could pass `uvmalloc()` a range that ends below where it starts. Every failure jumps to `bad:`, frees the half-built page table, and returns `-1` while the old image is still intact, because `p->pagetable` is replaced only after every check has passed. The stack and `argv` layout `kexec()` builds is drawn in [10-c-in-xv6.md](10-c-in-xv6.md#argv-and-the-calling-convention).
+The wrap-around check addresses the lecture's “don't be tricked into overwriting kernel memory”: without it, a huge `memsz` could give `uvmalloc()` a range whose end is below its start.
+
+> [!IMPORTANT]
+> **Replace the old image only after success.** Each listed `kexec()` failure goes to `bad:`, frees any half-built page table, and returns `-1`. The old image stays intact because `p->pagetable` is replaced only after all checks pass.
+
+The resulting stack and `argv` layout is drawn in [10-c-in-xv6.md](10-c-in-xv6.md#argv-and-the-calling-convention).
 
 ## Divergences from the lecture text
 
@@ -211,4 +309,9 @@ Because the trap path needs them before it can switch page tables. `uservec` in 
 
 ### Why does `isolate csr` report `stval=0x100027f3`?
 
-For an illegal-instruction trap, RISC-V puts the faulting instruction's encoding in `stval` instead of an address. `user/isolate.asm` shows `100027f3` at `0x44`, the same address as `sepc`, decoded as `csrr a5,sstatus`. For the page fault in `isolate kload`, `stval` is the refused address, `0x3ffffff000`.
+| Experiment          | Meaning of the observed `stval`                                       | Source evidence                                                                               |
+| ------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| **`isolate csr`**   | `0x100027f3` is the faulting instruction's encoding in this QEMU run. | `user/isolate.asm` shows `100027f3` at `0x44`, equal to `sepc`, decoded as `csrr a5,sstatus`. |
+| **`isolate kload`** | `0x3ffffff000` is the refused address.                                | This case is a load page fault rather than an illegal instruction.                            |
+
+For illegal instructions, the architecture permits implementations to report instruction bits in `stval`; do not assume every RISC-V implementation supplies a nonzero encoding. Here the disassembly explains the measured value.
