@@ -181,6 +181,8 @@ The C call reaches a user-space stub. Hardware crosses the privilege boundary at
 
 ### Three control transfers
 
+**Hardware prerequisite:** [calls, traps, and privilege returns](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#control-transfers-calls-traps-and-privilege-returns). That lesson explains the reusable mechanism; the table below records this tree’s `pause` path, stack changes, and return state.
+
 | Transfer               | Instruction                 | Privilege       | Stack                                               | Target chosen by                                             | In this exercise                                   |
 | ---------------------- | --------------------------- | --------------- | --------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------- |
 | **C function call**    | `jal`, returning with `ret` | Unchanged       | The same user stack                                 | The linker, which resolved the symbol's address              | `main()` calls `pause()`, `atoi()`, or `fprintf()` |

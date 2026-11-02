@@ -42,6 +42,8 @@ ch13-summary.md
 
 ## How a chapter note is written
 
+For instruction, ABI, CSR, and saved-state prerequisites, use the [assembly companion map](../README.md#assembly-prerequisites-and-companion-notes). It complements the OSTEP concordance: assembly lessons explain the machine-level foundation; chapter notes retain this kernel’s mechanisms and invariants.
+
 The rule that keeps these notes short is ownership: **`../operating-system/` owns portable concepts; this directory owns xv6's realization of them.** When placement is unclear, apply one test:
 
 Diagram colors used throughout these notes: blue marks decisions or routing, green marks data movement, yellow marks processing, cyan marks commits or stored results, and red marks stalls or failures. Labels **always** carry the same meaning without color.

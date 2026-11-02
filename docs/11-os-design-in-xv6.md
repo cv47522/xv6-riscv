@@ -174,7 +174,7 @@ The two columns distinguish virtual placement from the physical machine map; hig
 ## From boot to the first process
 
 > [!TIP]
-> **Assembly new to you?** Start with the [assembly course](../../assembly-language/README.md), then its [readiness checks](../../assembly-language/docs/08-readiness-and-next-steps.md). This section is an overview, not a line-by-line tutorial. The [boot-study proposal](boot/README.md) specifies the missing lessons and source coverage.
+> **Assembly new to you?** Start with the [assembly course](../../assembly-language/README.md), then its [readiness checks](../../assembly-language/docs/riscv/08-readiness-and-next-steps.md). This section is an overview, not a line-by-line tutorial. The [boot-study proposal](boot/README.md) specifies the missing lessons and source coverage.
 
 Lecture 3 traces `main()` → `userinit()` → `forkret()` → `/init`. The path starts two steps earlier, in machine mode. M-mode means machine mode, S-mode supervisor mode, and U-mode user mode; a hart is a hardware thread with its own register state (see the [glossary](04-terminology.md)).
 

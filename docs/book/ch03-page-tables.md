@@ -12,6 +12,8 @@
 
 ## Figures
 
+**Assembly prerequisite:** [allocation versus mapping](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#virtual-memory-map-pages-and-check-permissions). Use it for the machine-level foundation before reading this tree’s implementation below.
+
 ![A virtual address bar above a single tall page table, with arrows producing a physical address bar](fig/riscv_address.svg)
 
 _“An abstract view of a flat page table mapping virtual to physical addresses.” — [book figure](fig/README.md), `mem.tex` `fig:riscv_address`. The 64-bit virtual address splits into a 25-bit **EXT**, a 27-bit **Index**, and a 12-bit **Offset**. The index selects one of 2^27 entries, each holding a 44-bit **PPN** and 10 **Flags**; that PPN concatenated with the untouched offset forms the 56-bit physical address. This is the lie the next figure corrects: 2^27 entries of 8 bytes is a gigabyte of page table per process, which is why no real machine uses this shape._

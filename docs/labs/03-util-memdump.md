@@ -171,6 +171,8 @@ A mixed-width walker therefore uses the same one-byte unit that the format width
 
 ### Values, representations, and byte order
 
+For an instruction-level experiment with load widths, signedness, and byte order, see [the assembly memory lesson](../../../assembly-language/docs/riscv/02-memory-and-pointers.md#loads-width-signedness-and-byte-order). The details below apply to this xv6 tree.
+
 [`kernel/types.h`](../../kernel/types.h) defines `uint8`, `uint16`, `uint32`, and `uint64` on top of the widths the RISC-V compiler selected by this Makefile actually uses:
 
 | C type                  | Width on this target | Alias in `kernel/types.h` | Format character that consumes it |

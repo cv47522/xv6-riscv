@@ -12,6 +12,8 @@
 
 ## Figures
 
+**Assembly prerequisite:** [trap entry and privilege returns](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#control-transfers-calls-traps-and-privilege-returns). Use it for the machine-level foundation before reading this tree’s implementation below.
+
 The book draws this one in TikZ, so it is redrawn here rather than copied; see [fig/README.md](fig/README.md#the-figures-that-are-redrawn-instead).
 
 ```mermaid

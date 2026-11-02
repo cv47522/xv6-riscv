@@ -53,6 +53,8 @@ The book describes five run states informally; `enum procstate` in `kernel/proc.
 
 ### Boot, from `_entry` to the shell
 
+**Assembly prerequisite:** [CSR fields and privilege returns](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md). Use it for the machine-level foundation before reading this tree’s implementation below.
+
 Each step runs once, in order, so a numbered list carries it. [11-os-design-in-xv6.md](../11-os-design-in-xv6.md#from-boot-to-the-first-process) draws the same path as a flowchart with the symbols' addresses.
 
 1. QEMU (`-bios none`) loads `kernel/kernel` at `0x80000000` and starts **every** hart at `_entry` in `kernel/entry.S`, in machine mode with paging off.

@@ -22,6 +22,8 @@ You are refreshing the read-only book checkout, saving every figure the target c
 
 ## Step 1 — Refresh the book checkout without modifying it
 
+For machine-level prerequisites, consult the [assembly companion map](../README.md#assembly-prerequisites-and-companion-notes). Link reusable instruction, calling-convention, ELF, and CSR explanations to the sibling assembly lessons; retain this tree’s exact source symbols, values, invariants, and failure paths here. A simplified RV32 preview does not establish behavior of the RV64 kernel.
+
 `~/personal/xv6-riscv-book` is a fork whose branch tracks upstream `mit-pdos/xv6-riscv-book`. It is **input only**: bring in upstream commits by fast-forward and nothing else.
 
 ```bash

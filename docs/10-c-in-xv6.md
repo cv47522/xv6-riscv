@@ -115,6 +115,8 @@ The Linux comparison is illustrated in [Memory Management and Organization](../.
 
 ## Looking inside a user binary
 
+Practice the tools on a smaller C/assembly program in [C, ELF, linker symbols, and disassembly](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md). The details below apply to this xv6 tree.
+
 The lecture's commands, with the values this tree's build produced:
 
 ```bash
@@ -143,7 +145,7 @@ The general ELF and `.asm` material belongs to [06-build-artifacts.md](06-build-
 3. Set `p->trapframe->a1 = sp`, the address of that array.
 4. Return `argc` as the system call's result, which lands in `a0`.
 
-The RISC-V calling convention ([riscv-calling.pdf](https://pdos.csail.mit.edu/6.1810/2026/readings/riscv-calling.pdf)) passes the first two integer arguments in `a0` and `a1`, so `start(argc, argv)` receives them unchanged:
+The RISC-V calling convention ([worked calls-and-stacks lesson](../../assembly-language/docs/riscv/04-functions-and-stacks.md); [riscv-calling.pdf](https://pdos.csail.mit.edu/6.1810/2026/readings/riscv-calling.pdf)) passes the first two integer arguments in `a0` and `a1`, so `start(argc, argv)` receives them unchanged:
 
 | Register | Argument | How `kexec()` supplies it                                        |
 | -------- | -------- | ---------------------------------------------------------------- |

@@ -87,18 +87,7 @@ A `.h` file does exactly one thing: it is text pasted into a `.c` before compila
 
 ### `.S` versus `.s`: the capital letter matters
 
-A capital `.S` tells gcc to run the C preprocessor over the file before assembling it. That is the whole reason `user/usys.S` can open with
-
-```asm
-#include "kernel/syscall.h"
-.global fork
-fork:
- li a7, SYS_fork
- ecall
- ret
-```
-
-and write `SYS_fork` rather than the literal `1`. With a lower-case `.s` the preprocessor **never** runs, `#include` is meaningless, and every call number would have to be hand-copied — free to drift the moment someone renumbers `kernel/syscall.h`.
+A capital `.S` tells gcc to run the C preprocessor before assembling; see [assembler syntax and preprocessing](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md#assembler-syntax-directives-labels-and-symbols). Here, `user/usys.S` opens with `#include "kernel/syscall.h"`, so the [decoded stub below](#the-four-line-stub-decoded) can use `SYS_fork` rather than the literal `1`. With lower-case `.s`, preprocessing **never** runs and that `#include` does not import definitions; hand-copied call numbers could drift when `kernel/syscall.h` changes.
 
 ### Why generate `usys.S` instead of writing it
 
@@ -117,11 +106,13 @@ The generator also earns its keep by holding the one exception in a single `if`:
 
 ## Reading the assembly files
 
+For reusable syntax and practice, read the assembly course’s [register/instruction lesson](../../assembly-language/docs/riscv/01-values-registers-instructions.md), [branches and jumps](../../assembly-language/docs/riscv/03-control-flow.md), and [calls and stacks](../../assembly-language/docs/riscv/04-functions-and-stacks.md). The reference below keeps the exact vocabulary and source locations used by xv6.
+
 Five `.S` files exist in this tree — `kernel/entry.S`, `kernel/swtch.S`, `kernel/kernelvec.S`, `kernel/trampoline.S`, and the generated `user/usys.S` — and between them they use **seventeen distinct instructions**. That is the entire vocabulary. The tables below cover every mnemonic, register, directive, and preprocessor symbol that appears in any of them, so nothing in those files has to stay opaque.
 
 ### The four-line stub, decoded
 
-Take the `fork` stub from `user/usys.S` again, this time annotated:
+The `fork` stub from `user/usys.S`, annotated:
 
 ```asm
 .global fork      # export the name `fork` so ld can resolve calls to it
@@ -134,6 +125,8 @@ fork:             # a label: the address that the name `fork` refers to
 What is _absent_ matters as much as what is present: the stub **never** touches `a0` through `a5`. The C caller already left the arguments there, following the calling convention, and `ecall` does not disturb them — so the kernel finds them exactly where it expects. The stub's only job is to say _which_ system call this is.
 
 ### Instructions
+
+For `ecall` and `sret`, the assembly course’s [calls, traps, and privilege returns](../../assembly-language/docs/riscv/06-csrs-and-privilege.md#control-transfers-calls-traps-and-privilege-returns) explains the hardware mechanism; xv6’s configured trap path is traced [below](#why-the-system-call-number-goes-in-a7).
 
 | Instruction      | Reads as                                                        | What it does                                                                                           | Seen at                                    |
 | ---------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
@@ -160,7 +153,7 @@ What is _absent_ matters as much as what is present: the stub **never** touches 
 
 ### Registers
 
-RISC-V has 32 integer registers, architecturally named `x0` through `x31`. Nobody writes those names. The ABI assigns each one a role and a mnemonic, and every `.S` file here uses the mnemonic.
+RISC-V has 32 integer registers, `x0` through `x31`; the [register-alias table](../../assembly-language/docs/riscv/01-values-registers-instructions.md#register-names-x0x31-and-their-abi-aliases) maps them to ABI names. Every `.S` file here uses those aliases; this table records their roles in xv6.
 
 | Register       | Name from              | Role                                                                                                                 | Preserved across a call by |
 | -------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------- |
@@ -173,11 +166,13 @@ RISC-V has 32 integer registers, architecturally named `x0` through `x31`. Nobod
 | **`a0`–`a7`**  | **a**rgument           | The first eight function arguments. `a0` and `a1` also carry return values                                           | the caller                 |
 | **`s0`–`s11`** | **s**aved              | Long-lived values. `s0` doubles as the frame pointer                                                                 | the callee                 |
 
+For the distinction between a function frame, scheduling context, and user trapframe, see [saved execution state](../../assembly-language/docs/riscv/07-memory-and-saved-state.md#saved-state-stack-frame-context-and-trapframe).
+
 `kernel/swtch.S` saves exactly `ra`, `sp`, and `s0`–`s11` — fourteen registers, and not one of the `a*` or `t*`. That is not an oversight. `swtch` is called from C, so the compiler has already spilled anything it cared about in the caller-saved set; only the callee-saved registers have to survive. `kernel/trampoline.S`, by contrast, saves all 31, because a trap can strike between any two instructions and no compiler agreed to anything.
 
 ### Directives, labels, and preprocessor symbols
 
-Not everything in a `.S` file is an instruction. These are the rest:
+The [assembler-syntax lesson](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md#assembler-syntax-directives-labels-and-symbols) separates directives and labels from runtime instructions. These are the remaining tokens in xv6’s `.S` files:
 
 | Token                       | Kind                | Meaning                                                                                                                                                         |
 | --------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -195,7 +190,7 @@ Not everything in a `.S` file is an instruction. These are the rest:
 
 Because `a0` through `a5` are already spoken for, and `a7` is the argument register left over.
 
-RISC-V passes the first eight integer arguments in `a0`–`a7` and returns values in `a0`. xv6's kernel reads system call arguments straight out of the saved trapframe, and `argraw()` in [`kernel/syscall.c`](../kernel/syscall.c) maps argument 0 through argument 5 onto `a0` through `a5`:
+The [integer calling convention](../../assembly-language/docs/riscv/04-functions-and-stacks.md#calling-convention-what-caller-and-callee-agree-on) supplies `a0`–`a7` for up to eight register-sized integer arguments and `a0` for a single-register result. xv6's kernel reads system call arguments straight out of the saved trapframe, and `argraw()` in [`kernel/syscall.c`](../kernel/syscall.c) maps argument 0 through argument 5 onto `a0` through `a5`:
 
 ```c
 case 0: return p->trapframe->a0;
@@ -260,6 +255,8 @@ sequenceDiagram
 ```
 
 ## What ELF is
+
+The assembly course’s [ELF inspection exercise](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md#elf-inspect-headers-segments-and-symbols) explains headers, segments, symbols, `.bss`, and linker-defined addresses with a small executable. This section applies those distinctions to `kernel/kernel`, user binaries, and `kexec()`.
 
 **ELF** — **E**xecutable and **L**inkable **F**ormat — is the container Unix systems have used since the early 1990s for object files, shared libraries, and executables. Every `.o` in this tree is an ELF file, and so is `kernel/kernel`, and so is every `user/_name`.
 
@@ -345,11 +342,11 @@ panic(char *s)
 }
 ```
 
-| It does                                                                                                                                                      | It does not                                                                                             |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| Print `panic: ` followed by one fixed message                                                                                                                | Print an address, a register dump, or a backtrace                                                       |
+| It does                                                                                                                                                  | It does not                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Print `panic: ` followed by one fixed message                                                                                                            | Print an address, a register dump, or a backtrace                                                       |
 | Set `panicked`, which parks every _other_ hart forever inside `uartputc_sync` ([`kernel/uart.c`](../kernel/uart.c)) so nothing can overwrite the message | Reboot, unwind, or return — it is `__attribute__((noreturn))` in `kernel/defs.h` and ends in `for(;;);` |
-| Stop the machine dead while leaving QEMU running, so gdb can still attach                                                                                    | Kill only the faulting process. A panic is the entire kernel giving up                                  |
+| Stop the machine dead while leaving QEMU running, so gdb can still attach                                                                                | Kill only the faulting process. A panic is the entire kernel giving up                                  |
 
 There are 62 `panic()` call sites across 13 files in `kernel/`, and the string is **always** a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
 
@@ -779,16 +776,16 @@ So the prefix protects **your host**, not xv6. Without it, `user/rm` and `user/c
 
 Where they end up is the part that does not match Linux at all:
 
-|                             | Linux                                                               | xv6                                                                                    |
-| --------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| **Where binaries live**     | `/bin`, `/usr/bin`, `/sbin` — nowadays all symlinks into `/usr/bin` | The root directory, `/`. There is no `bin` directory                                   |
+|                             | Linux                                                               | xv6                                                                                            |
+| --------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Where binaries live**     | `/bin`, `/usr/bin`, `/sbin` — nowadays all symlinks into `/usr/bin` | The root directory, `/`. There is no `bin` directory                                           |
 | **How the shell finds one** | `$PATH` lookup                                                      | No `$PATH` exists. `user/sh.c` `runcmd()` passes the typed word straight to `exec()` as a path |
-| **Configuration**           | `/etc`                                                              | **Nothing.** xv6 has no configuration file of any kind                                 |
-| **Device nodes**            | `/dev`, populated by devtmpfs and udev                              | One node, `/console`, created by `user/init.c` calling `mknod("console", CONSOLE, 0)`  |
-| **Home directories**        | `/home/you`                                                         | None. There are no users, no login, and no uid                                         |
-| **Kernel interfaces**       | `/proc`, `/sys`                                                     | None                                                                                   |
-| **Scratch space**           | `/tmp`                                                              | None                                                                                   |
-| **Shape**                   | The FHS — dozens of standard directories                            | One flat directory: `.`, `..`, and then every program and data file side by side       |
+| **Configuration**           | `/etc`                                                              | **Nothing.** xv6 has no configuration file of any kind                                         |
+| **Device nodes**            | `/dev`, populated by devtmpfs and udev                              | One node, `/console`, created by `user/init.c` calling `mknod("console", CONSOLE, 0)`          |
+| **Home directories**        | `/home/you`                                                         | None. There are no users, no login, and no uid                                                 |
+| **Kernel interfaces**       | `/proc`, `/sys`                                                     | None                                                                                           |
+| **Scratch space**           | `/tmp`                                                              | None                                                                                           |
+| **Shape**                   | The FHS — dozens of standard directories                            | One flat directory: `.`, `..`, and then every program and data file side by side               |
 
 > [!NOTE]
 > The `/etc` and `/usr` question is worth splitting in two, because it mixes build time with run time.

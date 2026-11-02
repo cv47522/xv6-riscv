@@ -187,6 +187,9 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 
 ## Related references
 
+- [Assembly practice: stepping instructions and inspecting memory](../../assembly-language/docs/riscv/00-tools-and-first-run.md)
+- [Assembly practice: observing ra across a nested call](../../assembly-language/docs/riscv/04-functions-and-stacks.md#gdb-observe-ra-change-across-the-nested-call)
+
 - [Build, boot, and basic GDB usage](02-build-boot-and-usage.md#debugging)
 - [Terminology lookup](04-terminology.md)
 - [ELF and build artifacts](06-build-artifacts.md#what-elf-is)

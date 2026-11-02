@@ -433,6 +433,8 @@ make -d kernel/kernel 2>&1 | less  # why Make decided something was out of date
 
 ## Cross references
 
+For a smaller RISC-V build that connects C, assembly, a linker script, and the resulting ELF, see [the assembly build-pipeline exercise](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md#build-pipeline-from-source-files-to-an-elf).
+
 | For                                                           | See                                                                                                                                      |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | Makefile syntax, `.PHONY`, pattern rules, automatic variables | [C_Project_Build_Tool.md § Makefile Comprehensive Tutorial](../../c-programming/C_Project_Build_Tool.md#makefile-comprehensive-tutorial) |

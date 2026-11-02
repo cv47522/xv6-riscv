@@ -70,6 +70,8 @@ PATH=$PATH:/usr/local/opt/riscv-gnu-toolchain/bin
 
 ## Verifying the install
 
+For a small program using the same cross tools before booting a kernel, work through [tools and the first RISC-V run](../../assembly-language/docs/riscv/00-tools-and-first-run.md). The details below apply to this xv6 tree.
+
 ```bash
 qemu-system-riscv64 --version
 riscv64-linux-gnu-gcc --version

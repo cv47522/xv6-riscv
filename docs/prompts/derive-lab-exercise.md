@@ -41,7 +41,8 @@ Name the note `docs/labs/<NN>-<lab>-<exercise>.md`, using lowercase handout term
 | **Program layout, `UPROGS`, and C style**    | `docs/02-build-boot-and-usage.md`                                                                 |
 | **Lab selection, grading, and transcripts**  | `docs/03-lab-workflow.md`                                                                         |
 | **System-call signatures and failures**      | `docs/05-syscall-reference.md`                                                                    |
-| **`ecall`, registers, stubs, and artifacts** | `docs/06-build-artifacts.md`                                                                      |
+| **Reusable instructions, ABI, CSRs, and ELF practice** | [Assembly companion map](../README.md#assembly-prerequisites-and-companion-notes); retain exercise-specific evidence here |
+| **xv6 stubs, register usage, and artifacts** | `docs/06-build-artifacts.md`                                                                      |
 | **Trap path, trapframe, and harts**          | `docs/labs/01-util-sleep.md`, on loan until `docs/book/ch04-traps-and-system-calls.md` is written |
 | **Kernel mechanisms**                        | The matching `docs/book/ch*.md`                                                                   |
 | **Terminology**                              | `docs/04-terminology.md`                                                                          |

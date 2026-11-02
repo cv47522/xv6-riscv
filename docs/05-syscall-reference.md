@@ -15,6 +15,8 @@ The surface is small and knowable — **22 calls**, all declared in the `// syst
 
 ## What a system call actually is here
 
+For the hardware distinction between a call, a trap, and a privileged return, read [CSRs and privilege](../../assembly-language/docs/riscv/06-csrs-and-privilege.md#control-transfers-calls-traps-and-privilege-returns). The details below apply to this xv6 tree.
+
 Four files stand between the call in your C source and the code that does the work. Knowing which one to open saves most of the searching.
 
 ```mermaid

@@ -557,6 +557,8 @@ The reason is integrity: a directory entry references an inode, and the inode's 
 
 ## Lecture 2 — C and memory
 
+For a small assembly experiment behind these C observations, see [load widths, signedness, and byte order](../../assembly-language/docs/riscv/02-memory-and-pointers.md#loads-width-signedness-and-byte-order). The exercise results below are from this tree.
+
 Lecture 2 ([`l-c.txt`](../lectures/l-c.txt)) hands out three xv6 demos that already have descriptive names, so the practice versions keep them instead of taking an `ex<N>` prefix; `hwstruct` adds the homework demo the lecture runs but MIT did not publish. The lecture's own concepts, the user address space, and the Homework 2 answer live in [10-c-in-xv6.md](10-c-in-xv6.md); these sections cover only the programs.
 
 | Program                                               | Source            | Lecture                                                             | What it introduces                                                   |

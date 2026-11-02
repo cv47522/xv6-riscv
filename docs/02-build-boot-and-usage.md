@@ -295,6 +295,8 @@ The parentheses change which object is modified, not merely presentation. In `at
 
 ## Debugging
 
+For register stepping and memory inspection on a tiny bare-metal program, start with [the assembly course’s QEMU/GDB exercise](../../assembly-language/docs/riscv/00-tools-and-first-run.md#qemu-and-gdb-run-and-step-the-first-example). The details below apply to this xv6 tree.
+
 Kernel bugs rarely announce themselves clearly, so it is worth building the habit of reaching for the right tool instead of staring at the code. MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) says learning these is well worth the time, and that matches experience — the tools below turn most "it just hangs" sessions into a five-minute answer.
 
 ### Print statements, and keeping the output

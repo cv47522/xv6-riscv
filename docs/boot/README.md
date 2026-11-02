@@ -8,26 +8,26 @@
 | Stage | Read / do | Ready to continue when you can… |
 | --- | --- | --- |
 | **Assembly foundations** | [Lessons 0–5](../../../assembly-language/README.md): registers, memory, control flow, calls, tools, and ELF. | Single-step a tiny example and explain its next `pc`, register changes, and memory accesses. |
-| **Kernel-facing foundations** | [CSRs](../../../assembly-language/docs/06-csrs-and-privilege.md) and [memory/saved state](../../../assembly-language/docs/07-memory-and-saved-state.md). | Distinguish ordinary registers, CSRs, allocations, mappings, contexts, and trapframes. |
-| **Readiness check** | [Prediction exercises](../../../assembly-language/docs/08-readiness-and-next-steps.md). | Explain the results yourself; passing the automated checker alone is insufficient. |
+| **Kernel-facing foundations** | [CSRs](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md) and [memory/saved state](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md). | Distinguish ordinary registers, CSRs, allocations, mappings, contexts, and trapframes. |
+| **Readiness check** | [Prediction exercises](../../../assembly-language/docs/riscv/08-readiness-and-next-steps.md). | Explain the results yourself; passing the automated checker alone is insufficient. |
 | **This tree's boot** | The proposed lessons below, one source fragment at a time. | Account for every covered source line and verify the important transitions in GDB. |
 
 The prerequisite course assumes C/C++ knowledge and no assembly knowledge. Its six programs expose register arithmetic, memory widths, branches, nested calls, a C/assembly interface, and CSR operations. Keep those reusable explanations there; keep this kernel's addresses, fields, masks, ordering constraints, and failure paths here.
 
 ## Preview each mechanism in the browser first
 
-The sibling course rebuilds five boot-path mechanisms as small RV32 programs in [examples/xv6-rv32](../../../assembly-language/examples/xv6-rv32/) and runs them in [CPUlator's generic RV32 system](https://cpulator.01xz.net/?sys=rv32). Step one before writing or reading the matching lesson below: it fixes the expected register and memory state, so the later GDB session on QEMU checks a prediction rather than introducing the idea.
+The sibling course rebuilds five boot-path mechanisms as small RV32 programs in [codes/riscv/xv6-rv32](../../../assembly-language/codes/riscv/xv6-rv32/) and runs them in [CPUlator's generic RV32 system](https://cpulator.01xz.net/?sys=rv32). Step one before writing or reading the matching lesson below: it fixes the expected register and memory state, so the later GDB session on QEMU checks a prediction rather than introducing the idea.
 
 > [!WARNING]
 > These are previews, not evidence about this tree. CPUlator is a 32-bit, machine-mode-only CPU without `mhartid`, so the programs use 4-byte registers, `sw`/`lw`, a pretend hart id, and small addresses. Every value that the walkthroughs record must still come from this kernel under QEMU.
 
 | Planned lesson | Preview program | What the screenshot fixes | Explained in |
 | --- | --- | --- | --- |
-| **1. Entry and boot stacks** | [1-entry-stack.s](../../../assembly-language/examples/xv6-rv32/1-entry-stack.s) | `sp = stack0 + (hartid + 1) * 4096`, the per-hart slice top. | [Readiness lesson](../../../assembly-language/docs/08-readiness-and-next-steps.md#preview-entrys-in-the-browser) |
-| **2. Machine controls** | [2-start-mret.s](../../../assembly-language/examples/xv6-rv32/2-start-mret.s) | Clear-then-set of `mstatus.MPP`, `mepc = main`, and `mret` jumping without a call. | [CSR lesson](../../../assembly-language/docs/06-csrs-and-privilege.md#watch-xv6s-mode-switch-and-a-trap-in-the-browser) |
-| **4. Physical pages** | [4-kalloc-freelist.s](../../../assembly-language/examples/xv6-rv32/4-kalloc-freelist.s) | `struct run` links stored inside free pages, junk fills, and the LIFO pop. | [Memory lesson](../../../assembly-language/docs/07-memory-and-saved-state.md#watch-kallocs-free-list-in-the-browser) |
-| **5. First context switch** | [5-swtch-context.s](../../../assembly-language/examples/xv6-rv32/5-swtch-context.s) | Callee-saved registers stored to the old context and loaded from the new one; `ret` lands in another thread. | [Memory lesson](../../../assembly-language/docs/07-memory-and-saved-state.md#watch-swtch-save-one-context-and-load-another) |
-| **7. Trampoline (trap side)** | [3-ecall-trap.s](../../../assembly-language/examples/xv6-rv32/3-ecall-trap.s) | `ecall` sets the cause and saved PC, jumps to the vector, and returns past the `ecall` after `epc += 4`. | [CSR lesson](../../../assembly-language/docs/06-csrs-and-privilege.md#a-system-call-is-a-trap) |
+| **1. Entry and boot stacks** | [1-entry-stack.s](../../../assembly-language/codes/riscv/xv6-rv32/1-entry-stack.s) | `sp = stack0 + (hartid + 1) * 4096`, the per-hart slice top. | [Readiness lesson](../../../assembly-language/docs/riscv/08-readiness-and-next-steps.md#xv6-in-the-browser-preview-entrys) |
+| **2. Machine controls** | [2-start-mret.s](../../../assembly-language/codes/riscv/xv6-rv32/2-start-mret.s) | Clear-then-set of `mstatus.MPP`, `mepc = main`, and `mret` jumping without a call. | [CSR lesson](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#xv6-in-the-browser-startc-sets-mpp-and-mepc-then-mret) |
+| **4. Physical pages** | [4-kalloc-freelist.s](../../../assembly-language/codes/riscv/xv6-rv32/4-kalloc-freelist.s) | `struct run` links stored inside free pages, junk fills, and the LIFO pop. | [Memory lesson](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#xv6-in-the-browser-kallocs-free-list) |
+| **5. First context switch** | [5-swtch-context.s](../../../assembly-language/codes/riscv/xv6-rv32/5-swtch-context.s) | Callee-saved registers stored to the old context and loaded from the new one; `ret` lands in another thread. | [Memory lesson](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#xv6-in-the-browser-swtch-saves-and-loads-a-context) |
+| **7. Trampoline (trap side)** | [3-ecall-trap.s](../../../assembly-language/codes/riscv/xv6-rv32/3-ecall-trap.s) | `ecall` sets the cause and saved PC, jumps to the vector, and returns past the `ecall` after `epc += 4`. | [CSR lesson](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#xv6-in-the-browser-a-system-call-is-a-trap) |
 
 ![CPUlator RV32 after the entry.S stack computation: a1 = 2 (pretend hart 1 plus one), a0 = 0x2000, sp = 0x2020; la sp, stack0 assembled to li sp, 32 because stack0 is at 0x20](../images/cpulator/xv6-01-entry-stack.png)
 

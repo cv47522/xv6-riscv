@@ -24,6 +24,8 @@ This prompt never marks a lecture studied. [`close-lecture.md`](close-lecture.md
 
 ## Step 1 — Gather the sources
 
+For machine-level prerequisites, consult the [assembly companion map](../README.md#assembly-prerequisites-and-companion-notes). Link reusable instruction, calling-convention, ELF, and CSR explanations to the sibling assembly lessons; retain this tree’s exact source symbols, values, invariants, and failure paths here. A simplified RV32 preview does not establish behavior of the RV64 kernel.
+
 | Source                                       | What to take from it                                                                                                                                                     |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **`STUDY-PROGRESS.md`**                      | The lecture's row (date, links, checked or draft), its homework's `**Book:**` or `**Read:**` line, and its practice section if one exists                                |

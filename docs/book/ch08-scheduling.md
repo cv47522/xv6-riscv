@@ -12,6 +12,8 @@
 
 ## Figures
 
+**Assembly prerequisite:** [contexts versus trapframes](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#saved-state-stack-frame-context-and-trapframe). Use it for the machine-level foundation before reading this tree’s implementation below.
+
 Both of this chapter's figures are redrawn rather than copied — one is TikZ, the other ships only as a PDF; see [fig/README.md](fig/README.md#the-figures-that-are-redrawn-instead). Band colours follow the legend in [README.md](README.md#how-a-chapter-note-is-written).
 
 ```mermaid

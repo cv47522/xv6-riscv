@@ -48,6 +48,8 @@ The tension the lecture warns about shows up even in a kernel this small. _Isola
 
 ## What a system call does, step by step
 
+For the underlying machine operations, see the assembly course’s [calls, traps, and privilege returns](../../assembly-language/docs/riscv/06-csrs-and-privilege.md#control-transfers-calls-traps-and-privilege-returns). The sequence below pins that mechanism to xv6’s files and symbols.
+
 > [!NOTE]
 > **On loan to [ch04](book/ch04-traps-and-system-calls.md).** The lecture says "we'll see more detail later in the course"; this section only pins its seven steps to the symbols that perform them. Move it into ch04 when that chapter is written, and leave a link here.
 
@@ -56,6 +58,8 @@ The lecture's list is accurate in outline, but it hides who does each step. The 
 ![Two ellipses in user space above a red dividing line, with one arrow crossing it into the kernel box below](book/fig/os.svg)
 
 _“A kernel and two user processes.” — [book figure](book/fig/README.md), `unix.tex` `fig:os`, also captioned in [ch01](book/ch01-operating-system-interfaces.md#figures). Two user processes, `shell` and `cat`, above a red line; below it, one box holding the whole kernel; one arrow from the shell crosses the line, labelled **system call**. That single arrow is what the sequence diagram below opens up: every step in it happens somewhere along the arrow, and the red line is the U-mode/S-mode switch the hart makes at `ecall` and undoes at `sret`._
+
+<!-- TODO: Fix broken mermaid -->
 
 ```mermaid
 sequenceDiagram
