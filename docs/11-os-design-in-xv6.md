@@ -486,6 +486,8 @@ The lecture's emulation sketch is a useful model for each emulated hart:
 2. Decode it.
 3. Execute its effect on state such as a `uint64 reg[32]` register array.
 
+The real QEMU does not interpret one instruction at a time; it translates blocks of RISC-V code into x86 code that runs on the host CPU. See [How QEMU runs xv6 on an x86 host](#how-qemu-runs-xv6-on-an-x86-host-tcg-not-a-board).
+
 **`-bios none` omits separate firmware; QEMU's reset stub still runs.** The stub transfers to `_entry` in machine mode.
 
 `_entry` is the kernel's first instruction; GDB attached at reset may see the stub first. Why the kernel is linked there is in [06-build-artifacts.md](06-build-artifacts.md#why-the-kernel-is-linked-at-0x80000000).
@@ -506,6 +508,149 @@ Read the devices and RAM **bottom to top**:
 
 The two columns distinguish virtual placement from the physical machine map; high virtual mappings do not add physical RAM above `PHYSTOP`.
 
+### How QEMU runs xv6 on an x86 host: TCG, not a board
+
+**Yes: QEMU uses the host CPU, and no RISC-V chip exists anywhere in this setup.** The `virt` board, its RISC-V harts, RAM, UART, PLIC, timer, and virtio disk are all C code and data inside one Linux process.
+
+```mermaid
+flowchart TD
+    W["Windows runs the Hyper-V hypervisor on the Intel Core Ultra 7 165H."]
+    L["Hyper-V runs the WSL2 Linux kernel in a VM; its x86 instructions execute directly on the CPU through VT-x."]
+    Q["qemu-system-riscv64 is an ordinary x86 Linux process with one host thread per emulated hart."]
+    T["TCG translates each block of RISC-V guest code into x86 host code, caches it, and runs it."]
+    X["xv6 runs in M-, S-, and U-mode on the emulated virt board and sees no hypervisor."]
+    W --> L --> Q --> T --> X
+    classDef processing fill:#fffff0,stroke:#999944,color:#111
+    classDef routing fill:#f0f0ff,stroke:#6666aa,color:#111
+    classDef movement fill:#f0fff0,stroke:#669966,color:#111
+    class W,L routing
+    class Q,T processing
+    class X movement
+```
+
+**Two different mechanisms sit in this stack.** The lower layers use hardware virtualization, and the upper layer uses emulation:
+
+| Layer               | Mechanism                                                                                                        | Why                                                                                                        |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **WSL2 on Windows** | Hardware virtualization: VT-x runs guest x86 instructions natively, and EPT translates guest physical addresses. | Guest and host share one ISA, so no translation is needed. `lscpu` reports `Hypervisor vendor: Microsoft`. |
+| **xv6 inside QEMU** | Emulation with **TCG**, the **T**iny **C**ode **G**enerator: dynamic binary translation from RISC-V to x86.      | The ISAs differ, so the CPU cannot execute guest instructions. KVM would require a RISC-V host.            |
+
+**Evidence from this machine** (QEMU 8.2.2):
+
+```text
+$ qemu-system-riscv64 -accel help
+Accelerators supported in QEMU binary:
+tcg
+$ qemu-system-riscv64 -machine virt -accel kvm ...
+qemu-system-riscv64: -accel kvm: invalid accelerator kvm
+```
+
+`/dev/kvm` exists in this WSL2 VM because Hyper-V exposes nested VT-x (the `vmx` flag below). It could accelerate an x86 guest, but not this RISC-V one. Counting QEMU's threads while xv6 boots showed 4 threads with `-smp 1` and 6 with `-smp 3`: each added hart adds one host thread, so the 3 harts can run in parallel on 3 of the 16 vCPUs.
+
+**What emulation means for what you observe:**
+
+- **Correct behaviour, not real timing.** TCG reproduces RISC-V instruction semantics, privilege modes, and Sv39 translation in software. It does not model pipelines, caches, or real instruction timing.
+- **Time follows the host clock.** The `virt` board's timer runs at a nominal 10 MHz derived from the host clock, so `stimecmp` ticks are wall-clock intervals, not counted cycles.
+- **Devices are software.** The UART is QEMU's 16550A model, and the "disk" is reads and writes on the host file `fs.img`.
+
+#### xv6 under QEMU versus FreeRTOS on an ESP32
+
+**An ESP32 runs firmware on real silicon; xv6 here runs on a simulated board.** The comparison:
+
+| Property                | FreeRTOS on an ESP32                                                                                                 | xv6 in this repository                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Where code executes** | The chip's own core: Xtensa on the original ESP32 and S3, 32-bit RISC-V on the C3 and C6.                            | Host x86 code generated by TCG from RV64GC kernel code.                            |
+| **How code gets there** | ESP-IDF cross-compiles firmware, and it is flashed to the board's SPI flash.                                         | `make qemu` passes `-kernel kernel/kernel`; QEMU copies the ELF into emulated RAM. |
+| **Peripherals**         | Real GPIO, Wi-Fi, timers, and UART hardware.                                                                         | QEMU's device models: 16550A UART, PLIC, CLINT timer, virtio disk.                 |
+| **Timing**              | Real cycles and interrupt latency; suitable for timing-sensitive control.                                            | Host-dependent; useful for correctness, not for timing measurements.               |
+| **Isolation model**     | Tasks share one address space; no virtual memory or per-task privilege split. Protection needs an optional MPU port. | Per-process Sv39 page tables and U-mode/S-mode separation.                         |
+| **Debugging**           | JTAG or the USB debug interface, reaching the physical chip.                                                         | QEMU's GDB stub; see [09-debugging-xv6.md](09-debugging-xv6.md).                   |
+
+Even the RISC-V ESP32 variants could not boot this xv6: they are 32-bit cores without S-mode or an MMU, and xv6 needs RV64 with Sv39 paging. Espressif also publishes a QEMU fork that emulates some ESP32 chips, which is the same idea as `virt` applied to their boards.
+
+### WSL2 host CPU compared with xv6's emulated machine
+
+**The host is a 16-vCPU x86-64 VM; the guest is a 3-hart RV64 board with 128 MiB of RAM.** `lscpu` from the WSL2 host:
+
+<details>
+<summary>Full <code>lscpu</code> output from the WSL2 host</summary>
+
+```text
+❯ lscpu
+Architecture:             x86_64
+  CPU op-mode(s):         32-bit, 64-bit
+  Address sizes:          46 bits physical, 48 bits virtual
+  Byte Order:             Little Endian
+CPU(s):                   16
+  On-line CPU(s) list:    0-15
+Vendor ID:                GenuineIntel
+  Model name:             Intel(R) Core(TM) Ultra 7 165H
+    CPU family:           6
+    Model:                170
+    Thread(s) per core:   2
+    Core(s) per socket:   8
+    Socket(s):            1
+    Stepping:             4
+    BogoMIPS:             6144.00
+    Flags:                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse s
+                          se2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonst
+                          op_tsc cpuid pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadl
+                          ine_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch invpcid_single ssbd i
+                          brs ibpb stibp ibrs_enhanced tpr_shadow vnmi ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 sme
+                          p bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_
+                          vnni umip waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize flush_l
+                          1d arch_capabilities
+Virtualization features:
+  Virtualization:         VT-x
+  Hypervisor vendor:      Microsoft
+  Virtualization type:    full
+Caches (sum of all):
+  L1d:                    384 KiB (8 instances)
+  L1i:                    512 KiB (8 instances)
+  L2:                     16 MiB (8 instances)
+  L3:                     24 MiB (1 instance)
+Vulnerabilities:
+  Gather data sampling:   Not affected
+  Itlb multihit:          Not affected
+  L1tf:                   Not affected
+  Mds:                    Not affected
+  Meltdown:               Not affected
+  Mmio stale data:        Not affected
+  Reg file data sampling: Not affected
+  Retbleed:               Mitigation; Enhanced IBRS
+  Spec rstack overflow:   Not affected
+  Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prctl and seccomp
+  Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+  Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling; PBRSB-eIBRS SW sequence;
+                           BHI BHI_DIS_S
+  Srbds:                  Not affected
+  Tsx async abort:        Not affected
+```
+
+</details>
+
+The 16 CPUs are the WSL2 VM's vCPUs, capped by `processors=16` in `%UserProfile%\.wslconfig`; Hyper-V presents them as 8 cores × 2 threads, which is not the physical chip's topology. `free -h` inside WSL2 reports 31 GiB, matching `memory=32GB` in the same file.
+
+| Property                        | WSL2 host (`lscpu`)                                            | xv6 guest on QEMU `virt`                                                                               |
+| ------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| **ISA**                         | `x86_64`                                                       | RV64GC (`-march=rv64gc` in the Makefile)                                                               |
+| **CPUs**                        | 16 vCPUs                                                       | 3 harts (`-smp 3`), each one QEMU host thread; `NCPU` = 8 is xv6's limit                               |
+| **Byte order**                  | Little endian                                                  | Little endian                                                                                          |
+| **Virtual addresses**           | 48 bits, four-level paging                                     | Sv39: 39 bits, three levels; xv6 uses only up to `MAXVA` = `1L << 38`                                  |
+| **Physical memory**             | 46-bit addresses; 31 GiB RAM visible                           | `-m 128M`: `KERNBASE` `0x80000000` to `PHYSTOP` `0x88000000`                                           |
+| **Privilege levels**            | Rings 0 and 3, plus VMX root and non-root for the hypervisor   | M-mode, S-mode, U-mode                                                                                 |
+| **Hypervisor**                  | `Hypervisor vendor: Microsoft`; the `hypervisor` flag is set   | None visible; xv6 assumes bare metal                                                                   |
+| **System-call instruction**     | `syscall` flag                                                 | `ecall`                                                                                                |
+| **No-execute pages**            | `nx` flag                                                      | A PTE without `PTE_X`                                                                                  |
+| **Kernel access to user pages** | `smap`: the kernel faults on user pages unless it opts in      | `sstatus.SUM` stays clear, so `copyin()` and `copyout()` translate through the user page table instead |
+| **Address-space tags**          | `pcid`                                                         | The `satp` ASID field; `MAKE_SATP` leaves it 0, so xv6 flushes with `sfence.vma`                       |
+| **Timer**                       | `tsc_deadline_timer`                                           | `stimecmp` from the Sstc extension                                                                     |
+| **Interrupt controller**        | `apic`, `x2apic`                                               | PLIC for devices, CLINT for timers and software interrupts                                             |
+| **Caches**                      | L1d 384 KiB, L1i 512 KiB, L2 16 MiB, L3 24 MiB                 | Not modelled; guest memory accesses go through the host's caches                                       |
+| **Speculative-execution bugs**  | Mitigated (`Spectre v1`, `Spectre v2`, `Retbleed`, and others) | xv6 has no mitigations, and TCG does not reproduce RISC-V speculation; see `lectures/l-meltdown.txt`   |
+
+**Read the table as two machines, not one.** Only the left column is hardware; the right column is what QEMU presents to xv6. A host-CPU feature such as `avx2` or `smap` never reaches xv6, and a guest feature such as Sv39 or `ecall` exists only in QEMU's software model.
+
 ## Kernel boot: from entry to the first user process
 
 > [!TIP]
@@ -523,7 +668,7 @@ config:
 ---
 flowchart TD
     subgraph machine["1. QEMU starts every hart in M-mode with paging off."]
-        R["QEMU loads kernel/kernel into RAM at 0x80000000; its reset stub reaches _entry."]
+        R["QEMU loads kernel/kernel into RAM at 0x80000000, attaches fs.img as a virtio disk, and its reset stub reaches _entry."]
         A["entry.S sets sp = stack0 + (hartid + 1) * 4096 and calls start()."]
         B["start.c prepares supervisor state and the timer; mret enters main() in S-mode."]
     end
@@ -543,6 +688,7 @@ flowchart TD
         I["prepare_return() and trampoline userret enter /init at its ELF entry in U-mode."]
         J["user/ulib.c start() calls user/init.c main(); init opens the console and dups fd 0 twice."]
         K["init forks; the child execs sh while init waits, reaps orphans, and restarts an exited shell."]
+        L["Each later request, such as init calling fork(), runs a user/usys.S stub: li a7, SYS_fork, then ecall enters the kernel."]
     end
     R --> A --> B --> C
     C -->|Yes| D --> E --> F
@@ -551,12 +697,15 @@ flowchart TD
     F --> G --> H
     H -->|No: returns -1| X
     H -->|Yes: returns argc| I --> J --> K
+    K -.->|Each fork() and exec() here is a system call.| L
     classDef processing fill:#fffff0,stroke:#999944,color:#111
     classDef routing fill:#f0f0ff,stroke:#6666aa,color:#111
     classDef commit fill:#f0ffff,stroke:#449999,color:#111
     classDef movement fill:#f0fff0,stroke:#669966,color:#111
     classDef failure fill:#ffd9d9,stroke:#aa5555,color:#111
+    classDef request fill:#fff0f0,stroke:#aa6666,color:#111
     class A,D processing
+    class L request
     class B,C,F,H,I routing
     class E commit
     class R,G,J,K movement
@@ -569,19 +718,20 @@ flowchart TD
 
 **Sources behind the diagram:**
 
-| Stage                                                 | Source                                                                                                 |
-| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Machine-mode entry and supervisor setup**           | [`kernel/entry.S`](../kernel/entry.S), [`kernel/start.c`](../kernel/start.c).                          |
-| **Shared initialization**                             | [`kernel/main.c`](../kernel/main.c).                                                                   |
-| **Process creation, scheduling, and first execution** | [`userinit()` / `allocproc()` / `forkret()`](../kernel/proc.c), [`kernel/swtch.S`](../kernel/swtch.S). |
-| **Entry to user mode**                                | [`kernel/trampoline.S`](../kernel/trampoline.S).                                                       |
-| **User entry and shell launch**                       | [`user/ulib.c`](../user/ulib.c), [`user/init.c`](../user/init.c).                                      |
+| Stage                                                 | Source                                                                                                    |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Machine-mode entry and supervisor setup**           | [`kernel/entry.S`](../kernel/entry.S), [`kernel/start.c`](../kernel/start.c).                             |
+| **Shared initialization**                             | [`kernel/main.c`](../kernel/main.c).                                                                      |
+| **Process creation, scheduling, and first execution** | [`userinit()` / `allocproc()` / `forkret()`](../kernel/proc.c), [`kernel/swtch.S`](../kernel/swtch.S).    |
+| **Entry to user mode**                                | [`kernel/trampoline.S`](../kernel/trampoline.S).                                                          |
+| **User entry and shell launch**                       | [`user/ulib.c`](../user/ulib.c), [`user/init.c`](../user/init.c).                                         |
+| **System-call entry from `/init` and `sh`**           | [`user/usys.S`](../user/usys.S) (generated by `user/usys.pl`), [`kernel/syscall.h`](../kernel/syscall.h). |
 
 **Physical starting point:** RAM starts at `0x80000000` on QEMU's `virt` board. Low physical addresses contain devices and the reset ROM; `-bios none` omits separate firmware but retains QEMU's reset stub. The [memory-map reference](06-build-artifacts.md#why-the-kernel-is-linked-at-0x80000000) owns the exact regions.
 
 ### Boot stacks and the M-mode to S-mode transition
 
-**Each hart gets a downward-growing 4096-byte stack slice.** In `stack0[4096 * NCPU]`, `stack0 + (hartid + 1) * 4096` selects that slice's exclusive upper bound before C runs.
+**Each hart gets a downward-growing 4096-byte stack slice.** In `stack0[4096 * NCPU]`, `stack0 + (hartid + 1) * 4096` selects that slice's exclusive upper bound before C runs. Where those slices sit, and how the rest of RAM changes hands afterwards, is drawn in [Physical memory ownership across the boot stages](#physical-memory-ownership-across-the-boot-stages).
 
 Kernel `start()` prepares the transition to S-mode:
 
@@ -600,6 +750,20 @@ The complete register-write table remains in [Chapter 2's start() walkthrough](b
 ### Multicore boot: shared initialization and per-hart activation
 
 **Hart 0 initializes shared state; every hart can schedule the first process.** The release/acquire publication prevents other harts from using unfinished shared state.
+
+**How many harts xv6 runs on** is set by the build, capped by a compile-time constant:
+
+| Setting                   | Value                                                                                               | Source                                              |
+| ------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Harts QEMU creates**    | `-smp $(CPUS)`: 3 by default, 1 under `LAB=fs`, 4 under `LAB=lock`; `make CPUS=1 qemu` overrides it | [Makefile](../Makefile) `CPUS`                      |
+| **Most xv6 supports**     | `NCPU` = 8, which sizes `cpus[NCPU]` and `stack0[4096 * NCPU]`                                      | `kernel/param.h`, `kernel/proc.c`, `kernel/start.c` |
+| **Check between the two** | None: a hart id of 8 or more would index past both arrays                                           | `kernel/entry.S`, `mycpu()` in `kernel/proc.c`      |
+
+**Why `main()` tests `cpuid() == 0`:** QEMU releases every hart at `_entry` at the same time, so all of them reach `main()` concurrently. The shared setup must run exactly once: two harts running `kinit()` would free every page onto the free list twice, and two running `virtio_disk_init()` would reset the disk under each other.
+
+- **Election without a lock:** each hart's id is already in `tp` (copied from `mhartid` by `start()`), so the test needs no shared memory and cannot race.
+- **Why 0 specifically:** QEMU numbers harts from 0, so hart 0 exists under any `-smp` value, including `CPUS=1`. It is chosen by id, not by arrival order; another hart may reach `main()` first and simply wait.
+- **What every hart still does itself:** `satp`, `stvec`, and the PLIC enable bits are per-hart state, so the others run `kvminithart()`, `trapinithart()`, and `plicinithart()` once `started` is published.
 
 | Actor                 | Work before scheduling                                                                                                          |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -638,6 +802,45 @@ The complete register-write table remains in [Chapter 2's start() walkthrough](b
 | `scheduler` | `0x80001206`                    | every hart ends `main()` here                     |
 | `start`     | `0x800050a8`                    | the last machine-mode C function                  |
 | `uservec`   | `0x80006000`                    | the trampoline page, mapped again at `TRAMPOLINE` |
+
+### Physical memory ownership across the boot stages
+
+**Boot never moves the kernel image; it only changes who owns the free RAM above it.** Before `kinit()` nothing manages that RAM, and afterwards every allocation peels pages off the top.
+
+![Four columns showing physical RAM from 0x80000000 to 0x88000000 at four boot stages, with the free region becoming a free list and then losing pages from the top](images/boot-physical-memory.svg)
+
+_Measured with GDB at `CPUS=3`. [View the SVG](images/boot-physical-memory.svg) or open [the editable Excalidraw drawing](images/boot-physical-memory.excalidraw) in Excalidraw. Thick borders mark what each stage changed; bands are not to scale._
+
+| Stage                            | What changes                                                                                             | Measured value                                                                |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **`_entry` and `start()`**       | Each hart sets `sp` inside `stack0`, which lives in the kernel's `.bss`. Paging is off.                  | `stack0` = `0x8001b470`; boot `sp` = `0x8001c470`, `0x8001d470`, `0x8001e470` |
+| **`kinit()`**                    | `freerange(end, PHYSTOP)` hands every page from `PGROUNDUP(end)` to `PHYSTOP` to `kfree()`.              | 32,732 pages; free-list head `0x87fff000`                                     |
+| **`kvminit()`**                  | `kvmmake()` allocates the root table, lower-level tables, and one kernel stack per `proc[]` slot.        | root `kernel_pagetable` = `0x87fff000`; 166 pages; head `0x87f59000`          |
+| **`kvminithart()`**              | `satp` switches to `kernel_pagetable`. RAM is direct-mapped, so no address above changes meaning.        | `KSTACK(0)` = `0x3fffffd000` (virtual only)                                   |
+| **`virtio_disk_init()`**         | Three queue pages: `desc`, `avail`, `used`.                                                              | `0x87f59000`–`0x87f57000`                                                     |
+| **`userinit()` → `allocproc()`** | The first process slot gets a trapframe and a user page table holding only `TRAMPOLINE` and `TRAPFRAME`. | trapframe `0x87f56000`; user root `0x87f55000`; head `0x87f52000`             |
+
+**Why allocations come from the top:** `kfree()` pushes each page onto the head of `kmem.freelist`, and `freerange()` walks upward, so the last page freed, `0x87fff000`, becomes the first one `kalloc()` returns.
+
+**Why the kernel keeps working when paging turns on:** `kvmmake()` maps `KERNBASE` through `PHYSTOP` at identical virtual addresses, so every pointer created with `satp = 0` stays valid. Only the trampoline and the kernel stacks gain extra high virtual addresses; those do not add RAM above `PHYSTOP`.
+
+**The first user page table is built but not used:** `satp` still holds `kernel_pagetable` at the end of `main()`. It switches to `0x87f55000` only when `forkret()` jumps to `userret`, after `kexec()` has added `/init`'s pages.
+
+> [!NOTE]
+> The page counts depend on `NPROC`, `CPUS`, and the build. Reproduce them with `make qemu-gdb` and these GDB commands, deleting each breakpoint after it hits so another hart does not stop there first:
+>
+> ```text
+> hbreak kvminithart
+> continue
+> print/x kernel_pagetable
+> print/x kmem.freelist
+> delete
+> hbreak scheduler
+> continue
+> print/x proc[0].trapframe
+> print/x proc[0].pagetable
+> print/x kmem.freelist
+> ```
 
 ### `/init`: console descriptors and shell lifecycle
 

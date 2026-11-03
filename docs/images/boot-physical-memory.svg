@@ -1,0 +1,210 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1660 824" width="1660" height="824" role="img" aria-labelledby="title desc" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, Monaco, monospace">
+  <title id="title">Physical RAM during xv6 boot</title>
+  <desc id="desc">Four stages of physical memory ownership from _entry through userinit(), with measured addresses.</desc>
+  <rect width="1660" height="824" fill="#ffffff"/>
+  <line x1="40" y1="170" x2="160" y2="170" stroke="#adb5bd" stroke-dasharray="4 4"/>
+  <line x1="40" y1="470" x2="160" y2="470" stroke="#adb5bd" stroke-dasharray="4 4"/>
+  <line x1="40" y1="640" x2="160" y2="640" stroke="#adb5bd" stroke-dasharray="4 4"/>
+  <line x1="40" y1="720" x2="160" y2="720" stroke="#adb5bd" stroke-dasharray="4 4"/>
+  <rect x="168" y="170" width="350" height="300" rx="4" fill="#ffffff" stroke="#868e96" stroke-width="1" stroke-dasharray="8 5"/>
+  <rect x="168" y="470" width="350" height="170" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="182" y="524" width="322" height="104" rx="4" fill="#fffff0" stroke="#1e1e1e" stroke-width="3"/>
+  <rect x="168" y="640" width="350" height="80" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="546" y="170" width="350" height="300" rx="4" fill="#f0fff0" stroke="#1e1e1e" stroke-width="3"/>
+  <rect x="546" y="470" width="350" height="170" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="560" y="524" width="322" height="104" rx="4" fill="#fffff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="546" y="640" width="350" height="80" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="924" y="170" width="350" height="210" rx="4" fill="#f0ffff" stroke="#1e1e1e" stroke-width="3"/>
+  <rect x="924" y="380" width="350" height="90" rx="4" fill="#f0fff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="924" y="470" width="350" height="170" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="938" y="524" width="322" height="104" rx="4" fill="#fffff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="924" y="640" width="350" height="80" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="1302" y="170" width="350" height="56" rx="4" fill="#f0ffff" stroke="#868e96" stroke-width="1"/>
+  <rect x="1302" y="226" width="350" height="54" rx="4" fill="#f0ffff" stroke="#1e1e1e" stroke-width="3"/>
+  <rect x="1302" y="280" width="350" height="100" rx="4" fill="#f0ffff" stroke="#1e1e1e" stroke-width="3"/>
+  <rect x="1302" y="380" width="350" height="90" rx="4" fill="#f0fff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="1302" y="470" width="350" height="170" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="1316" y="524" width="322" height="104" rx="4" fill="#fffff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="1302" y="640" width="350" height="80" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="40" y="782" width="26" height="18" rx="4" fill="#ffffff" stroke="#868e96" stroke-width="1" stroke-dasharray="8 5"/>
+  <rect x="208" y="782" width="26" height="18" rx="4" fill="#f0fff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="400" y="782" width="26" height="18" rx="4" fill="#f0ffff" stroke="#868e96" stroke-width="1"/>
+  <rect x="640" y="782" width="26" height="18" rx="4" fill="#fffff0" stroke="#868e96" stroke-width="1"/>
+  <rect x="792" y="782" width="26" height="18" rx="4" fill="#f1f3f5" stroke="#868e96" stroke-width="1"/>
+  <rect x="952" y="782" width="26" height="18" rx="4" fill="#ffffff" stroke="#1e1e1e" stroke-width="3"/>
+  <text x="40" y="50" font-size="26" fill="#1e1e1e" text-anchor="start" font-weight="700" xml:space="preserve">
+    <tspan x="40" dy="0">Physical RAM during xv6 boot: who owns which pages</tspan>
+  </text>
+  <text x="40" y="75" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="40" dy="0">Measured with GDB on CPUS=3 (kernel/kernel at this commit). High addresses at the top; bands are not to scale.</tspan>
+  </text>
+  <text x="40" y="165" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="40" dy="0">PHYSTOP</tspan>
+    <tspan x="40" dy="17">0x88000000</tspan>
+  </text>
+  <text x="40" y="465" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="40" dy="0">PGROUNDUP(end)</tspan>
+    <tspan x="40" dy="17">0x80024000</tspan>
+  </text>
+  <text x="40" y="635" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="40" dy="0">etext</tspan>
+    <tspan x="40" dy="17">0x80007000</tspan>
+  </text>
+  <text x="40" y="715" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="40" dy="0">KERNBASE</tspan>
+    <tspan x="40" dy="17">0x80000000</tspan>
+  </text>
+  <text x="168" y="119" font-size="15" fill="#1e1e1e" text-anchor="start" font-weight="700" xml:space="preserve">
+    <tspan x="168" dy="0">1. _entry, start(), main()</tspan>
+  </text>
+  <text x="168" y="141" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="168" dy="0">satp = 0: addresses are physical</tspan>
+  </text>
+  <text x="178" y="309.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="178" dy="0">0x80024000 - 0x88000000</tspan>
+    <tspan x="178" dy="17">32,732 free pages, untouched:</tspan>
+    <tspan x="178" dy="17">no allocator exists yet</tspan>
+  </text>
+  <text x="178" y="491" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="178" dy="0">kernel data + bss</tspan>
+    <tspan x="178" dy="17">0x80007000 - 0x80023560 (end)</tspan>
+  </text>
+  <text x="192" y="557.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="192" dy="0">NEW: stack0[4096 * NCPU] 0x8001b470</tspan>
+    <tspan x="192" dy="17">boot sp (slice top) per hart:</tspan>
+    <tspan x="192" dy="17">0: 0x8001c470  1: 0x8001d470</tspan>
+    <tspan x="192" dy="17">2: 0x8001e470  slices 3-7 unused</tspan>
+  </text>
+  <text x="178" y="669.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="178" dy="0">kernel text 0x80000000 - 0x80007000</tspan>
+    <tspan x="178" dy="17">_entry, main, start, ...</tspan>
+    <tspan x="178" dy="17">trampoline page at 0x80006000</tspan>
+  </text>
+  <text x="546" y="119" font-size="15" fill="#1e1e1e" text-anchor="start" font-weight="700" xml:space="preserve">
+    <tspan x="546" dy="0">2. kinit() on hart 0</tspan>
+  </text>
+  <text x="546" y="141" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="546" dy="0">freerange(end, PHYSTOP); satp = 0</tspan>
+  </text>
+  <text x="532.0" y="119" font-size="15" fill="#1e1e1e" text-anchor="middle" xml:space="preserve">
+    <tspan x="532.0" dy="0">-&gt;</tspan>
+  </text>
+  <text x="556" y="301.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="556" dy="0">NEW: 32,732 pages on kmem.freelist</tspan>
+    <tspan x="556" dy="17">kfree() fills each with 1s</tspan>
+    <tspan x="556" dy="17">head = 0x87fff000: freed last,</tspan>
+    <tspan x="556" dy="17">so kalloc() returns it first</tspan>
+  </text>
+  <text x="556" y="491" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="556" dy="0">kernel data + bss</tspan>
+    <tspan x="556" dy="17">0x80007000 - 0x80023560 (end)</tspan>
+  </text>
+  <text x="570" y="557.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="570" dy="0">stack0[4096 * NCPU] 0x8001b470</tspan>
+    <tspan x="570" dy="17">boot sp (slice top) per hart:</tspan>
+    <tspan x="570" dy="17">0: 0x8001c470  1: 0x8001d470</tspan>
+    <tspan x="570" dy="17">2: 0x8001e470  slices 3-7 unused</tspan>
+  </text>
+  <text x="556" y="669.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="556" dy="0">kernel text 0x80000000 - 0x80007000</tspan>
+    <tspan x="556" dy="17">_entry, main, start, ...</tspan>
+    <tspan x="556" dy="17">trampoline page at 0x80006000</tspan>
+  </text>
+  <text x="924" y="119" font-size="15" fill="#1e1e1e" text-anchor="start" font-weight="700" xml:space="preserve">
+    <tspan x="924" dy="0">3. kvminit(), kvminithart()</tspan>
+  </text>
+  <text x="924" y="141" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="924" dy="0">satp = kernel_pagetable (VA == PA)</tspan>
+  </text>
+  <text x="910.0" y="119" font-size="15" fill="#1e1e1e" text-anchor="middle" xml:space="preserve">
+    <tspan x="910.0" dy="0">-&gt;</tspan>
+  </text>
+  <text x="934" y="239.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="934" dy="0">NEW: 166 pages from the top:</tspan>
+    <tspan x="934" dy="17">0x87fff000 down to 0x87f5a000</tspan>
+    <tspan x="934" dy="17">root kernel_pagetable 0x87fff000</tspan>
+    <tspan x="934" dy="17">page-table pages for the maps</tspan>
+    <tspan x="934" dy="17">+ 64 kernel stacks, mapped high</tspan>
+    <tspan x="934" dy="17">at KSTACK(p): p=0 -&gt; 0x3fffffd000</tspan>
+  </text>
+  <text x="934" y="431.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="934" dy="0">free list, head 0x87f59000</tspan>
+  </text>
+  <text x="934" y="491" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="934" dy="0">kernel data + bss</tspan>
+    <tspan x="934" dy="17">0x80007000 - 0x80023560 (end)</tspan>
+  </text>
+  <text x="948" y="557.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="948" dy="0">stack0[4096 * NCPU] 0x8001b470</tspan>
+    <tspan x="948" dy="17">boot sp (slice top) per hart:</tspan>
+    <tspan x="948" dy="17">0: 0x8001c470  1: 0x8001d470</tspan>
+    <tspan x="948" dy="17">2: 0x8001e470  slices 3-7 unused</tspan>
+  </text>
+  <text x="934" y="669.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="934" dy="0">kernel text 0x80000000 - 0x80007000</tspan>
+    <tspan x="934" dy="17">_entry, main, start, ...</tspan>
+    <tspan x="934" dy="17">trampoline page at 0x80006000</tspan>
+  </text>
+  <text x="1302" y="119" font-size="15" fill="#1e1e1e" text-anchor="start" font-weight="700" xml:space="preserve">
+    <tspan x="1302" dy="0">4. virtio_disk_init(), userinit()</tspan>
+  </text>
+  <text x="1302" y="141" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
+    <tspan x="1302" dy="0">user table idle until userret</tspan>
+  </text>
+  <text x="1288.0" y="119" font-size="15" fill="#1e1e1e" text-anchor="middle" xml:space="preserve">
+    <tspan x="1288.0" dy="0">-&gt;</tspan>
+  </text>
+  <text x="1312" y="196.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1312" dy="0">kernel tables + stacks</tspan>
+    <tspan x="1312" dy="17">0x87fff000 - 0x87f5a000</tspan>
+  </text>
+  <text x="1312" y="251.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1312" dy="0">NEW: virtio queue: 3 pages</tspan>
+    <tspan x="1312" dy="17">0x87f59000 - 0x87f57000</tspan>
+  </text>
+  <text x="1312" y="311.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1312" dy="0">NEW: allocproc() for /init's slot:</tspan>
+    <tspan x="1312" dy="17">trapframe     0x87f56000</tspan>
+    <tspan x="1312" dy="17">user root PT  0x87f55000</tspan>
+    <tspan x="1312" dy="17">+ 2 PT pages for TRAMPOLINE</tspan>
+  </text>
+  <text x="1312" y="431.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1312" dy="0">free list, head 0x87f52000</tspan>
+  </text>
+  <text x="1312" y="491" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1312" dy="0">kernel data + bss</tspan>
+    <tspan x="1312" dy="17">0x80007000 - 0x80023560 (end)</tspan>
+  </text>
+  <text x="1326" y="557.0" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1326" dy="0">stack0[4096 * NCPU] 0x8001b470</tspan>
+    <tspan x="1326" dy="17">boot sp (slice top) per hart:</tspan>
+    <tspan x="1326" dy="17">0: 0x8001c470  1: 0x8001d470</tspan>
+    <tspan x="1326" dy="17">2: 0x8001e470  slices 3-7 unused</tspan>
+  </text>
+  <text x="1312" y="669.5" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="1312" dy="0">kernel text 0x80000000 - 0x80007000</tspan>
+    <tspan x="1312" dy="17">_entry, main, start, ...</tspan>
+    <tspan x="1312" dy="17">trampoline page at 0x80006000</tspan>
+  </text>
+  <text x="40" y="767" font-size="13" fill="#1e1e1e" text-anchor="start" font-weight="700" xml:space="preserve">
+    <tspan x="40" dy="0">Legend (text labels carry the same meaning):</tspan>
+  </text>
+  <text x="74" y="796" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="74" dy="0">unmanaged RAM</tspan>
+  </text>
+  <text x="242" y="796" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="242" dy="0">on the free list</tspan>
+  </text>
+  <text x="434" y="796" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="434" dy="0">handed out by kalloc()</tspan>
+  </text>
+  <text x="674" y="796" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="674" dy="0">boot stacks</tspan>
+  </text>
+  <text x="826" y="796" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="826" dy="0">kernel image</tspan>
+  </text>
+  <text x="986" y="796" font-size="13" fill="#1e1e1e" text-anchor="start" xml:space="preserve">
+    <tspan x="986" dy="0">thick border, NEW: changed in this stage</tspan>
+  </text>
+</svg>

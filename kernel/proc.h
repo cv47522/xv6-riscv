@@ -18,7 +18,17 @@ struct context {
   uint64 s11;
 };
 
-// Per-CPU state.
+/*
+ * Per-CPU state.
+ *
+ * Q: Isn't one process per CPU?
+ * A: One at a time, not one for life. cpus[NCPU] describes harts and
+ *    proc[NPROC] describes processes; NPROC (64) exceeds NCPU (8).
+ *    c->proc names the process this hart runs right now, and is 0
+ *    while the hart runs scheduler() on c->context. After each sched()
+ *    a process may resume on any hart, so nothing pins it to one.
+ *    See docs/book/ch08-scheduling.md.
+ */
 struct cpu {
   struct proc *proc;      // The process running on this cpu, or null.
   struct context context; // swtch() here to enter scheduler().
@@ -38,6 +48,28 @@ extern struct cpu cpus[NCPU];
  * prepare_return() and userret in trampoline.S set up
  * the trapframe's kernel_*, restore user registers from the
  * trapframe, switch to the user page table, and enter user space.
+ *
+ * Q: Aren't these the same as the registers?
+ * A: Same names, different storage. A hart has one register file, and
+ *    usertrap() needs it, so uservec copies the 31 user registers (all
+ *    but x0) into this page and userret copies them back. The kernel_*
+ *    fields are not user registers: uservec loads them to enter the
+ *    kernel. epc holds the user pc that usertrap() copies from sepc.
+ *    Each offset must match the sd/ld offsets in kernel/trampoline.S.
+ *
+ * Q: Why do ra, sp, and s0-s11 also appear in struct context?
+ * A: The two structs save different values at different boundaries:
+ *
+ *      Struct     Saved by  At                    Holds values of
+ *      ---------  --------  --------------------  --------------------
+ *      trapframe  uservec   any trap from U-mode  the user program
+ *      context    swtch()   a call from sched()   a kernel thread
+ *
+ *    A trap can land between any two user instructions, so every
+ *    register may be live and all are saved. swtch() is an ordinary
+ *    call: the compiler has already saved caller-saved registers, so
+ *    only ra, sp, and callee-saved s0-s11 remain. A process blocked in
+ *    sleep() has both: user s0 in its trapframe, kernel s0 in context.
  */
 struct trapframe {
   uint64 kernel_satp;    //   0: kernel page table
@@ -80,7 +112,19 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
-// Per-process state
+/*
+ * Per-process state
+ *
+ * Q: What is chan?
+ * A: A wait channel: a kernel address used only as a key naming the
+ *    event a process waits for, such as &ticks, &pi->nread, or the
+ *    waiting parent's own struct proc in kwait(). sleep_prepare(chan)
+ *    stores the key; wakeup(chan) clears p->chan in every process
+ *    holding the same key and makes SLEEPING ones RUNNABLE. Clearing
+ *    it also records that the wakeup happened, so sleep() sleeps only
+ *    while p->chan is still non-zero. See kernel/proc.c and
+ *    docs/book/ch09-sleep-and-wakeup.md.
+ */
 struct proc {
   struct spinlock lock;
 
