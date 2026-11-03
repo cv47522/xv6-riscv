@@ -11,9 +11,9 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 > [!IMPORTANT]
 > This is a derivation guide, not a solution. Its C quotation is an unchanged function from `user/ls.c`, and the decisions for `user/find.c` remain questions. The one exception is the final [Solution walkthrough](#solution-walkthrough), a marked spoiler; stop before it if you are still deriving.
 
-## What the exercise asks for
+## What the exercise asks for: `find`
 
-### Contract
+### `find` contract
 
 | Contract        | Required behavior                                                                                        |
 | --------------- | -------------------------------------------------------------------------------------------------------- |
@@ -25,9 +25,18 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 | **Build**       | Put the source directly in `user/find.c` and register `$U/_find` in `UPROGS`; this tree has neither yet. |
 
 > [!WARNING]
-> `find` matches names, not files. A directory whose name equals the requested name is a match too, and its path is printed just like a file's: with `a/b` a directory holding a file `b`, `find . b` prints both `./a/b` and `./a/b/b`. The grader's directory-match case asserts exactly one such line. A program that matches only `T_FILE` entries misses it.
+> **Directories can match too.** Matching only `T_FILE` entries misses the grader's directory-match case, which asserts exactly one such line.
 
-### What the grader checks
+With `a/b` a directory holding a file `b`, `find . b` has two matches:
+
+| Matching entry                     | Printed path |
+| ---------------------------------- | ------------ |
+| **Directory `b` under `a`**        | `./a/b`      |
+| **File `b` inside that directory** | `./a/b/b`    |
+
+`find` compares names and prints paths for both kinds of match.
+
+### `find` grader checks
 
 - **Score:** four tests in [`grade-lab-util`](../../grade-lab-util), **40 points** total.
 - **Breakpoints:** none.
@@ -40,7 +49,7 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 | **`find, recursive`**                                      | 10     | Put `NAME` in a child, its grandchild, and another child; run `find . NAME`.  | Prefixes for all three paths                                         | None                              |
 | **`find, missing target, no duplicates, directory match`** | 10     | Search for a present file, absent name, and directory name; then `echo DONE`. | Respectively 1, 0, and 1 lines matching `^\./.*NAME`; exact `^DONE$` | Prefixes `path too long`, `panic` |
 
-### What the grader does not prove
+### `find` grader evidence limits
 
 | Test group      | Matching mechanism                                               | Limit                                                           |
 | --------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
@@ -48,7 +57,7 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#find
 | **Recursive**   | The same prefix assertions                                       | Duplicate or extra lines are not counted.                       |
 | **Corner**      | Multiline `re.findall()`, literal `./` prefix, exact counts      | Names still have no end anchor.                                 |
 
-The subdirectory case observes the requested start point and rejects the root-level duplicate basename. A passing score establishes only the [listed observations](#what-the-grader-checks).
+The subdirectory case observes the requested start point and rejects the root-level duplicate basename. A passing score establishes only the [listed observations](#find-grader-checks).
 
 **Unproven policies:**
 
@@ -57,7 +66,7 @@ The subdirectory case observes the requested start point and rejects the root-le
 - Argument diagnostics.
 - Failure handling for `open`, `fstat`, and `stat`.
 
-## Prerequisites
+## `find` prerequisites and references
 
 | When                | Read                                                                                                                                                                                                                                                                                                        | Ownership                                                                                                                                                                                                                        |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +83,7 @@ The subdirectory case observes the requested start point and rejects the root-le
 > [!NOTE]
 > The sibling C note and the three sibling demos teach hosted C and Linux concepts, not xv6's callable API. [`user/user.h`](../../user/user.h) is the complete user interface here; `opendir()` and `readdir()` are not available.
 
-## The code to read first
+## Code to read first for `find`
 
 | File                                                                          | Contributes                                                                                                    | Does not contribute                                                    |
 | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -191,7 +200,7 @@ ls(char *path)
 
 `ls()` does not filter `.` and `..` because displaying them is useful. Their presence becomes consequential only when a tree traversal follows directory entries into further directories.
 
-## The concept underneath
+## The concept underneath `find`: directory records, names, and paths
 
 | Constant or record  | Value in this tree                    | Source                                   | Why it matters                                                                                                         |
 | ------------------- | ------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -222,7 +231,7 @@ _From the sibling Linux demo [`dir_dot_entries.c`](../../../operating-system/cod
 - **Red edges:** every directory has both aliases, including the starting one.
 - **Loop evidence:** a different record name has an `inum` already on the path.
 
-Following every directory record repeats the same names until a path or descriptor limit stops the walk. Interpret the missing-target and duplicate checks using the [grader limits](#what-the-grader-does-not-prove).
+Following every directory record repeats the same names until a path or descriptor limit stops the walk. Interpret the missing-target and duplicate checks using the [grader limits](#find-grader-evidence-limits).
 
 ### Record names versus C strings
 
@@ -238,9 +247,9 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 - **`stat()` implementation:** a user-library wrapper in [`user/ulib.c`](../../user/ulib.c), rather than a separate kernel primitive.
 - **Descriptor lifetime:** it closes the temporary descriptor it opens; `ls()`'s call does not retain that descriptor.
 
-## Deriving it
+## Deriving `find`: decisions and traps
 
-**Contract:** return to the [requirements](#contract) and [grader evidence](#what-the-grader-checks); the table below identifies decisions, not a second specification.
+**Contract:** return to the [requirements](#find-contract) and [grader evidence](#find-grader-checks); the table below identifies decisions, not a second specification.
 
 | Decision for `user/find.c`                 | Source-backed question to settle                                                                                                                                                                                                                                 |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -264,7 +273,7 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 | **Compare the dots against the parent or the full path**        | The parent path is the same for every record, and `"path/."` never equals `"."`, so `.` and `..` are still followed. | `ls()`'s `buf` and `p` in [`user/ls.c`](../../user/ls.c)                                                      |
 | **Return from inside the record loop**                          | Returning on a child's result or on one failed `stat()` skips its remaining siblings and leaks the directory fd.     | `ls()`'s `continue` and final `close(fd)` in [`user/ls.c`](../../user/ls.c)                                   |
 
-## Verifying it
+## Verifying `find`: build, guest checks, and grading
 
 1. Register `$U/_find`, then build and boot using the [user-program workflow](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise):
 
@@ -292,9 +301,9 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
     ./grade-lab-util find
     ```
 
-**Evidence:** the commands above are verification steps, not a transcript claiming a completed `user/find.c`. Interpret results using [the evidence limits](#what-the-grader-does-not-prove).
+**Evidence:** the commands above are verification steps, not a transcript claiming a completed `user/find.c`. Interpret results using [the evidence limits](#find-grader-evidence-limits).
 
-**Saved failure transcripts** ([Docs 03](../03-lab-workflow.md#grading) owns the mechanics):
+**Saved failure transcripts** ([Docs 03](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts) owns the mechanics):
 
 - `xv6.out.find_curdir`
 - `xv6.out.find_subdir`
@@ -308,7 +317,7 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 
 [Docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns image mechanics. Neither the user-space directory reader nor its future recursion needs a kernel-debugger recipe.
 
-## Questions
+## Questions about `find`: directory records, names, and paths
 
 1. Why does [`ls()`](../../user/ls.c) call `fstat(fd, &st)` before treating reads as `struct dirent` records?
     - **Format:** `read()` returns raw bytes from any inode. Only `st.type == T_DIR` guarantees 16-byte `struct dirent` slots; file or console bytes would be misread as inode numbers and names.
@@ -338,7 +347,7 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
     - **Present file:** exactly one line matches `^\./.*PRESENT`; it is not reported again through `.` or `..`.
     - **Absent name / directory name:** zero / one matching lines, respectively.
     - **Completion:** neither `path too long` nor `panic` appears before `DONE`.
-    - **Limit:** names have no end anchor, so a matched line need not end at the name. See [what the grader does not prove](#what-the-grader-does-not-prove).
+    - **Limit:** names have no end anchor, so a matched line need not end at the name. See [what the grader does not prove](#find-grader-evidence-limits).
 
 7. Why can a 512-byte buffer in [`ls()`](../../user/ls.c) still be rejected by `MAXPATH` in [`kernel/param.h`](../../kernel/param.h)?
     - **Local limit:** 512 bytes is only `ls()`'s buffer size.
@@ -357,7 +366,7 @@ The 14-byte record field needs a safe conversion before string comparison. [`ls(
 - **Source `Q:`/`A:` blocks:** one design question answered beside the relevant code.
 - **Drawings below:** one call's control flow, then memory and descriptors across nested calls.
 
-### One call of `find()`
+### One `find()` call: matching, descent, and cleanup
 
 ```mermaid
 flowchart TD
@@ -397,15 +406,15 @@ flowchart TD
 
 _Pink opens or descends, blue decides, yellow builds the path, cyan prints or closes, and red reports a failure. This palette matches the `ls()` diagram above, with pink added for requests._
 
-The loop shape matches the [`ls()` diagram](#ls-line-by-line). Three decisions implement the added [contract](#contract):
+The loop shape matches the [`ls()` diagram](#ls-line-by-line). Three decisions implement the added [contract](#find-contract):
 
 - **Skip aliases before matching:** `find . ..` prints nothing; neither `.` nor `..` is descended into.
-- **Match the name, print the path:** compare bare `child_name_ptr`, print whole `child_path`. The [current-directory test](#what-the-grader-checks) observes the `./NAME` prefix.
+- **Match the name, print the path:** compare bare `child_name_ptr`, print whole `child_path`. The [current-directory test](#find-grader-checks) observes the `./NAME` prefix.
 - **Continue after a directory match:** a matching directory still reaches `stat()`, so it is printed and then searched. The corner test requires the directory-match count.
 
 A `stat()` failure is reported and marks the return status, but the loop continues with the next record. One unreadable child therefore does not hide the rest of the tree, and `main()` still exits 1 at the end.
 
-### Memory and descriptors at the deepest point
+### Recursive `find()` memory and descriptor lifetimes
 
 ![Three stack frames for find(".", "b"), find("./a", "b"), and find("./a/aa", "b"). Each frame shows its child_path bytes, where child_name points, and the fd it holds. Beside them, p->ofile[] shows fds 0 to 2 for the console, fds 3 to 5 held by the three frames, and fd 6 opened briefly by stat().](fig/util-find-recursion-state.svg)
 
@@ -424,9 +433,9 @@ Both resources stay live until the nested call returns: the caller still has rec
 
 Sizing `child_path` at `MAXPATH` rather than `ls()`'s 512 bytes is what keeps the stack row harmless. A 512-byte buffer would buy nothing, because the kernel rejects any path that long at `open()`.
 
-### Decisions, answered
+### Answers to the `find` derivation decisions
 
-This table answers the [Deriving it](#deriving-it) checklist row by row; the source comments hold the longer reasoning.
+This table answers the [Deriving it](#deriving-find-decisions-and-traps) checklist row by row; the source comments hold the longer reasoning.
 
 | Decision                                   | What `user/find.c` does                                                                                                                                         |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |

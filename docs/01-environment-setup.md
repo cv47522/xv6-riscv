@@ -1,4 +1,4 @@
-# Environment Setup
+# xv6 Toolchain Installation and Verification
 
 ---
 
@@ -8,7 +8,7 @@
 
 Installing the toolchain for xv6-riscv, and — more usefully — what each package is actually for. Based on MIT's [6.1810 tools page](https://pdos.csail.mit.edu/6.1810/2026/tools.html), with the reasoning filled in.
 
-## The one-liner
+## Install the Debian, Ubuntu, or WSL 2 packages
 
 On Debian, Ubuntu, or WSL 2 running Ubuntu:
 
@@ -20,9 +20,13 @@ sudo apt-get install git build-essential gdb-multiarch qemu-system-misc \
 > [!IMPORTANT]
 > Ubuntu 24.04 or newer. Older releases ship a QEMU below the 7.2 minimum that xv6's virtio disk driver requires, and the Makefile's `check-qemu-version` target will refuse to boot.
 
-## Why each package
+## Host tools, cross tools, and the emulator
 
-The central fact that explains this list: **xv6 is cross-compiled**. Your machine is x86-64; the kernel you build targets RISC-V and can only run under emulation. So you need two complete toolchains — one for the host, one for the target — plus an emulator to run the result.
+**xv6 is cross-compiled:** this machine is x86-64, while the kernel targets RISC-V and runs under emulation. The installation therefore supplies three roles:
+
+- **Host toolchain:** builds tools that run on your machine, including `mkfs/mkfs`.
+- **Target toolchain:** builds the RISC-V kernel and user programs.
+- **Emulator:** runs the resulting RISC-V machine.
 
 | Package                        | What it provides                                   | Why xv6 needs it                                                                                                                                                                      |
 | ------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -33,7 +37,7 @@ The central fact that explains this list: **xv6 is cross-compiled**. Your machin
 | **qemu-system-misc**           | `qemu-system-riscv64`                              | Emulates the whole RISC-V machine xv6 boots on. Debian bundles the less common architectures into this "misc" package rather than shipping one per ISA.                               |
 | **gdb-multiarch**              | A GDB that understands many target architectures   | Plain `gdb` on an x86 host can only debug x86. `gdb-multiarch` can attach to QEMU's RISC-V gdb stub.                                                                                  |
 
-### Also required, but already present
+### Preinstalled build dependencies: Perl, Python, and bc
 
 These come preinstalled on Ubuntu, so MIT's command does not list them. Worth knowing about, because a missing one produces a confusing failure rather than a clear "not found":
 
@@ -68,7 +72,7 @@ PATH=$PATH:/usr/local/opt/riscv-gnu-toolchain/bin
 
 **Windows** — install WSL 2 with Ubuntu 24.04, then follow the Debian/Ubuntu instructions inside it. Everything runs in the Linux environment.
 
-## Verifying the install
+## Check installed tool versions
 
 For a small program using the same cross tools before booting a kernel, work through [tools and the first RISC-V run](../../assembly-language/docs/riscv/00-tools-and-first-run.md). The details below apply to this xv6 tree.
 
@@ -89,9 +93,11 @@ A known-good set, from the machine these notes were written on (Ubuntu 24.04.4 L
 | **python3**               | 3.12.10 |
 
 > [!NOTE]
-> The MIT page also lists `riscv64-unknown-elf-gcc` and `riscv64-unknown-linux-gnu-gcc` among the version checks. You do not need those if you installed the `riscv64-linux-gnu-` packages — they are alternative prefixes for the same job. The Makefile probes for all of them in turn and uses whichever it finds first; see the `TOOLPREFIX` block in the [Makefile](../Makefile).
+> **The compiler prefixes are alternatives.** MIT also lists `riscv64-unknown-elf-gcc` and `riscv64-unknown-linux-gnu-gcc`; you do not need them if you installed the `riscv64-linux-gnu-` packages.
 
-## Confirming it all works
+The Makefile probes all three prefixes in turn and uses whichever it finds first; see its [`TOOLPREFIX` block](../Makefile).
+
+## Verify the toolchain with a build and boot
 
 The real test is a build and boot:
 

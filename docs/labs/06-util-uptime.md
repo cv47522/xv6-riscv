@@ -11,9 +11,9 @@ The first optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu
 > [!IMPORTANT]
 > No solution or pseudocode before the end: the C quotation below is existing kernel code from `kernel/sysproc.c`, and the target gets a contract, source-backed decisions, and traps. The one exception is the final [Solution walkthrough](#solution-walkthrough), a marked spoiler; stop before it if you are still deriving.
 
-## What the exercise asks for
+## What the exercise asks for: `uptime`
 
-### Contract
+### `uptime` contract
 
 | Aspect                 | Requirement or local convention                                                                                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -26,10 +26,10 @@ The first optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu
 | **Build registration** | Repository: this tree lists `uptime` in `LAB_PRACTICE_PROGS` in the [Makefile](../../Makefile), which adds `$U/_uptime` to `UPROGS` and compiles it with `STRICT_CFLAGS`.       |
 | **Exit status**        | Repository convention: `0` on success. `uptime()` [cannot fail](../05-syscall-reference.md#time-and-system), so a failure status would come only from your own argument policy. |
 
-### What the grader checks
+### `uptime` grader checks
 
 > [!NOTE]
-> **Local tests, not MIT's.** The handout leaves the optional challenges ungraded. The four `uptime` tests in [`grade-lab-util`](../../grade-lab-util) were added in this repository, total **20 points**, and define the output format and argument policy in the [contract](#contract).
+> **Local tests, not MIT's.** The handout leaves the optional challenges ungraded. The four `uptime` tests in [`grade-lab-util`](../../grade-lab-util) were added in this repository, total **20 points**, and define the output format and argument policy in the [contract](#uptime-contract).
 
 | Test                                | Points | Commands                       | Positive assertion                                                 | Negative assertion           |
 | ----------------------------------- | ------ | ------------------------------ | ------------------------------------------------------------------ | ---------------------------- |
@@ -38,9 +38,9 @@ The first optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu
 | **`uptime, advances across sleep`** | 5      | `uptime`, `sleep 10`, `uptime` | Exactly two `Uptime: N ticks` lines, the second at least 10 larger | No separate pattern          |
 | **`uptime, rejects arguments`**     | 5      | `uptime extra`, then `echo OK` | Lines matching `^Usage: uptime$` and `^OK$`                        | `exec .* failed`, `^Uptime:` |
 
-The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.md#what-the-grader-does-not-prove) records that its own breakpoint test **cannot** tell a breakpoint stop from a timeout; here, a program that **never** enters `sys_uptime()` prints its line and fails. The lower bound of 10 is a guarantee, not a tolerance: `sys_pause()` samples `ticks` after the first reading and returns only after 10 more have elapsed.
+The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.md#sleep-grader-evidence-limits) records that its own breakpoint test **cannot** tell a breakpoint stop from a timeout; here, a program that **never** enters `sys_uptime()` prints its line and fails. The lower bound of 10 is a guarantee, not a tolerance: `sys_pause()` samples `ticks` after the first reading and returns only after 10 more have elapsed.
 
-### What the grader does not prove
+### `uptime` grader evidence limits
 
 | Evidence                          | What remains unchecked                                                                                     |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -48,7 +48,7 @@ The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.m
 | **The second reading is larger**  | An upper bound or the unit; only `clockintr()` in [`kernel/trap.c`](../../kernel/trap.c) defines one tick. |
 | **`Usage: uptime` appears**       | The exit status, or that the message went to fd 2; the console shows both descriptors alike.               |
 
-## Prerequisites
+## `uptime` prerequisites and references
 
 | When                            | Read                                                                                                         | Why it matters here                                                                                   |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
@@ -61,7 +61,7 @@ The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.m
 > [!NOTE]
 > Host `uptime(1)` prints wall-clock time and load averages read from `/proc/uptime`. That is a different program on a different kernel; the xv6 exercise is a tick count from one system call.
 
-## The code to read first
+## Code to read first for `uptime`
 
 | File                                         | Contributes                                                                                              | Does not contribute                                  |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -71,7 +71,7 @@ The syscall test forbids `^Uptime:` on purpose. [The sleep note](01-util-sleep.m
 | [`kernel/trap.c`](../../kernel/trap.c)       | `clockintr()`, which increments `ticks` and schedules the next timer interrupt.                          | No wall-clock time; there is no real-time clock API. |
 | [`user/printf.c`](../../user/printf.c)       | The `%d` and `%u` conversions.                                                                           | No field width or padding.                           |
 
-The stub, `a7`, and dispatch are identical to `pause`'s; [the sleep note](01-util-sleep.md#the-four-existing-layers) walks them once, and [docs 06](../06-build-artifacts.md#the-four-line-stub-decoded) owns the stub itself.
+The stub, `a7`, and dispatch are identical to `pause`'s; [the sleep note](01-util-sleep.md#the-four-existing-layers-of-pause) walks them once, and [docs 06](../06-build-artifacts.md#the-four-line-stub-decoded) owns the stub itself.
 
 ## `sys_uptime()` line by line
 
@@ -99,7 +99,7 @@ sys_uptime(void)
 
 Compare `sys_pause()` in the [sleep note](01-util-sleep.md#syspause-line-by-line): both take `tickslock` and read `ticks`, but `uptime` returns immediately instead of sleeping on `&ticks`.
 
-## The concept underneath
+## The concept underneath `uptime`: tick snapshots and result types
 
 | Constant or fact            | Value in this tree                                    | Source                                                                                                                |
 | --------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -112,19 +112,23 @@ Compare `sys_pause()` in the [sleep note](01-util-sleep.md#syspause-line-by-line
 > [!CAUTION]
 > The tenth-of-a-second figure is an observation about the current timer constant and QEMU's timebase, not part of the interface. Print ticks, as the handout asks.
 
-The counter starts at zero when the kernel boots, so a fresh `make qemu` followed by `uptime` reports a small number that includes boot and the time you took to type. Restarting QEMU resets it; starting a new shell with `Ctrl-d` does not, because the kernel keeps running.
+| Event                                   | Effect on `ticks`                            |
+| --------------------------------------- | -------------------------------------------- |
+| **Kernel boot or QEMU restart**         | Counter starts at zero.                      |
+| **Fresh `make qemu`, then `uptime`**    | Small reading includes boot and typing time. |
+| **`Ctrl-d` starts a replacement shell** | No reset: the kernel keeps running.          |
 
-The `uint`-to-`int` boundary is the one portability edge. Values at or above 2^31 ticks would print as negative with `%d`; at the current interval that is years of uptime, so it is a type observation rather than a practical failure. Choosing `%d` or `%u` is a decision for the [derivation](#deriving-it), and [docs 05](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) records which argument type each reads.
+The `uint`-to-`int` boundary is the one portability edge. Values at or above 2^31 ticks would print as negative with `%d`; at the current interval that is years of uptime, so it is a type observation rather than a practical failure. Choosing `%d` or `%u` is a decision for the [derivation](#deriving-uptime-decisions-and-traps), and [docs 05](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) records which argument type each reads.
 
-## Deriving it
+## Deriving `uptime`: decisions and traps
 
-**Contract:** use the [requirements above](#contract); settle each question from the named source.
+**Contract:** use the [requirements above](#uptime-contract); settle each question from the named source.
 
 | Decision for `user/uptime.c` | Source-backed question to settle                                                                                                                                                    |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Obtain the value**         | What does [`user/user.h`](../../user/user.h) say `uptime` takes and returns?                                                                                                        |
 | **Print it**                 | Which [`printf` conversion](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) matches the declared type, and which descriptor should normal output use? |
-| **Handle extra arguments**   | How will the program reject them, as the [contract](#contract) requires, when nothing in `sys_uptime()` reads an argument?                                                          |
+| **Handle extra arguments**   | How will the program reject them, as the [contract](#uptime-contract) requires, when nothing in `sys_uptime()` reads an argument?                                                   |
 | **Finish**                   | Which of `exit(0)` and `return 0` matches [the repository convention](../02-build-boot-and-usage.md#house-style-for-a-new-user-program)?                                            |
 
 | Trap                                            | Observable consequence                                                                                                                                                            | Source to inspect                                                        |
@@ -136,7 +140,7 @@ The `uint`-to-`int` boundary is the one portability edge. Values at or above 2^3
 | **Declaring `argv` but never using it**         | `STRICT_CFLAGS` adds `-Wextra`, so `make` fails with `unused parameter 'argv' [-Werror=unused-parameter]`.                                                                        | [`Makefile`](../../Makefile)                                             |
 | **Including a host header such as `<stdio.h>`** | The freestanding build fails; `printf` comes from `user/user.h`.                                                                                                                  | [docs 06](../06-build-artifacts.md#why-you-cannot-use-the-hosts-headers) |
 
-## Verifying it
+## Verifying `uptime`: build, guest checks, and grading
 
 1. Build and boot:
 
@@ -160,7 +164,7 @@ The `uint`-to-`int` boundary is the one portability edge. Values at or above 2^3
     make grade
     ```
 
-These are checks to run, not a transcript. The difference in step 2 exceeds 10 by however long the second command took to type. Use [the evidence limits](#what-the-grader-does-not-prove) when reading a pass. The focused failure logs are `xv6.out.uptime`, `xv6.out.uptime_syscall`, `xv6.out.uptime_advances`, and `xv6.out.uptime_args`; [docs 03](../03-lab-workflow.md#grading) owns transcript handling, and `make grade` fails if another QEMU already holds `fs.img`.
+These are checks to run, not a transcript. The difference in step 2 exceeds 10 by however long the second command took to type. Use [the evidence limits](#uptime-grader-evidence-limits) when reading a pass. The focused failure logs are `xv6.out.uptime`, `xv6.out.uptime_syscall`, `xv6.out.uptime_advances`, and `xv6.out.uptime_args`; [docs 03](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts) owns transcript handling, and `make grade` fails if another QEMU already holds `fs.img`.
 
 To observe the system call itself rather than its printed result, stop in the handler:
 
@@ -190,9 +194,9 @@ To observe the system call itself rather than its printed result, stop in the ha
     finish
     ```
 
-Saved `a7` should be 14. `finish` prints the handler's return value, which is the `ticks` snapshot; time spent stopped in GDB makes it a poor wall-clock comparison. [Docs 09](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) explains stopping in user code instead.
+Saved `a7` should be 14. `finish` prints the handler's return value, which is the `ticks` snapshot; time spent stopped in GDB makes it a poor wall-clock comparison. [Docs 09](../09-debugging-xv6.md#debug-usersleep-manually-with-add-symbol-file-and-hbreak) explains stopping in user code instead.
 
-## Questions
+## Questions about `uptime`: tick snapshots and result types
 
 1. Which source line in [`kernel/sysproc.c`](../../kernel/sysproc.c) shows that `uptime` takes no arguments, and what happens to a value a caller leaves in `a0`?
 2. Why does `sys_uptime()` take `tickslock` to read a single integer, and which function holds the same lock while writing it?
@@ -215,7 +219,7 @@ Saved `a7` should be 14. `finish` prints the handler's return value, which is th
 | **Print**            | `printf("Uptime: %d ticks\n", ...)` on fd 1.                                   | `%d` matches the `int` declaration in `user/user.h`; the unit stays in the output.        |
 | **Finish**           | `exit(0)`.                                                                     | The repository's success convention.                                                      |
 
-The program deliberately prints no seconds. A conversion would hard-code the `1000000` timer constant from `clockintr()`, which the [caution above](#the-concept-underneath) says is an observation, not an interface. The `uint`-to-`int` narrowing is accepted rather than worked around with `%u`: it matters only beyond 2^31 ticks, and `%d` keeps the format string consistent with the declared return type.
+The program deliberately prints no seconds. A conversion would hard-code the `1000000` timer constant from `clockintr()`, which the [caution above](#the-concept-underneath-uptime-tick-snapshots-and-result-types) says is an observation, not an interface. The `uint`-to-`int` narrowing is accepted rather than worked around with `%u`: it matters only beyond 2^31 ticks, and `%d` keeps the format string consistent with the declared return type.
 
 | Decision                   | What `user/uptime.c` does                                 |
 | -------------------------- | --------------------------------------------------------- |

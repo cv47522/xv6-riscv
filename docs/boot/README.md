@@ -5,12 +5,12 @@
 
 ## Start with the missing prerequisites
 
-| Stage | Read / do | Ready to continue when you can… |
-| --- | --- | --- |
-| **Assembly foundations** | [Lessons 0–5](../../../assembly-language/README.md): registers, memory, control flow, calls, tools, and ELF. | Single-step a tiny example and explain its next `pc`, register changes, and memory accesses. |
-| **Kernel-facing foundations** | [CSRs](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md) and [memory/saved state](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md). | Distinguish ordinary registers, CSRs, allocations, mappings, contexts, and trapframes. |
-| **Readiness check** | [Prediction exercises](../../../assembly-language/docs/riscv/08-readiness-and-next-steps.md). | Explain the results yourself; passing the automated checker alone is insufficient. |
-| **This tree's boot** | The proposed lessons below, one source fragment at a time. | Account for every covered source line and verify the important transitions in GDB. |
+| Stage                         | Read / do                                                                                                                                                            | Ready to continue when you can…                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Assembly foundations**      | [Lessons 0–5](../../../assembly-language/README.md): registers, memory, control flow, calls, tools, and ELF.                                                         | Single-step a tiny example and explain its next `pc`, register changes, and memory accesses. |
+| **Kernel-facing foundations** | [CSRs](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md) and [memory/saved state](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md). | Distinguish ordinary registers, CSRs, allocations, mappings, contexts, and trapframes.       |
+| **Readiness check**           | [Prediction exercises](../../../assembly-language/docs/riscv/08-readiness-and-next-steps.md).                                                                        | Explain the results yourself; passing the automated checker alone is insufficient.           |
+| **This tree's boot**          | The proposed lessons below, one source fragment at a time.                                                                                                           | Account for every covered source line and verify the important transitions in GDB.           |
 
 The prerequisite course assumes C/C++ knowledge and no assembly knowledge. Its six programs expose register arithmetic, memory widths, branches, nested calls, a C/assembly interface, and CSR operations. Keep those reusable explanations there; keep this kernel's addresses, fields, masks, ordering constraints, and failure paths here.
 
@@ -21,33 +21,33 @@ The sibling course rebuilds five boot-path mechanisms as small RV32 programs in 
 > [!WARNING]
 > These are previews, not evidence about this tree. CPUlator is a 32-bit, machine-mode-only CPU without `mhartid`, so the programs use 4-byte registers, `sw`/`lw`, a pretend hart id, and small addresses. Every value that the walkthroughs record must still come from this kernel under QEMU.
 
-| Planned lesson | Preview program | What the screenshot fixes | Explained in |
-| --- | --- | --- | --- |
-| **1. Entry and boot stacks** | [1-entry-stack.s](../../../assembly-language/codes/riscv/xv6-rv32/1-entry-stack.s) | `sp = stack0 + (hartid + 1) * 4096`, the per-hart slice top. | [Readiness lesson](../../../assembly-language/docs/riscv/08-readiness-and-next-steps.md#xv6-in-the-browser-preview-entrys) |
-| **2. Machine controls** | [2-start-mret.s](../../../assembly-language/codes/riscv/xv6-rv32/2-start-mret.s) | Clear-then-set of `mstatus.MPP`, `mepc = main`, and `mret` jumping without a call. | [CSR lesson](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#xv6-in-the-browser-startc-sets-mpp-and-mepc-then-mret) |
-| **4. Physical pages** | [4-kalloc-freelist.s](../../../assembly-language/codes/riscv/xv6-rv32/4-kalloc-freelist.s) | `struct run` links stored inside free pages, junk fills, and the LIFO pop. | [Memory lesson](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#xv6-in-the-browser-kallocs-free-list) |
-| **5. First context switch** | [5-swtch-context.s](../../../assembly-language/codes/riscv/xv6-rv32/5-swtch-context.s) | Callee-saved registers stored to the old context and loaded from the new one; `ret` lands in another thread. | [Memory lesson](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#xv6-in-the-browser-swtch-saves-and-loads-a-context) |
-| **7. Trampoline (trap side)** | [3-ecall-trap.s](../../../assembly-language/codes/riscv/xv6-rv32/3-ecall-trap.s) | `ecall` sets the cause and saved PC, jumps to the vector, and returns past the `ecall` after `epc += 4`. | [CSR lesson](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#xv6-in-the-browser-a-system-call-is-a-trap) |
+| Planned lesson                | Preview program                                                                            | What the screenshot fixes                                                                                    | Explained in                                                                                                                           |
+| ----------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Entry and boot stacks**  | [1-entry-stack.s](../../../assembly-language/codes/riscv/xv6-rv32/1-entry-stack.s)         | `sp = stack0 + (hartid + 1) * 4096`, the per-hart slice top.                                                 | [Readiness lesson](../../../assembly-language/docs/riscv/08-readiness-and-next-steps.md#xv6-in-the-browser-preview-entrys)             |
+| **2. Machine controls**       | [2-start-mret.s](../../../assembly-language/codes/riscv/xv6-rv32/2-start-mret.s)           | Clear-then-set of `mstatus.MPP`, `mepc = main`, and `mret` jumping without a call.                           | [CSR lesson](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#xv6-in-the-browser-startc-sets-mpp-and-mepc-then-mret)     |
+| **4. Physical pages**         | [4-kalloc-freelist.s](../../../assembly-language/codes/riscv/xv6-rv32/4-kalloc-freelist.s) | `struct run` links stored inside free pages, junk fills, and the LIFO pop.                                   | [Memory lesson](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#xv6-in-the-browser-kallocs-free-list)               |
+| **5. First context switch**   | [5-swtch-context.s](../../../assembly-language/codes/riscv/xv6-rv32/5-swtch-context.s)     | Callee-saved registers stored to the old context and loaded from the new one; `ret` lands in another thread. | [Memory lesson](../../../assembly-language/docs/riscv/07-memory-and-saved-state.md#xv6-in-the-browser-swtch-saves-and-loads-a-context) |
+| **7. Trampoline (trap side)** | [3-ecall-trap.s](../../../assembly-language/codes/riscv/xv6-rv32/3-ecall-trap.s)           | `ecall` sets the cause and saved PC, jumps to the vector, and returns past the `ecall` after `epc += 4`.     | [CSR lesson](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md#xv6-in-the-browser-a-system-call-is-a-trap)                |
 
 ![CPUlator RV32 after the entry.S stack computation: a1 = 2 (pretend hart 1 plus one), a0 = 0x2000, sp = 0x2020; la sp, stack0 assembled to li sp, 32 because stack0 is at 0x20](../images/cpulator/xv6-01-entry-stack.png)
 
-*Lesson 1 preview.* With `stack0` at `0x20`, hart 1 starts at `0x2020`, the exclusive top of its own 4096-byte slice. In this kernel the same formula runs at the `stack0` address chosen by `kernel.ld`, and `mhartid` supplies the real hart id.
+_Lesson 1 preview._ With `stack0` at `0x20`, hart 1 starts at `0x2020`, the exclusive top of its own 4096-byte slice. In this kernel the same formula runs at the `stack0` address chosen by `kernel.ld`, and `mhartid` supplies the real hart id.
 
 ![CPUlator RV32 after the start.c sequence: 0x800 was written to mstatus but 0x1800 reads back, mepc = main, and mret jumped to main](../images/cpulator/xv6-02-start-mret.png)
 
-*Lesson 2 preview.* The read-back shows that `MPP` is a WARL field: CPUlator implements only M-mode, so it keeps `11`. On QEMU's `virt` board the write sticks and `mret` enters S-mode at `main`; lesson 2 must observe that transition directly.
+_Lesson 2 preview._ The read-back shows that `MPP` is a WARL field: CPUlator implements only M-mode, so it keeps `11`. On QEMU's `virt` board the write sticks and `mret` enters S-mode at `main`; lesson 2 must observe that transition directly.
 
 ![CPUlator RV32 memory after freerange and one kalloc: the free-list head points at 0x100, page 0x100 links to 0xe0, page 0xe0 ends the list, free pages hold 0x01 junk, and the allocated page 0x120 holds 0x05 junk](../images/cpulator/xv6-04-kalloc-freelist.png)
 
-*Lesson 4 preview.* Toy 32-byte pages make the whole list visible on one screen. The real allocator uses 4096-byte pages from `end` to `PHYSTOP` and takes `kmem.lock`, which a single-hart preview cannot exercise.
+_Lesson 4 preview._ Toy 32-byte pages make the whole list visible on one screen. The real allocator uses 4096-byte pages from `end` to `PHYSTOP` and takes `kmem.lock`, which a single-hart preview cannot exercise.
 
 ![CPUlator RV32 after swtch: the old context holds A's ra, sp, s0, and s1; the registers now hold B's values; the simulator's ABI checker reports that the function clobbered ra, sp, s0, and s1](../images/cpulator/xv6-05-swtch-context.png)
 
-*Lesson 5 preview.* CPUlator's calling-convention checker flags `swtch` because it returns with different `ra`, `sp`, and saved registers, which is the purpose of a context switch. The real `struct context` fields are 8 bytes, so lesson 5 must match each `sd`/`ld` offset to `kernel/proc.h`.
+_Lesson 5 preview._ CPUlator's calling-convention checker flags `swtch` because it returns with different `ra`, `sp`, and saved registers, which is the purpose of a context switch. The real `struct context` fields are 8 bytes, so lesson 5 must match each `sd`/`ld` offset to `kernel/proc.h`.
 
 ![CPUlator RV32 stopped inside a trap handler: a7 = 16 (SYS_write), mtvec points at the handler, mepc holds the ecall address, and mcause = 11](../images/cpulator/xv6-03-ecall-trap.png)
 
-*Lesson 7 preview (trap side).* The preview traps to machine mode with `mcause = 11`; an xv6 user `ecall` is delegated to supervisor mode, reports `scause = 8`, and enters `uservec` in the trampoline page. The `epc += 4` step matches `p->trapframe->epc += 4` in `kernel/trap.c`.
+_Lesson 7 preview (trap side)._ The preview traps to machine mode with `mcause = 11`; an xv6 user `ecall` is delegated to supervisor mode, reports `scause = 8`, and enters `uservec` in the trampoline page. The `epc += 4` step matches `p->trapframe->epc += 4` in `kernel/trap.c`.
 
 ## Teaching format for every lesson
 
@@ -62,8 +62,8 @@ The sibling course rebuilds five boot-path mechanisms as small RV32 programs in 
 
 A trace table should use these columns:
 
-| Source line / instruction | Inputs before it | Operation in plain language | Registers / memory after it | Why needed; failure or invariant |
-| --- | --- | --- | --- | --- |
+| Source line / instruction               | Inputs before it                                                            | Operation in plain language               | Registers / memory after it                   | Why needed; failure or invariant                        |
+| --------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------- | ------------------------------------------------------- |
 | **One actual source statement per row** | Values, addresses, and their owners; use symbolic values where appropriate. | Expand unfamiliar syntax and identifiers. | Show changes separately from preserved state. | Explain the constraint, not merely the operation again. |
 
 A separate symbol table should identify each local/global variable's type, lifetime, owner, and role. For example, a local pointer, a global array, and a CSR helper must not all be described merely as “state.” Introduce acronyms through the existing [glossary](../04-terminology.md), adding missing entries there as the lessons are written.
@@ -154,12 +154,12 @@ These are learning units, not an obligation to fit each unit into one long page.
 
 ## What “every line” will mean
 
-| Coverage level | Required evidence | What remains visible |
-| --- | --- | --- |
-| **Complete small file** | Every source line classified and explained, including structural lines and both branch outcomes. | Runtime observations may exercise only selected paths; say which. |
-| **Boot-facing part of a large file** | Every line of the listed functions, their globals/types, and required helper contracts explained. | All other functions remain explicitly pending; the file is not marked complete. |
-| **Whole-file completion** | Union of all covered spans accounts for the entire file at a recorded revision. | Later edits invalidate affected spans until checked again. |
-| **Dependency body** | The called function's actual implementation receives the same line treatment in its owning lesson. | An interface summary alone does not complete the dependency. |
+| Coverage level                       | Required evidence                                                                                  | What remains visible                                                            |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Complete small file**              | Every source line classified and explained, including structural lines and both branch outcomes.   | Runtime observations may exercise only selected paths; say which.               |
+| **Boot-facing part of a large file** | Every line of the listed functions, their globals/types, and required helper contracts explained.  | All other functions remain explicitly pending; the file is not marked complete. |
+| **Whole-file completion**            | Union of all covered spans accounts for the entire file at a recorded revision.                    | Later edits invalidate affected spans until checked again.                      |
+| **Dependency body**                  | The called function's actual implementation receives the same line treatment in its owning lesson. | An interface summary alone does not complete the dependency.                    |
 
 The initial full-file set is `entry.S`, `start.c`, `main.c`, `swtch.S`, `trampoline.S`, and `user/init.c`. `proc.c` gets a boot-path pass followed by the remaining-process-path pass. `kernel.ld`, `kalloc.c`, and `exec.c` are supporting full-file studies; `riscv.h`, `proc.h`, `vm.c`, `trap.c`, and device/filesystem helpers need explicit partial coverage until their owning lessons finish them.
 
@@ -167,28 +167,28 @@ Do not recursively expand every dependency inside the same page. Record the edge
 
 ## Visuals to create where they earn their space
 
-| Relationship | Proposed material | Why this form |
-| --- | --- | --- |
-| **Boot-stack slices** | Editable Excalidraw source plus adjacent SVG export: two harts, slice bounds, downward frame growth, and the initial `sp` values. | Spatial placement makes “top of stack” and the `+1` in the slice calculation concrete. |
-| **Page ownership and translation** | Before/after page tables plus a small object graph for free list → allocated page → mapped page. | Distinguishes ownership changes from address translation and avoids treating virtual/physical addresses as interchangeable. |
-| **Initialization dependencies** | Small Mermaid graph separating shared initialization from per-hart activation. | Explains ordering and the `started` publication boundary. |
-| **First context switch** | Register/offset table plus a compact sequence diagram. | Shows saved `ra`/`sp`, which stack is active, and the unusual lock handoff. |
-| **Trampoline address continuity** | Editable Excalidraw source plus SVG: kernel and user tables mapping the same code page, with trapframe access and the switching instruction marked. | The same virtual address across a page-table switch is a spatial relationship. |
-| **Parent, child, and descriptors** | Object graph and a short message sequence for fork/exec/wait. | Makes shared open-file objects and the shell's lifecycle explicit. |
+| Relationship                       | Proposed material                                                                                                                                   | Why this form                                                                                                               |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Boot-stack slices**              | Editable Excalidraw source plus adjacent SVG export: two harts, slice bounds, downward frame growth, and the initial `sp` values.                   | Spatial placement makes “top of stack” and the `+1` in the slice calculation concrete.                                      |
+| **Page ownership and translation** | Before/after page tables plus a small object graph for free list → allocated page → mapped page.                                                    | Distinguishes ownership changes from address translation and avoids treating virtual/physical addresses as interchangeable. |
+| **Initialization dependencies**    | Small Mermaid graph separating shared initialization from per-hart activation.                                                                      | Explains ordering and the `started` publication boundary.                                                                   |
+| **First context switch**           | Register/offset table plus a compact sequence diagram.                                                                                              | Shows saved `ra`/`sp`, which stack is active, and the unusual lock handoff.                                                 |
+| **Trampoline address continuity**  | Editable Excalidraw source plus SVG: kernel and user tables mapping the same code page, with trapframe access and the switching instruction marked. | The same virtual address across a page-table switch is a spatial relationship.                                              |
+| **Parent, child, and descriptors** | Object graph and a short message sequence for fork/exec/wait.                                                                                       | Makes shared open-file objects and the shell's lifecycle explicit.                                                          |
 
 Use the [repository palette and figure rules](../../AGENTS.md#documentation-visual-readability). Excalidraw sources must sit beside their SVG exports, with both linked from captions; render and inspect every new/changed figure. Required facts stay in the Markdown too, so a drawing never becomes a second specification. Do not add a diagram where a small table or numbered list already explains the relationship.
 
 ## Existing documents to update when the walkthroughs are written
 
-| Document | Proposed change |
-| --- | --- |
-| **[OS design note](../11-os-design-in-xv6.md#from-boot-to-the-first-process)** | Keep its compact overview and measured addresses; link each stage to the corresponding completed lesson. Do not grow another full explanation here. |
-| **[Book chapter 2](../book/ch02-operating-system-organization.md)** | Preserve its standard sections and ownership model; add links from the boot-stack, `start`, and `forkret` summaries to the new lessons. Reconcile its “straight to `_entry`” wording with the observed QEMU reset stub. |
-| **[Build artifacts](../06-build-artifacts.md)** | Keep artifact/reference ownership; link its instruction and register reference to the slower assembly course where practice is needed. |
-| **[Terminology](../04-terminology.md)** | Add missing terms once and link to them from the new lessons. |
-| **[Debugging](../09-debugging-xv6.md)** | Keep reusable debugger mechanics here; leave source-fragment-specific observations beside the fragment. |
-| **[Docs index](../README.md)** | Register this study route once the walkthrough lessons exist, distinguishing it from the chapter summaries. |
-| **[Progress tracker](../../STUDY-PROGRESS.md)** | Record actual reading and verification evidence when the learner completes it; creating documents does not establish mastery. |
+| Document                                                                                         | Proposed change                                                                                                                                                                                                         |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[OS design note](../11-os-design-in-xv6.md#kernel-boot-from-entry-to-the-first-user-process)** | Keep its compact overview and measured addresses; link each stage to the corresponding completed lesson. Do not grow another full explanation here.                                                                     |
+| **[Book chapter 2](../book/ch02-operating-system-organization.md)**                              | Preserve its standard sections and ownership model; add links from the boot-stack, `start`, and `forkret` summaries to the new lessons. Reconcile its “straight to `_entry`” wording with the observed QEMU reset stub. |
+| **[Build artifacts](../06-build-artifacts.md)**                                                  | Keep artifact/reference ownership; link its instruction and register reference to the slower assembly course where practice is needed.                                                                                  |
+| **[Terminology](../04-terminology.md)**                                                          | Add missing terms once and link to them from the new lessons.                                                                                                                                                           |
+| **[Debugging](../09-debugging-xv6.md)**                                                          | Keep reusable debugger mechanics here; leave source-fragment-specific observations beside the fragment.                                                                                                                 |
+| **[Docs index](../README.md)**                                                                   | Register this study route once the walkthrough lessons exist, distinguishing it from the chapter summaries.                                                                                                             |
+| **[Progress tracker](../../STUDY-PROGRESS.md)**                                                  | Record actual reading and verification evidence when the learner completes it; creating documents does not establish mastery.                                                                                           |
 
 ## Verification and commit sequence for the follow-up
 

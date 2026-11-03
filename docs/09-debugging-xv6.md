@@ -6,16 +6,28 @@
 
 ---
 
-This guide explains why the checked-in VS Code session can stop in `kernel/sysproc.c` but leaves a breakpoint in `user/sleep.c` unresolved, why the native programs under `/home/wahsieh/personal/c-programming/notes` behave differently, how to load one xv6 user program's symbols manually, and when a single emulated hart makes debugging easier. Use [04-terminology.md](04-terminology.md) for term lookup and [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debugging) for the basic kernel-debugger workflow.
+**Source breakpoints depend on the ELF symbols GDB has loaded.** This guide covers:
 
-## The short answer
+- **VS Code source resolution:** why `kernel/sysproc.c` resolves while `user/sleep.c` remains unresolved.
+- **Native versus remote debugging:** why programs under `/home/wahsieh/personal/c-programming/notes` behave differently.
+- **User-program debugging:** how to load one xv6 program's symbols manually.
+- **Hart selection:** when one emulated hart makes a trace easier.
 
-VS Code is not accepting one C directory and rejecting another. A source breakpoint becomes usable only when GDB has debug information that maps that source line to an address in a loaded symbol file. The native notes build and launch one selected ELF, so that ELF supplies the current file's symbols. The xv6 session attaches to a whole emulated machine and loads only `kernel/kernel`; `kernel/sysproc.c` belongs to that ELF, while `user/sleep.c` belongs to the separate `user/_sleep` ELF.
+Use [04-terminology.md](04-terminology.md) for term lookup and [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu) for the basic kernel-debugger workflow.
+
+## Source breakpoints require symbols from the correct ELF
+
+A source breakpoint becomes usable when **a loaded symbol file maps its source line to an address**. The directory containing the C file does not decide that.
+
+| Session            | Loaded ELF                                                 | Source resolution                                                                      |
+| ------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Native C notes** | The selected program, built and launched for the exercise. | That ELF supplies the selected source's symbols.                                       |
+| **xv6**            | Only `kernel/kernel`, attached to the emulated machine.    | `kernel/sysproc.c` resolves; `user/sleep.c` belongs to the separate `user/_sleep` ELF. |
 
 > [!IMPORTANT]
 > The `program` value in this repository's `.vscode/launch.json` names `kernel/kernel` for symbols. The configuration does not ask the host operating system to execute that RISC-V file: `.gdbinit` attaches to QEMU's already-running remote target, and `launchCompleteCommand: "None"` prevents a host-style `run` command.
 
-## Two debugger launch models
+## Native process launch versus QEMU remote attachment
 
 ```mermaid
 flowchart TB
@@ -72,7 +84,7 @@ The colors label request, processing, routing, data, successful resolution, and 
 | **Source covered initially**     | Sources linked into the selected ELF.   | Sources linked into the kernel ELF.                                                    |
 | **Other executable code**        | Usually outside the exercise's process. | Separate user ELFs such as `user/_sleep`, loaded later from `fs.img`.                  |
 
-## What the screenshots show
+## VS Code evidence: sys_pause breakpoint and decoded argument
 
 ![VS Code paused on the verified `sys_pause` breakpoint while the `sleep.c` breakpoint remains gray](images/vscode-kernel-breakpoint-hit.png)
 
@@ -82,13 +94,17 @@ _VS Code paused on the verified `sys_pause` breakpoint while the `sleep.c` break
 
 _After `argint(0, &n)` executes, the debugger can show `n = 10`. The stack remains `sys_pause` → `syscall` → `usertrap`, so this is kernel-side evidence about the request rather than a stop in `sleep.c:main`._
 
-## Why one breakpoint resolves and the other does not
+## kernel/kernel symbols do not cover user/\_sleep
 
-`kernel/kernel` and `user/_sleep` are two independent RISC-V ELF files. Both contain DWARF source mappings because the Makefile compiles with `-ggdb`, but GDB reads mappings only from symbol files it has loaded. The generated `.gdbinit` contains `symbol-file kernel/kernel` and no `add-symbol-file user/_sleep`, so the initial session can translate a `sysproc.c` line into a kernel virtual address but has no translation for a `sleep.c` line.
+**Both ELFs contain debug information; only the kernel ELF is loaded initially.** The Makefile's `-ggdb` supplies DWARF source mappings in the independent RISC-V files `kernel/kernel` and `user/_sleep`.
+
+The generated `.gdbinit` contains `symbol-file kernel/kernel` and no `add-symbol-file user/_sleep`. GDB therefore maps `sysproc.c` lines to kernel virtual addresses but has no source-to-address translation for `sleep.c`.
 
 `fs.img` does not solve that symbol problem. It stores the linked `sleep` executable for xv6 to load with `exec`; it is not a GDB symbol container, and QEMU's remote stub does not understand the xv6 filesystem or process table. The stub reports machine state—registers, memory, and emulated CPUs—while GDB relies on the ELF files supplied by the human or debugger configuration to label that state.
 
-## Manually debugging an xv6 user program
+<a id="debug-usersleep-manually-with-add-symbol-file-and-hbreak"></a>
+
+## Debug user/\_sleep manually with add-symbol-file and hbreak
 
 The following recipe adds `user/_sleep` to the existing kernel-debugging session without changing `.vscode`. It is deliberately manual because the symbol file is meaningful only while the intended xv6 process occupies that user address space.
 
@@ -160,19 +176,21 @@ The hardware breakpoint is purposeful. It asks QEMU to stop when a hart executes
 
 ## Why use `CPUS=1`
 
-There is no automatic host-CPU selection here. The Makefile sets `CPUS := 3` by default, passes that value to QEMU's `-smp` option, and accepts a command-line override; the `fs` lab is the one branch that forces `CPUS := 1`. In this QEMU machine, each virtual CPU is a RISC-V hart.
+**`CPUS` selects emulated harts, independently of the host CPU count.** The Makefile defaults to `CPUS := 3`, passes it to QEMU's `-smp`, and accepts a command-line override. The `fs` lab is the branch that forces `CPUS := 1`; each virtual CPU in this machine is a RISC-V hart.
 
-| Setting              | What becomes easier or harder                                                                                                                                                       | When to use it                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **`CPUS=1`**         | Removes cross-hart execution, lock contention, and many interleavings. Timer interrupts and xv6 process scheduling still occur, so the run is simpler but not fully deterministic.  | Trace one causal path, single-step, inspect one call stack, or use the QEMU monitor without first choosing a hart. |
-| **Default `CPUS=3`** | Exercises concurrent kernel paths and can expose races, deadlocks, and ordering assumptions that one hart hides. Console order and the currently stopped hart are less predictable. | Reproduce multicore failures and perform final correctness checks after the focused trace.                         |
+| Setting              | Best use                                                                                                     | Execution differences                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `CPUS=1`             | Trace one causal path, single-step, inspect one call stack, or use the QEMU monitor without choosing a hart. | Removes cross-hart execution, lock contention, and many interleavings.                 |
+| **Default `CPUS=3`** | Reproduce multicore failures and run final correctness checks after a focused trace.                         | Exercises concurrent paths that can expose races, deadlocks, and ordering assumptions. |
+
+**One hart is simpler, not fully deterministic:** timer interrupts and xv6 scheduling still occur. With three harts, console order and the currently stopped hart are less predictable; those interleavings can reveal failures the single-hart trace hides.
 
 QEMU exposes the emulated harts to GDB as debugger threads. Those entries are execution contexts of virtual CPUs, not xv6 processes and not user-level software threads. `info threads` answers “which hart did QEMU report?”, while `myproc()` and `p->state` in xv6 answer “which process is this hart running?”
 
 > [!IMPORTANT]
 > `CPUS=1` is a debugging lens, not a fix. A change is not concurrency-safe until it also survives the repository's normal multi-hart tests.
 
-## Troubleshooting
+## GDB troubleshooting: symbols, reused addresses, and harts
 
 | Observation                                                               | Likely cause                                                                                                                 | Check or correction                                                                                                                                  |
 | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -185,12 +203,12 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 | **`exec sleep failed` appears**                                           | The running guest's `fs.img` does not contain the linked user program.                                                       | Quit QEMU, rebuild the image, boot again, and confirm the xv6 shell's `ls` output includes `sleep` before debugging source behavior.                 |
 | **The bug disappears with `CPUS=1`**                                      | The failure depends on cross-hart concurrency.                                                                               | Treat the single-hart trace as partial evidence and reproduce with the default three harts.                                                          |
 
-## Related references
+## Assembly, GDB, ELF, and sleep exercise references
 
 - [Assembly practice: stepping instructions and inspecting memory](../../assembly-language/docs/riscv/00-tools-and-first-run.md)
 - [Assembly practice: observing ra across a nested call](../../assembly-language/docs/riscv/04-functions-and-stacks.md#gdb-observe-ra-change-across-the-nested-call)
 
-- [Build, boot, and basic GDB usage](02-build-boot-and-usage.md#debugging)
+- [Build, boot, and basic GDB usage](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu)
 - [Terminology lookup](04-terminology.md)
-- [ELF and build artifacts](06-build-artifacts.md#what-elf-is)
+- [ELF and build artifacts](06-build-artifacts.md#elf-headers-segments-and-load-addresses)
 - [The util `sleep` exercise](labs/01-util-sleep.md)

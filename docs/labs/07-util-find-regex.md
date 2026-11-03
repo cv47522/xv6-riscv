@@ -11,23 +11,23 @@ An optional challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810
 > [!IMPORTANT]
 > No solution or pseudocode before the end: the C quotation below is the unchanged matcher from `user/grep.c`, which is not the target, and `user/find.c` gets a contract, decisions, and traps. Its traversal is explained in [`04-util-find.md`](04-util-find.md). The one exception is the final [Solution walkthrough](#solution-walkthrough), a marked spoiler; stop before it if you are still deriving.
 
-## What the exercise asks for
+## What the exercise asks for: `find` regular expressions
 
-### Contract
+### `find` regular expressions contract
 
 | Aspect               | Requirement or local convention                                                                                                                                                                       |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Target**           | Handout: extend `find`'s name matching. Repository: modify the existing `user/find.c`; no new program or `UPROGS` entry is needed.                                                                    |
 | **Pattern language** | Handout: regular expressions, with `user/grep.c` named as primitive prior art. That matcher supports `^`, `.`, `*`, and `$` only; supporting more is your extension, not a requirement.               |
-| **What is matched**  | Repository convention from [`04-util-find.md`](04-util-find.md#contract), asserted by the local tests: the entry's own name, **never** the path that leads to it.                                     |
+| **What is matched**  | Repository convention from [`04-util-find.md`](04-util-find.md#find-contract), asserted by the local tests: the entry's own name, **never** the path that leads to it.                                |
 | **Anchoring**        | Not specified by the handout. Repository decision, asserted by the local tests: grep's rule, so a pattern is unanchored unless it uses `^` or `$`. A plain word therefore matches anywhere in a name. |
 | **Earlier modes**    | Keep plain search, directory matches, and `-exec` from [`04-util-find.md`](04-util-find.md) and [`05-util-find-exec.md`](05-util-find-exec.md) working.                                               |
 | **Build**            | `find.o` is in `STRICT_OBJS` in the [Makefile](../../Makefile), so it compiles with `-Wall -Werror -Wextra -pedantic`.                                                                                |
 
-### What the grader checks
+### `find` regular expressions grader checks
 
 > [!NOTE]
-> **Local tests, not MIT's.** The handout leaves this challenge ungraded. The three `find regex` tests in [`grade-lab-util`](../../grade-lab-util) were added in this repository, total **30 points**, and fix the anchoring rule and name-only matching in the [contract](#contract).
+> **Local tests, not MIT's.** The handout leaves this challenge ungraded. The three `find regex` tests in [`grade-lab-util`](../../grade-lab-util) were added in this repository, total **30 points**, and fix the anchoring rule and name-only matching in the [contract](#find-regular-expressions-contract).
 
 Each test boots a fresh image, builds the same fixture under a directory `DIR` with a random 8-character name, runs its `find` commands, and compares each command's output lines with the expected set, ignoring order. `find_regex_run()` takes a command's output as the text between its `$ command` line and the next one.
 
@@ -46,19 +46,19 @@ Each test boots a fresh image, builds the same fixture under a directory `DIR` w
 | **`find regex, wildcards`**                   | 10     | `^a.c$`, `^a*b$`, `^.$`, `.*`            | `.` or `*` is mishandled, or `.*` prints or descends into `.` and `..`. |
 | **`find regex, names not paths, with -exec`** | 10     | `DIR` itself, then `^a.c -exec echo hit` | The pattern sees the path, or `-exec` no longer receives each match.    |
 
-[Which pattern filters what](#which-pattern-filters-what) lists every expected result. The earlier exact-match comparison, which [`user/find_basic.c`](../../user/find_basic.c) still uses, fails all three tests, and a version that applies the matcher to the full path also fails all three: `^ab` **cannot** match `DIR/ab`, and `find DIR DIR` prints every entry.
+[Which pattern filters what](#find-regex-patterns-and-the-names-they-match) lists every expected result. The earlier exact-match comparison, which [`user/find_basic.c`](../../user/find_basic.c) still uses, fails all three tests, and a version that applies the matcher to the full path also fails all three: `^ab` **cannot** match `DIR/ab`, and `find DIR DIR` prints every entry.
 
-### What the grader does not prove
+### `find` regular expressions grader evidence limits
 
-| Evidence                     | What remains unchecked                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Each output set matches**  | Output order, and diagnostics on fd 2, which share the console but are compared only if they appear.    |
-| **The fixture names pass**   | Names of the full 14 bytes, which have no terminator in `struct dirent`; the fixture's names are short. |
-| **`-exec` receives matches** | Combinations with `$` in an `-exec` command line; see [the harness trap](#verifying-it).                |
+| Evidence                     | What remains unchecked                                                                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Each output set matches**  | Output order, and diagnostics on fd 2, which share the console but are compared only if they appear.                                          |
+| **The fixture names pass**   | Names of the full 14 bytes, which have no terminator in `struct dirent`; the fixture's names are short.                                       |
+| **`-exec` receives matches** | Combinations with `$` in an `-exec` command line; see [the harness trap](#verifying-find-regular-expressions-build-guest-checks-and-grading). |
 
-The seven literal-name `find` and `exec` tests stay the regression suite. Under grep's rule, `find . b -exec grep hello` in [`user/findtest.sh`](../../user/findtest.sh) also runs `grep` on `zombie`, `find_basic`, and `sf-bad-eof`; none of those files contains `hello` in this image, so the counted occurrences are unchanged. [`04-util-find.md`](04-util-find.md#what-the-grader-checks) and [`05-util-find-exec.md`](05-util-find-exec.md#what-the-grader-checks) own those assertions and their limits.
+The seven literal-name `find` and `exec` tests stay the regression suite. Under grep's rule, `find . b -exec grep hello` in [`user/findtest.sh`](../../user/findtest.sh) also runs `grep` on `zombie`, `find_basic`, and `sf-bad-eof`; none of those files contains `hello` in this image, so the counted occurrences are unchanged. [`04-util-find.md`](04-util-find.md#find-grader-checks) and [`05-util-find-exec.md`](05-util-find-exec.md#find--exec-grader-checks) own those assertions and their limits.
 
-## Prerequisites
+## `find` regular expressions prerequisites and references
 
 | When                | Read                                                                                                                        | Why it matters here                                                   |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -71,7 +71,7 @@ The seven literal-name `find` and `exec` tests stay the regression suite. Under 
 > [!NOTE]
 > Host `find -name` uses shell glob patterns and `find -regex` matches the whole path with POSIX regular expressions. Neither is the xv6 matcher; use `user/grep.c` as the specification of what `^ . * $` mean here.
 
-## The code to read first
+## Code to read first for `find` regular expressions
 
 | File                               | Contributes                                                                                            | Does not contribute                                                         |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
@@ -153,7 +153,7 @@ _Legend: blue decides, yellow processes, cyan returns a match, and red returns n
 
 Every function reads `text` until `'\0'`, so the text **must** be a C string. Every recursion step consumes at least one pattern character, and `matchstar()` consumes text, so the work is bounded by the pattern and the 14-byte name; there is no stack-depth concern at that size.
 
-## The concept underneath
+## The concept underneath `find` regular expressions: grep matching and shell input
 
 | Fact                         | Value or behavior                                  | Source                                                              |
 | ---------------------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
@@ -166,14 +166,19 @@ Every function reads `text` until `'\0'`, so the text **must** be a C string. Ev
 > [!WARNING]
 > **A literal name is also a pattern.** Under grep's rule, adopted here, `find . b` matches every name containing `b`; in this image that includes programs such as `zombie` and `find_basic` and the fixture `sf-bad-eof`. Write `^b$` to ask for the exact name.
 
-Two consequences follow from the shell, not the matcher. `sh` performs no globbing, so `find . 'b*'` is unnecessary: `find . b*` already delivers `b*` to `find`. And `sh` performs no quote removal, so the quoted form delivers the quote characters as part of the pattern. None of `^ . * $` is in `symbols[]`, so all four reach `argv` intact.
+| Shell input   | Pattern delivered to `find`                                                  |
+| ------------- | ---------------------------------------------------------------------------- |
+| `find . b*`   | `b*`; `sh` performs no globbing.                                             |
+| `find . 'b*'` | Quote characters remain part of the pattern; `sh` performs no quote removal. |
 
-## Which pattern filters what
+These are shell rules, not matcher rules. None of `^ . * $` is in `symbols[]`, so all four reach `argv` intact.
+
+## `find` regex patterns and the names they match
 
 > [!TIP]
 > Predict a row before you run it. Each result below was computed with a line-for-line port of `match()`, `matchhere()`, and `matchstar()`, and the fixture rows are exactly what the local tests expect.
 
-The fixture from [the grader](#what-the-grader-checks), with `✓` where the name matches. `sub/ab` **always** behaves like `ab`, because only the final name is matched.
+The fixture from [the grader](#find-regular-expressions-grader-checks), with `✓` where the name matches. `sub/ab` **always** behaves like `ab`, because only the final name is matched.
 
 | Pattern | `ab` | `abc` | `xab` | `aab` | `b` | `axc` | `sub` | What the pattern says                                       |
 | ------- | ---- | ----- | ----- | ----- | --- | ----- | ----- | ----------------------------------------------------------- |
@@ -204,24 +209,29 @@ The same rule applied to this image's root directory. These are snapshots: every
 | `.sh$`     | `findtest.sh`; the unescaped dot would also accept a name such as `xsh` |
 | `^ex.*c`   | `ex1copy`, `ex2create`, `ex4exec`, `ex5forkexec`, `ex6redirect`         |
 
-Four patterns show the operators' limits. `x*` matching everything is the classic surprise: `matchstar()` succeeds after zero repetitions, so an unanchored star pattern constrains nothing. `.sh$` is the closest available way to ask for a `.sh` suffix, because there is no escape. And `a$b` and `\.` match nothing for opposite reasons: one treats an operator as a literal, the other treats a would-be escape as a literal.
+**Operator limits behind the tables:**
 
-## Deriving it
+- **`x*` matches everything:** `matchstar()` succeeds after zero repetitions, so an unanchored star pattern constrains nothing.
+- **`.sh$` approximates a `.sh` suffix:** there is no escape, so the wildcard is the closest available form.
+- **`a$b` matches nothing here:** `$` is treated as a literal because it is not last.
+- **`\.` matches nothing here:** the would-be escape is a literal backslash.
 
-**Contract:** use the [requirements above](#contract); settle each question from the named source.
+## Deriving `find` regular expressions: decisions and traps
+
+**Contract:** use the [requirements above](#find-regular-expressions-contract); settle each question from the named source.
 
 | Decision for `user/find.c`     | Source-backed question to settle                                                                                                                                                                                                                |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Apply the anchoring rule**   | The [contract](#contract) fixes grep's rule. Which single function in [`user/grep.c`](../../user/grep.c) already implements it, including the `^` case, so that no anchoring logic of your own is needed?                                       |
+| **Apply the anchoring rule**   | The [contract](#find-regular-expressions-contract) fixes grep's rule. Which single function in [`user/grep.c`](../../user/grep.c) already implements it, including the `^` case, so that no anchoring logic of your own is needed?              |
 | **Reuse the matcher**          | `grep.o` cannot be linked into `_find` because both define `main()`. Will you copy the functions into `find.c`, or move them into a file every program links through `ULIB`? What does each choice change for `grep` and for future lab merges? |
 | **Satisfy the strict flags**   | `find()` receives `name` as `const char *`, while the grep functions take `char *`. Which declaration must change so `-Werror` accepts the call without a cast that hides a write?                                                              |
 | **Feed it a C string**         | Which buffer in `find()` already holds a terminated copy of the entry name, per [`04-util-find.md`](04-util-find.md#record-names-versus-c-strings)?                                                                                             |
-| **Keep `.` and `..` excluded** | Does the skip for `.` and `..` run before the comparison, so that a pattern such as `.` **cannot** reintroduce the descent [the corner test](04-util-find.md#what-the-grader-checks) guards against?                                            |
-| **Preserve `-exec`**           | Does the pattern remain `argv[2]` with `-exec` at `argv[3]`, as [`05-util-find-exec.md`](05-util-find-exec.md#contract) requires?                                                                                                               |
+| **Keep `.` and `..` excluded** | Does the skip for `.` and `..` run before the comparison, so that a pattern such as `.` **cannot** reintroduce the descent [the corner test](04-util-find.md#find-grader-checks) guards against?                                                |
+| **Preserve `-exec`**           | Does the pattern remain `argv[2]` with `-exec` at `argv[3]`, as [`05-util-find-exec.md`](05-util-find-exec.md#find--exec-contract) requires?                                                                                                    |
 
 | Trap                                               | Observable consequence                                                                                                   | Source to inspect                                                      |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| **Matching against the full path**                 | The start path becomes text the pattern sees; with substring semantics `find . a` also matches every entry under `./a/`. | [`04-util-find.md`](04-util-find.md#contract)                          |
+| **Matching against the full path**                 | The start path becomes text the pattern sees; with substring semantics `find . a` also matches every entry under `./a/`. | [`04-util-find.md`](04-util-find.md#find-contract)                     |
 | **Calling the matcher on `de.name`**               | A 14-byte name has no terminator, so `matchhere()` reads past the field.                                                 | [`kernel/fs.h`](../../kernel/fs.h), [`user/grep.c`](../../user/grep.c) |
 | **Calling `matchhere()` instead of `match()`**     | Every pattern becomes start-anchored: `ab$` loses `xab` and `aab`, failing `find regex, anchors`.                        | `match()` in [`user/grep.c`](../../user/grep.c)                        |
 | **Keeping the `strcmp()` test beside the matcher** | Only exact names print; all three local tests fail.                                                                      | [`user/find.c`](../../user/find.c)                                     |
@@ -230,7 +240,7 @@ Four patterns show the operators' limits. `x*` matching everything is the classi
 | **Expecting `\.` to match a literal dot**          | There is no escape case; `\` is an ordinary character followed by the wildcard `.`.                                      | `matchhere()` in [`user/grep.c`](../../user/grep.c)                    |
 | **Expecting `+`, `?`, `[]`, or `\|`**              | They are literals, and `\|` is consumed by `sh` as a pipe before `find` runs.                                            | [`user/grep.c`](../../user/grep.c), [`user/sh.c`](../../user/sh.c)     |
 
-## Verifying it
+## Verifying `find` regular expressions: build, guest checks, and grading
 
 1. Build and boot:
 
@@ -256,14 +266,21 @@ Four patterns show the operators' limits. `x*` matching everything is the classi
     ./grade-lab-util find exec
     ```
 
-These are checks to run, not a transcript. Compare guest results with [the tables above](#which-pattern-filters-what). The focused failure logs are `xv6.out.find_regex_anchors`, `xv6.out.find_regex_wildcards`, and `xv6.out.find_regex_names_exec`; [docs 03](../03-lab-workflow.md#grading) owns transcript handling.
+These are checks to run, not a transcript. Compare guest results with [the tables above](#find-regex-patterns-and-the-names-they-match). The focused failure logs are `xv6.out.find_regex_anchors`, `xv6.out.find_regex_wildcards`, and `xv6.out.find_regex_names_exec`; [docs 03](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts) owns transcript handling.
 
 > [!WARNING]
-> **A `$` followed by a space in a scripted command stalls the grader.** `shell_script()` in [`gradelib.py`](../../gradelib.py) types the next command whenever the bytes `$ ` appear in the output, and the console echoes typed text, so `find DIR ^ab$ -exec echo hit` releases the next command before `find` has run. That is why the `-exec` case uses `^a.c`. A `$` at the end of a command is safe, since a newline follows it. [The prompt note](08-util-sh-prompt.md#the-harness-depends-on-the-prompt) owns the pacing rule.
+> **A `$` followed by a space in a scripted command stalls the grader.**
+
+| Scripted command boundary                                         | Harness outcome                                  |
+| ----------------------------------------------------------------- | ------------------------------------------------ |
+| **`$` followed by a space**, as in `find DIR ^ab$ -exec echo hit` | Releases the next command before `find` has run. |
+| **`$` at the end of the command**                                 | Safe: a newline follows it.                      |
+
+`shell_script()` in [`gradelib.py`](../../gradelib.py) types the next command whenever `$ ` appears in output. The console echoes typed text, so the command's own pattern can trigger that prompt detector. That is why the `-exec` test uses `^a.c`. [The prompt note](08-util-sh-prompt.md#why-the-grader-requires-the-exact---prompt) owns the pacing rule.
 
 `grep` itself is a convenient oracle: `ls | grep PATTERN` shows which names the same matcher accepts; unanchored patterns behave the same, but `$` patterns **do not**, because each `ls` line ends with the type, inode, and size columns. No kernel-debugger recipe is needed; the whole change is user space.
 
-## Questions
+## Questions about `find` regular expressions: grep matching and shell input
 
 1. Using only `match()` in [`user/grep.c`](../../user/grep.c), does the pattern `b` match the name `zombie`? Does `^b$`?
 2. Why does `match()`'s loop test `*text++ != '\0'` after calling `matchhere()` rather than before, and which pattern depends on that order?
@@ -288,7 +305,7 @@ These are checks to run, not a transcript. Compare guest results with [the table
 
 The change is one condition, which is why it can stay small. Everything the earlier notes established still holds around it: the terminated copy at `child_name_ptr`, the `.` and `..` skip before the comparison, the descent into every directory whether or not it matched, and the print-or-run choice at a match.
 
-### Decisions, answered
+### Answers to the `find` regex derivation decisions
 
 | Decision                       | What `user/find.c` does                                                                                                                                                                                                 |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -300,5 +317,4 @@ The change is one condition, which is why it can stay small. Everything the earl
 | **Preserve `-exec`**           | The pattern is still `argv[2]`; `run()` receives `child_path`, so `^a.c -exec echo hit` prints `hit DIR/abc` and `hit DIR/axc`.                                                                                         |
 
 > [!NOTE]
-> Literal names keep working only in the sense the [warning above](#the-concept-underneath) describes: `find . b` now also lists `zombie`, `find_basic`, and `sf-bad-eof`. `^b$` restores the exact meaning, and `user/find_basic.c` keeps the exact `strcmp()` version for comparison.
-
+> Literal names keep working only in the sense the [warning above](#the-concept-underneath-find-regular-expressions-grep-matching-and-shell-input) describes: `find . b` now also lists `zombie`, `find_basic`, and `sf-bad-eof`. `^b$` restores the exact meaning, and `user/find_basic.c` keeps the exact `strcmp()` version for comparison.

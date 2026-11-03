@@ -18,38 +18,38 @@ The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2
 > [!IMPORTANT]
 > No solution or pseudocode. `user/sh.c` is both the starter code and the file you will change, so the shell notes quote it only as it stands unmodified in this tree. If you have already edited it, compare against `git show HEAD:user/sh.c`. The other C quotation is from the lecture example `user/ex1copy.c`, which is not a target.
 
-## What the exercise asks for
+## What the exercise asks for: shell prompts
 
-### Contract
+### shell prompts contract
 
-| Aspect                   | Requirement or local convention                                                                                                                                                              |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Target**               | Handout: modify `user/sh.c`. It is already `$U/_sh` in `UPROGS`; no new program or Makefile change is needed.                                                                                |
-| **Behavior from a file** | Handout: no `$ ` while processing commands from a file, as in `sh < findtest.sh`.                                                                                                            |
-| **Interactive behavior** | Implied by the handout and required by the grader: the shell `init` starts on the console must keep printing exactly `$ `. See [the harness dependency](#the-harness-depends-on-the-prompt). |
-| **Pipe input**           | Not specified. `cat script \| sh` is neither a file nor a person; choosing its behavior is a [decision](#deriving-it).                                                                       |
-| **Command behavior**     | Everything else in the shell stays as it is: parsing, `cd`, redirection, pipes, and exit at end of input.                                                                                    |
-| **Kernel**               | No kernel change is needed; `fstat` already reports what a descriptor refers to.                                                                                                             |
+| Aspect                   | Requirement or local convention                                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Target**               | Handout: modify `user/sh.c`. It is already `$U/_sh` in `UPROGS`; no new program or Makefile change is needed.                                                                                         |
+| **Behavior from a file** | Handout: no `$ ` while processing commands from a file, as in `sh < findtest.sh`.                                                                                                                     |
+| **Interactive behavior** | Implied by the handout and required by the grader: the shell `init` starts on the console must keep printing exactly `$ `. See [the harness dependency](#why-the-grader-requires-the-exact---prompt). |
+| **Pipe input**           | Not specified. `cat script \| sh` is neither a file nor a person; choosing its behavior is a [decision](#deriving-shell-prompts-decisions-and-traps).                                                 |
+| **Command behavior**     | Everything else in the shell stays as it is: parsing, `cd`, redirection, pipes, and exit at end of input.                                                                                             |
+| **Kernel**               | No kernel change is needed; `fstat` already reports what a descriptor refers to.                                                                                                                      |
 
-### What the grader checks
+### shell prompts grader checks
 
 > [!NOTE]
 > **No test for this behavior.** No test in [`grade-lab-util`](../../grade-lab-util) asserts that a script shell is silent. The `exec via sh script` test runs `sh < findtest.sh` but counts only `hello` occurrences, so it passes with or without prompts.
 
-### The harness depends on the prompt
+### Why the grader requires the exact `$ ` prompt
 
 > [!WARNING]
-> **Every util test that boots QEMU types its commands only after it sees `$ `.** `shell_script()` in [`gradelib.py`](../../gradelib.py) writes the next command each time the bytes `$ ` appear in QEMU's output, and `assert_command_output()` in [`grade-lab-util`](../../grade-lab-util) locates output between `$ command` lines. A shell change that removes or alters the console prompt stalls or breaks the whole suite, not one test.
+> **Keep the console prompt exactly `$ `.** Every util test that boots QEMU waits for it before typing commands. Removing or altering it stalls or breaks the whole suite, not one test.
 
-| Harness behavior            | Consequence for any `sh.c` change                                                                                                                                            |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Paces input on `$ `**     | The interactive shell must print the two bytes `$ ` before each read. Extra text before them is tolerated; their absence is not.                                             |
-| **Counts any `$ `**         | A script shell's prompts also release the next scripted command, while that shell is still reading its file; the typed text waits in the console buffer for the outer shell. |
-| **Splits on `$ command\n`** | Prompt text must stay `$ ` exactly, or the sixfive and memdump output comparisons lose their boundaries.                                                                     |
+| Harness behavior                                                              | Consequence for any `sh.c` change                                                                                                                                                     |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **[`shell_script()`](../../gradelib.py) paces input on `$ `**                 | Writes the next command each time those bytes appear in QEMU output. The interactive shell must print them before each read; extra preceding text is tolerated, their absence is not. |
+| **`shell_script()` counts any `$ `**                                          | A script shell's prompts also release the next scripted command while it is still reading its file. The typed text waits in the console buffer for the outer shell.                   |
+| **[`assert_command_output()`](../../grade-lab-util) splits on `$ command\n`** | Prompt text must stay `$ ` exactly, or the sixfive and memdump output comparisons lose their boundaries.                                                                              |
 
 Suppressing the script shell's prompts changes when `echo DONE` is typed during `exec via sh script`, not what the test counts. Rerun that test after the change rather than predicting its timing. The [wait](09-util-sh-wait.md), [tab-completion](10-util-sh-tab-completion.md), and [history](11-util-sh-history.md) notes link here for the same constraint.
 
-## Prerequisites
+## shell prompts prerequisites and references
 
 | When                | Read                                                                                                                                                     | Why it matters here                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
@@ -62,7 +62,7 @@ Suppressing the script shell's prompts changes when `echo DONE` is typed during 
 > [!NOTE]
 > A hosted shell would call `isatty(0)`. xv6 has no `isatty()`; [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter) explains why the inode type is a sufficient substitute in a tree with one device file.
 
-## The code to read first
+## Code to read first for shell prompts
 
 | File                                     | Contributes                                                                                                         | Does not contribute                                                |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
@@ -131,9 +131,14 @@ flowchart TD
 
 _Legend: pink requests a new process, blue routes or waits, green moves input bytes, and yellow does the work this exercise changes. Labels carry the meaning without color._
 
-`exec` keeps the descriptor table, so the script shell inherits fd 0 on the file and fds 1 and 2 on the console. `init` started the outer shell with no arguments, and `parseexec()` gives the inner one only `sh`, so neither shell can learn its mode from `argv`; only the descriptor can tell it. Every command the script shell runs is a further fork, each inheriting the same fd 0.
+| Shell instance          | Arguments identify the mode?            | Input descriptor                                     |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------- |
+| **Outer console shell** | No: `init` starts it with no arguments. | fd 0 is the console.                                 |
+| **Inner script shell**  | No: `parseexec()` gives it only `sh`.   | fd 0 is the file; fds 1 and 2 remain on the console. |
 
-## The concept underneath
+`exec` keeps the descriptor table, so only the descriptor reveals the input source. Every command the script shell runs is a further fork, each inheriting the same fd 0.
+
+## The concept underneath shell prompts: input descriptors and interactivity
 
 The `fstat(0, ...)` test in [`user/ex1copy.c`](../../user/ex1copy.c) already separates the three cases, quoted unchanged:
 
@@ -156,9 +161,9 @@ The `fstat(0, ...)` test in [`user/ex1copy.c`](../../user/ex1copy.c) already sep
 
 The descriptor's type is a property of fd 0 at the moment of the call. Nothing inside the shell changes fd 0 between commands, because redirection happens in forked children; the main loop's fd 0 is the one it started with. That is what makes a single answer valid for the shell's lifetime, and also why asking again per command is merely redundant, not wrong.
 
-## Deriving it
+## Deriving shell prompts: decisions and traps
 
-**Contract:** use the [requirements above](#contract), and keep [the harness dependency](#the-harness-depends-on-the-prompt) intact.
+**Contract:** use the [requirements above](#shell-prompts-contract), and keep [the harness dependency](#why-the-grader-requires-the-exact---prompt) intact.
 
 | Decision for `user/sh.c`             | Source-backed question to settle                                                                                                                                        |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -176,7 +181,7 @@ The descriptor's type is a property of fd 0 at the moment of the call. Nothing i
 | **Changing the prompt text**               | `assert_command_output()` loses the `$ command` boundaries for sixfive and memdump. | [`grade-lab-util`](../../grade-lab-util)                                    |
 | **Running `make fmt` after editing**       | Every source under `kernel/`, `user/`, and `mkfs/` is reformatted, not only `sh.c`. | [AGENTS.md](../../AGENTS.md#c-source-style)                                 |
 
-## Verifying it
+## Verifying shell prompts: build, guest checks, and grading
 
 1. Build and boot:
 
@@ -194,16 +199,16 @@ The descriptor's type is a property of fd 0 at the moment of the call. Nothing i
 
     The last command starts an interactive nested shell; it should still prompt. Leave it with `Ctrl-d`.
 
-3. Quit QEMU with `Ctrl-a x`, then run the test that uses a script shell and the full suite, because [every test depends on the prompt](#the-harness-depends-on-the-prompt):
+3. Quit QEMU with `Ctrl-a x`, then run the test that uses a script shell and the full suite, because [every test depends on the prompt](#why-the-grader-requires-the-exact---prompt):
 
     ```bash
     ./grade-lab-util "sh script"
     make grade
     ```
 
-These are checks to run, not a transcript. Files created by the first command persist only for this boot; [docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) covers `make qemu` versus `make qemu-fs`. [Docs 03](../03-lab-workflow.md#grading) owns failed-transcript handling. No kernel-debugger recipe is needed; the change is entirely in user space.
+These are checks to run, not a transcript. Files created by the first command persist only for this boot; [docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) covers `make qemu` versus `make qemu-fs`. [Docs 03](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts) owns failed-transcript handling. No kernel-debugger recipe is needed; the change is entirely in user space.
 
-## Questions
+## Questions about shell prompts: input descriptors and interactivity
 
 1. In `sh < findtest.sh`, which process performs `close(0)` and `open()`, and which process prints the prompts you want to remove?
 2. Why does `getcmd()` write the prompt to fd 2 rather than fd 1, and what does that already achieve for `sh < script > out`?

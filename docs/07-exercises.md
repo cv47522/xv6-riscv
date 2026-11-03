@@ -1,4 +1,4 @@
-# Lecture Exercises
+# xv6 lecture exercises: program behavior and regression tests
 
 ---
 
@@ -11,7 +11,7 @@ The small programs the 6.1810 lectures hand out, one section each: what the exer
 > [!NOTE]
 > This file owns the exercises themselves. The mechanics they all share — how a `.c` file under `user/` becomes an xv6 command, why the tree stays flat, and the house style a new program has to match — belong to [02-build-boot-and-usage.md](02-build-boot-and-usage.md#adding-and-running-a-user-exercise), and are not repeated here. To write the next one, use [`prompts/add-lecture-exercise.md`](prompts/add-lecture-exercise.md), which encodes the whole procedure; in Claude Code it is wired up as `/exercise`.
 
-## The set
+## Lecture 1 program map
 
 Lecture 1 ([`l-overview.txt`](../lectures/l-overview.txt)) walks through nine example programs. Each is named `ex<N><verb>`, where `N` is the lecture's own numbering and the verb is the lecture's own wording — so `ex5forkexec` is lecture 1's `ex5.c`, described there as "fork() a new process, exec() a program".
 
@@ -62,7 +62,7 @@ Green is I/O, red is process and buffer creation, blue is the combinations that 
 
 The official [Lecture 1 example](https://pdos.csail.mit.edu/6.1810/2026/lec/l-overview/ex1.c) is a filter: it copies every byte from descriptor 0 to descriptor 1 until `read()` returns 0 for EOF. It does not stop after one line, and it adds nothing to the data it copies.
 
-### Waiting is part of the interface
+### Interactive input: echo, blocking, and Ctrl-d
 
 Interactively, type a line, press Enter, and then press `Ctrl-d` at the next empty input position:
 
@@ -75,7 +75,14 @@ hello
 $
 ```
 
-The first `hello` is the console echoing the keys you typed. The second is `ex1copy` writing the bytes returned by `read()`. The program then calls `read()` again, and `consoleread()` in `kernel/console.c` hands back at most one line per call — so once the typed input is drained, that read sleeps in the kernel. Pressing `Ctrl-d` there makes it return 0, which ends the loop and restores the shell prompt. The wait is expected input-filter behaviour, not a **deadlock**.
+The two copies of `hello` come from different places:
+
+1. **Console echo** displays the keys you typed.
+2. **ex1copy output** writes the bytes returned by `read()`.
+3. **The next read waits** once that input is drained: `consoleread()` in `kernel/console.c` returns at most one line per call.
+4. **Ctrl-d at the empty input position** makes `read()` return 0, ends the loop, and restores the shell prompt.
+
+That wait is expected input-filter behaviour, not a **deadlock**.
 
 A finite pipeline supplies EOF automatically when its writer exits, and the two hint lines are gone:
 
@@ -95,9 +102,9 @@ That difference is the point. A filter **must not** add bytes to its output, so 
 That last case is not a special case in `ex1copy` — `filestat()` in `kernel/file.c` serves `FD_INODE` and `FD_DEVICE` and returns -1 for `FD_PIPE`, so one `fstat()` call separates all three sources for free.
 
 > [!NOTE]
-> Without the hint, an interactive run is visually identical to a hung program: no prompt, no output, no cursor movement. That is the single most common first-encounter confusion with Unix filters, and it is why [02's troubleshooting table](02-build-boot-and-usage.md#when-things-go-wrong) still carries a row for it — `cat` with no arguments behaves exactly the same way and says nothing at all.
+> Without the hint, an interactive run is visually identical to a hung program: no prompt, no output, no cursor movement. That is the single most common first-encounter confusion with Unix filters, and it is why [02's troubleshooting table](02-build-boot-and-usage.md#troubleshoot-build-boot-and-runtime-failures) still carries a row for it — `cat` with no arguments behaves exactly the same way and says nothing at all.
 
-### What lecture 1 uses it to teach
+### ex1copy: Unix I/O concepts and implementing code
 
 Twenty lines of C carry most of the Unix I/O model. The commentary block at the top of `user/ex1copy.c` is the long form; this is the map from each teaching point to the code in this tree that implements it.
 
@@ -114,30 +121,42 @@ Twenty lines of C carry most of the Unix I/O model. The commentary block at the 
 
 The lecture ends on an open question — how do you make a _new_ file descriptor? — and the answer is `open()`, `pipe()`, and `dup()` in `user/user.h`. `user/sh.c` builds every redirection and pipeline out of those three plus `close()`, resting entirely on `fdalloc()`'s lowest-unused-descriptor rule; see [book/ch01](book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection).
 
-### Questions the source raises
+### ex1copy: input detection, diagnostics, and EOF questions
 
 Five things in `user/ex1copy.c` look arbitrary until you follow them into the kernel. The source carries the same answers inline, next to the code each one explains.
 
 #### Why `fstat(0, …)` rather than `fstat(1, …)`?
 
-The hint answers exactly one question — _is a human about to type at me?_ — and that is a property of the input side alone. The two sides come apart in both directions: `ex1copy > out` leaves descriptor 1 on a file while somebody still waits at the keyboard, and `echo hi | ex1copy` leaves descriptor 1 on the console with nobody typing. `fstat()` takes a descriptor rather than a path, so it reports on whatever `sh` wired to 0 before `exec`, which is precisely the thing in doubt.
+**The hint depends on the input side:** is a human about to type? Descriptor 1 cannot answer that question:
+
+| Invocation           | Descriptor 1 | Human waiting at input? |
+| -------------------- | ------------ | ----------------------- |
+| `ex1copy > out`      | File         | Yes                     |
+| `echo hi \| ex1copy` | Console      | No                      |
+
+`fstat()` takes a descriptor rather than a path, so `fstat(0, …)` reports on whatever `sh` wired to standard input before `exec`.
 
 #### What counts as `T_DEVICE` besides the console? Is the display separate?
 
-In this tree, nothing else, and no. `T_DEVICE` is the inode type that `mknod()` stamps in `sys_mknod()` (`kernel/sysfile.c`), and the only `mknod()` call in the entire source tree is `mknod("console", CONSOLE, 0)` in `user/init.c` — so `console` is the only device file that exists. Keyboard and display are not two devices either: one inode with major number `CONSOLE` covers both directions, because `consoleinit()` registers `devsw[CONSOLE].read = consoleread` and `devsw[CONSOLE].write = consolewrite` over the same UART.
+**The console is this tree's only device file, and one inode covers both directions.** Two source facts establish that:
 
-| Symbol         | Defined in       | What it actually bounds                                                         |
-| -------------- | ---------------- | ------------------------------------------------------------------------------- |
-| **`T_DEVICE`** | `kernel/stat.h`  | inode type `3`, written only by `mknod()`, never by `create()` for a plain file |
-| **`CONSOLE`**  | `kernel/file.h`  | major number `1`, the only major number anything claims                         |
-| **`NDEV`**     | `kernel/param.h` | size of `devsw[]` — room for ten majors, nine of which stay empty               |
+- **Creation:** `sys_mknod()` in `kernel/sysfile.c` stamps the `T_DEVICE` inode type. The tree's only `mknod()` call is `mknod("console", CONSOLE, 0)` in `user/init.c`.
+- **Input and output:** `consoleinit()` registers `devsw[CONSOLE].read = consoleread` and `devsw[CONSOLE].write = consolewrite` over the same UART. Keyboard and display therefore share the inode with major number `CONSOLE`.
+
+| Symbol     | Defined in       | What it actually bounds                                                         |
+| ---------- | ---------------- | ------------------------------------------------------------------------------- |
+| `T_DEVICE` | `kernel/stat.h`  | inode type `3`, written only by `mknod()`, never by `create()` for a plain file |
+| `CONSOLE`  | `kernel/file.h`  | major number `1`, the only major number anything claims                         |
+| `NDEV`     | `kernel/param.h` | size of `devsw[]` — room for ten majors, nine of which stay empty               |
 
 > [!NOTE]
 > On Linux the same test would pass for every character device — `/dev/null`, a disk, any tty — which is why portable filters call `isatty()` instead of inspecting the file type. xv6 has no `isatty()`, and with a single device file it does not need one.
 
 #### Why write the hint to descriptor 2 when it is not an error?
 
-Descriptor 2 is better read as the _out-of-band_ descriptor than as the error one: it is what stays pointed at the terminal when `>` moves descriptor 1 somewhere else. Anything _about_ the run rather than _part_ of it belongs there — errors, progress, prompts, and this hint. The filter rule is what forces the choice: `ex1copy > out` and `ex1copy | wc` **must** see the input bytes and nothing more, and `sh` redirects only the descriptor you name.
+**Descriptor 2 carries diagnostics about the run:** errors, progress, prompts, and this hint. It stays pointed at the terminal when `>` moves descriptor 1 elsewhere.
+
+The filter rule forces that choice: `ex1copy > out` and `ex1copy | wc` **must** see the input bytes and nothing more. `sh` redirects only the descriptor you name.
 
 #### Why `fprintf(2, …)` rather than `printf(…)`?
 
@@ -147,30 +166,30 @@ Descriptor 2 is better read as the _out-of-band_ descriptor than as the error on
 
 Nowhere in `ex1copy.c`, which **never** names it: `read()` returns 0 and the `> 0` loop test does the rest. Two functions in `kernel/console.c` produce that zero.
 
-| Function            | What it does with `C('D')`                                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`consoleintr()`** | Accepts byte `0x04` — `C(x)` is `((x) - '@')` — as a line terminator alongside `'\n'`, advancing `cons.w` and waking a sleeping reader even though no newline arrived.         |
-| **`consoleread()`** | Pulls that byte back out, `break`s without copying it, and returns `target - n`. At an empty position nothing has been copied yet, `n` is still `target`, and the result is 0. |
+| Function        | What it does with `C('D')`                                                                                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `consoleintr()` | Accepts byte `0x04` — `C(x)` is `((x) - '@')` — as a line terminator alongside `'\n'`, advancing `cons.w` and waking a sleeping reader even though no newline arrived.         |
+| `consoleread()` | Pulls that byte back out, `break`s without copying it, and returns `target - n`. At an empty position nothing has been copied yet, `n` is still `target`, and the result is 0. |
 
-That is also the whole content of "on an empty line". Type `abc` and then Ctrl-d, and `consoleread()` takes its `if (n < target) cons.r--` branch, pushing the Ctrl-d back into the buffer so that `read()` returns three bytes and only the _next_ call returns 0 — a partial line needs two presses.
+**Ctrl-d after partial input first returns those bytes.** With `abc` already typed, `consoleread()` takes `if (n < target) cons.r--` and pushes Ctrl-d back into the buffer. That `read()` returns three bytes; only the next call returns 0. This is why the interactive instruction specifies an empty line and a partial line needs two presses.
 
-### Regression tests
+### ex1copy regression tests
 
 [`grade-exercises`](../grade-exercises) holds three tests for `ex1copy`, each pinning one of the behaviours above:
 
-| Test                                     | What it asserts                                                                                                                                                        |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`copies finite piped input`**          | A 71-byte payload survives `echo … \| ex1copy` byte for byte. It deliberately exceeds `buf[64]`, so the copy takes two loop iterations rather than one.                |
-| **`interactive input ends with Ctrl-d`** | Each typed line appears exactly twice — console echo, then the copy — and `\x04` at an empty position lets the shell go on to run the next command.                    |
-| **`reports a closed output pipe`**       | With a reader that exits first, `write()` returns -1 and the program prints `ex1copy: write error` and exits, instead of looping back into `read()` and waiting there. |
+| Test                                 | What it asserts                                                                                                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `copies finite piped input`          | A 71-byte payload survives `echo … \| ex1copy` byte for byte. It deliberately exceeds `buf[64]`, so the copy takes two loop iterations rather than one.                |
+| `interactive input ends with Ctrl-d` | Each typed line appears exactly twice — console echo, then the copy — and `\x04` at an empty position lets the shell go on to run the next command.                    |
+| `reports a closed output pipe`       | With a reader that exits first, `write()` returns -1 and the program prints `ex1copy: write error` and exits, instead of looping back into `read()` and waiting there. |
 
 ```bash
-./grade-exercises                          # every exercise, 12 tests
+./grade-exercises                          # every exercise, 18 tests
 ./grade-exercises ex1copy                  # just this one
 ./grade-exercises "closed output pipe"     # one test, by name
 ```
 
-Filtering is a substring match against the test title, and every title is prefixed with its exercise name — see [the suite](#regression-suite) below. The harness itself — how it boots QEMU, drives the shell, and pattern-matches the transcript — is described in [03-lab-workflow.md](03-lab-workflow.md#grading).
+Filtering is a substring match against the test title, and every title is prefixed with its exercise name — see [the suite](#grade-exercises-coverage-and-mutation-checks) below. The harness itself — how it boots QEMU, drives the shell, and pattern-matches the transcript — is described in [03-lab-workflow.md](03-lab-workflow.md#run-graders-and-interpret-failure-transcripts).
 
 ## `ex2create` — making a descriptor
 
@@ -183,9 +202,11 @@ $ cat ex2.out
 Hello
 ```
 
-### Why the answer is always 3
+### Why open() returns descriptor 3
 
-Nothing in the program chooses 3. `fdalloc()` in `kernel/sysfile.c` scans `p->ofile[]` from index 0 and returns the first empty slot, and slots 0, 1, and 2 were filled before `main()` started — `user/init.c` opens the console and `dup()`s it twice, and `sh` inherits all three through `fork()`.
+**`fdalloc()` returns the lowest unused descriptor.** It scans `p->ofile[]` from index 0 in `kernel/sysfile.c`.
+
+Slots 0, 1, and 2 are already occupied before `main()` starts: `user/init.c` opens the console and `dup()`s it twice, and `sh` inherits all three through `fork()`. The exercise's first `open()` therefore gets slot 3.
 
 | Slot  | Holds                    | Put there by                     |
 | ----- | ------------------------ | -------------------------------- |
@@ -196,7 +217,7 @@ Nothing in the program chooses 3. `fdalloc()` in `kernel/sysfile.c` scans `p->of
 
 That rule is not a curiosity. It is load-bearing: `close(1)` frees slot 1, so the next `open()` is _guaranteed_ to land there, which is the entire mechanism behind [`ex6redirect`](#ex6redirect--how--is-implemented).
 
-### Two levels of indirection
+### open(), fork(), and dup(): descriptor and offset sharing
 
 `open()` builds a chain, and later exercises depend on knowing where it can be cut:
 
@@ -206,17 +227,25 @@ p->ofile[3]  ──►  struct file  ──►  inode
                     offset)           data)
 ```
 
-`fork()` copies the first level and _shares_ the second, which is why a parent and child writing the same descriptor append in turn rather than overwriting each other. `dup()` does the same. Two descriptors share an offset **if and only if** they came from the same original by `fork()` or `dup()` — **never** merely by opening the same file twice.
+The shared `struct file` determines whether two descriptors move one offset:
 
-### What xv6 leaves out
+| Descriptor origin                | Offset relationship                                                                  |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| **fork()**                       | Copies the descriptor-table level and shares the `struct file`.                      |
+| **dup()**                        | Adds another descriptor for the same `struct file`.                                  |
+| **Two independent open() calls** | Create separate `struct file` objects and separate offsets, even for the same inode. |
 
-| Compared with Linux           | In xv6                                                                                                                                 |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **`open(path, flags, mode)`** | Two arguments only. There are no users, groups, or permission bits, so there is no `mode` to pass.                                     |
-| **`O_CREAT`**                 | Spelled `O_CREATE`, in `kernel/fcntl.h`. Five flags exist in total: `O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREATE`, `O_TRUNC`.           |
-| **`lseek`**                   | Absent. The book names it as one of the basic calls that make xv6 non-POSIX; an offset only ever moves forward, by reading or writing. |
+Thus two descriptors share an offset **if and only if** they descend from the same original through `fork()` or `dup()`. A parent and child writing through that shared offset append in turn rather than overwriting each other.
 
-### Errors, deliberately not ignored
+### open(): differences from Linux and missing lseek()
+
+| Compared with Linux       | In xv6                                                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `open(path, flags, mode)` | Two arguments only. There are no users, groups, or permission bits, so there is no `mode` to pass.                                     |
+| `O_CREAT`                 | Spelled `O_CREATE`, in `kernel/fcntl.h`. Five flags exist in total: `O_RDONLY`, `O_WRONLY`, `O_RDWR`, `O_CREATE`, `O_TRUNC`.           |
+| `lseek`                   | Absent. The book names it as one of the basic calls that make xv6 non-POSIX; an offset only ever moves forward, by reading or writing. |
+
+### ex2create: open() and short-write errors
 
 The lecture slide says of its own examples: "these examples ignore errors — don't be this sloppy!" The official `ex2.c` does ignore them; this version does not, because neither failure announces itself where it happens.
 
@@ -254,7 +283,10 @@ A real run looks like this:
 ```
 
 > [!IMPORTANT]
-> `printf()` in `user/printf.c` is **not atomic**. It formats into a small buffer and calls `write()` as it goes, and the scheduler can switch processes between those writes. With the default `CPUS=3` the two processes are genuinely running at the same instant on different harts, and `uartputc()` takes a lock per _character_ rather than per line — so the granularity of the mixing is a byte.
+> `printf()` in `user/printf.c` is **not atomic**, and output can mix one byte at a time.
+
+- **Between writes:** `printf()` formats into a small buffer and calls `write()` as it goes; the scheduler can switch processes between those calls.
+- **Across harts:** the default `CPUS=3` lets both processes run at the same instant. `uartputc()` locks per character rather than per line, so individual bytes can interleave.
 
 This is the first appearance of the problem the locking and scheduling chapters exist to solve. `make qemu CPUS=1` usually produces whole lines, which is not a fix — it only makes the race harder to hit.
 
@@ -295,14 +327,19 @@ for (i = 0;; i++) {
 }
 ```
 
-Omit the `0` and the loop keeps fetching whatever follows the array on the stack. It does not run away forever — `MAXARG` stops it after 32 entries — but it either copies garbage as arguments or hits `bad` and returns -1. A missing terminator is therefore an `exec` that mysteriously fails, or a program receiving arguments nobody typed. Same rule as a C string's trailing NUL, one level up: an array of `char` needs a sentinel byte, an array of `char *` needs a sentinel pointer.
+**A missing null pointer makes the kernel read beyond the argument array.** It fetches whatever follows on the stack until one of these outcomes:
+
+- **Garbage arguments:** later stack contents supply unintended pointers and a terminator.
+- **Failure:** an invalid access reaches `bad` and returns -1, or `MAXARG` stops the walk at 32 entries.
+
+The walk is bounded, but the result can still be a failed `exec` or arguments nobody typed. A C string needs a sentinel byte; an array of `char *` needs a sentinel pointer.
 
 `argv[0]` is conventionally the program's own name. Nothing enforces it, and `user/echo.c` ignores it entirely — its loop starts at `argv[1]`, which is why the output above begins at `this`.
 
 > [!NOTE]
 > `exec()` does not return on success, so the statement _after_ it is the error path. No `if` is needed there, and adding one would misrepresent the control flow.
 
-### Why this program is useless on its own
+### Why a shell cannot call exec() without fork()
 
 `exec()` consumed the caller. A shell **cannot** work this way: if `sh` called `exec()` directly it would _become_ `echo`, print, exit, and **never** read a second command. The fix is to `exec()` in a process you can afford to lose — which is the next exercise.
 
@@ -368,7 +405,13 @@ ex5forkexec: child 8 exited with status 0
 The `parent waiting` message is printed in the gap between `fork()` and `wait()`, so it competes with the child's `THIS IS ECHO` exactly as the two halves of [`ex3fork`](#ex3fork--one-call-two-returns) compete — same non-atomic `printf()`, same per-character `uartputc()` lock. `wait()` orders everything after the call and nothing before it. Move the message above the `fork()`, or below the `wait()`, and the run comes out clean.
 
 > [!WARNING]
-> A run that prints only `exec ex5forkexec failed` is **not** this program. `ex5forkexec` says `ex5forkexec: exec echo failed`; that wording is `user/sh.c` `runcmd()`, so it is the _shell_ failing to exec the name it read — the exercise never started. `consoleintr()` in `kernel/console.c` drops a character outright when the 128-byte line buffer is full (`if (c != 0 && cons.e - cons.r < INPUT_BUF_SIZE)`) and echoes nothing for it, so typed-ahead or pasted input can hand `sh` a name that is not on disk. Feeding qemu 100 command lines at once reproduces it with the damage visible: `exec ex5forkexx5fokrc failed`. Feeding 120 runs one line per prompt: 120 finished, zero failures.
+> **`exec ex5forkexec failed` comes from the shell:** the exercise never started. Its own error is `ex5forkexec: exec echo failed`.
+
+`runcmd()` in `user/sh.c` emits the shell error when it cannot exec the name it read. Pasted or typed-ahead input can corrupt that name:
+
+- **Buffer limit:** `consoleintr()` in `kernel/console.c` accepts input only under `if (c != 0 && cons.e - cons.r < INPUT_BUF_SIZE)`. Once its 128-byte line buffer is full, it drops characters without echoing them.
+- **Reproduction:** feeding QEMU 100 command lines at once produced `exec ex5forkexx5fokrc failed`.
+- **Prompt-paced check:** feeding 120 runs one line per prompt finished all 120 with zero failures.
 
 ### `wait()` returns a pid and delivers status through a pointer
 
@@ -379,7 +422,14 @@ One integer **cannot** carry both the identity of the child and the value it exi
 | **> 0** | the pid of a child that exited. With several children this is how you learn _which_ — `wait()` reaps any, and xv6 has no `waitpid()` |
 | **-1**  | the caller has no children at all                                                                                                    |
 
-`wait()` blocks **only if** no child has exited _yet_. One that finished earlier is already a **zombie** — exited but retained so its status can still be collected — and `wait()` returns from it immediately. `kexit()` sets `p->state = ZOMBIE` and wakes the parent; `kwait()` copies `p->xstate` out and calls `freeproc()`. A parent that **never** waits is what `user/zombie.c` demonstrates.
+Whether `wait()` blocks depends on the children's state:
+
+| State                                   | wait() behavior                           |
+| --------------------------------------- | ----------------------------------------- |
+| **No child has exited yet**             | Blocks until a child exits.               |
+| **An exited child is already a zombie** | Collects that child's status immediately. |
+
+A **zombie** has exited but remains available for status collection. `kexit()` sets `p->state = ZOMBIE` and wakes the parent; `kwait()` copies `p->xstate` out and calls `freeproc()`. `user/zombie.c` demonstrates a parent that never waits.
 
 Passing `0` instead of an address tells the kernel to skip the store — `kwait()` guards it with `if (addr != 0 && copyout(...) < 0)`. That is the documented way to say "I don't want the status", and it is what [`ex6redirect`](#ex6redirect--how--is-implemented) does.
 
@@ -422,9 +472,9 @@ Three properties combine, and removing any one breaks it:
 
 | Step               | What it provides                                           |
 | ------------------ | ---------------------------------------------------------- |
-| **`fork()`**       | a process whose descriptors can safely be damaged          |
+| `fork()`           | a process whose descriptors can safely be damaged          |
 | **`close`+`open`** | puts the file where the program will look for descriptor 1 |
-| **`exec()`**       | keeps the table while replacing the program                |
+| `exec()`           | keeps the table while replacing the program                |
 
 Descriptor 2 is untouched, which is why an error from `echo` would still reach the terminal — `>` redirects only the descriptor you name. That is the same reason `ex1copy` puts its hint on 2.
 
@@ -445,17 +495,19 @@ xyz
 
 One `pipe()` call, two descriptors, one kernel object:
 
-| `fds[]`      | End   | Direction       | Blocks when                                   |
-| ------------ | ----- | --------------- | --------------------------------------------- |
-| **`fds[0]`** | read  | out of the pipe | the buffer is empty and a writer still exists |
-| **`fds[1]`** | write | into the pipe   | the buffer is full and a reader still exists  |
+| `fds[]`  | End   | Direction       | Blocks when                                   |
+| -------- | ----- | --------------- | --------------------------------------------- |
+| `fds[0]` | read  | out of the pipe | the buffer is empty and a writer still exists |
+| `fds[1]` | write | into the pipe   | the buffer is full and a reader still exists  |
 
 The buffer is `char data[PIPESIZE]` — 512 bytes — in `kernel/pipe.c`. It is not a file, nothing touches the disk, and it has **no name in the file system**, which is why a pipe can only be handed to another process by `fork()`.
 
 Nothing here uses a pipe-specific call. `read()` and `write()` are the same ones from `ex1copy`; `fileread()` and `filewrite()` branch on `f->type` and forward to `piperead()`/`pipewrite()`. That uniformity is the whole abstraction: `ls | grep x` works because `grep` reads descriptor 0 with no idea a pipe is behind it.
 
 > [!WARNING]
-> **This one-process version works only by staying under the buffer size.** Write more than `PIPESIZE` with nobody draining the other end and the program hangs on itself — `pipewrite()` sleeps at `pi->nwrite == pi->nread + PIPESIZE` waiting for a reader that is this same, now-sleeping, process. A pipe is a rendezvous between two schedulable things. `Ctrl-p` dumps the process table and shows it stuck in state `sleep`.
+> **This one-process version works only by staying under the buffer size.** Writing more than `PIPESIZE` before reading makes the process block on itself.
+
+`pipewrite()` sleeps at `pi->nwrite == pi->nread + PIPESIZE`, waiting for the same process to drain the buffer. That process cannot reach its read while asleep: a pipe needs two schedulable participants for this rendezvous. `Ctrl-p` dumps the process table and shows it stuck in state `sleep`.
 
 A pipe has no EOF marker in the data. `read()` returns 0 only when the buffer is empty **and** every write-end descriptor has been closed. Until then, an empty pipe means "wait", not "finished" — which is the subject of the next exercise.
 
@@ -491,7 +543,7 @@ The mirror-image rule holds on the other side: if every read end closes while a 
 > [!NOTE]
 > This program reads a fixed byte count and would survive the mistake. The closes are there anyway, because in a real pipeline the reader always waits for EOF.
 
-### How the shell goes one step further
+### Shell pipelines: dup() connects the pipe to descriptor 0
 
 `ls | grep x` needs something this file does not show. Here the parent reads descriptor 3 knowingly; `grep` **must** read descriptor 0, because that is all any program knows. The shell bridges the gap with `dup()`:
 
@@ -530,7 +582,7 @@ struct dirent {
 
 Sixteen bytes per entry, so a directory of _n_ entries is exactly 16*n* bytes. The read loop therefore contains no parsing at all: each `read()` of `sizeof(de)` bytes lands one whole record, and the file's length says when to stop.
 
-### Three details the loop must get right
+### Directory records: free slots, name termination, and short reads
 
 | Detail                                     | Why, and what happens otherwise                                                                                                                                                                                                        |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -561,14 +613,14 @@ For a small assembly experiment behind these C observations, see [load widths, s
 
 Lecture 2 ([`l-c.txt`](../lectures/l-c.txt)) hands out three xv6 demos that already have descriptive names, so the practice versions keep them instead of taking an `ex<N>` prefix; `hwstruct` adds the homework demo the lecture runs but MIT did not publish. The lecture's own concepts, the user address space, and the Homework 2 answer live in [10-c-in-xv6.md](10-c-in-xv6.md); these sections cover only the programs.
 
-| Program                                               | Source            | Lecture                                                             | What it introduces                                                   |
-| ----------------------------------------------------- | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **[`ptr`](#ptr--where-things-live)**                  | `user/ptr.c`      | [`ptr.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/ptr.c)     | `&`, `*`, `->`, `int **`, function pointers, and `argv` on the stack |
-| **[`array`](#array--two-spellings-of-one-access)**    | `user/array.c`    | [`array.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/array.c) | `a[i]` versus `*(a + i)`, and arithmetic that scales by element size |
-| **[`hwstruct`](#hwstruct--homework-2-on-64-bit-xv6)** | `user/hwstruct.c` | lecture's "[demo hw.c]"                                             | Homework 2's struct expressions, run instead of computed             |
-| **[`str`](#str--where-a-string-may-be-written)**      | `user/str.c`      | [`str.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/str.c)     | `0`-terminated strings and a deliberate overflow                     |
+| Program                                                    | Source            | Lecture                                                             | What it introduces                                                   |
+| ---------------------------------------------------------- | ----------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **[`ptr`](#ptr--global-stack-and-function-addresses)**     | `user/ptr.c`      | [`ptr.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/ptr.c)     | `&`, `*`, `->`, `int **`, function pointers, and `argv` on the stack |
+| **[`array`](#array--two-spellings-of-one-access)**         | `user/array.c`    | [`array.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/array.c) | `a[i]` versus `*(a + i)`, and arithmetic that scales by element size |
+| **[`hwstruct`](#hwstruct--homework-2-on-64-bit-xv6)**      | `user/hwstruct.c` | lecture's "[demo hw.c]"                                             | Homework 2's struct expressions, run instead of computed             |
+| **[`str`](#str--writable-stack-versus-read-only-literal)** | `user/str.c`      | [`str.c`](https://pdos.csail.mit.edu/6.1810/2026/lec/l-c/str.c)     | `0`-terminated strings and a deliberate overflow                     |
 
-### `ptr` — where things live
+### `ptr` — global, stack, and function addresses
 
 ```text
 $ ptr x yz
@@ -582,12 +634,12 @@ argv[0]=0x0000000000004FF0 "ptr"
 argv[3]=0x0000000000000000
 ```
 
-Each printed address falls into one region of the [user address space](10-c-in-xv6.md#the-user-address-space): `p` (`&g`) in the `.data` page, `q` and `pp` in `main`'s stack frame, and `argv` above them where `kexec()` left it. Two results are the point of the program:
+Each printed address falls into one region of the [user address space](10-c-in-xv6.md#user-address-space-text-data-guard-stack-and-heap): `p` (`&g`) in the `.data` page, `q` and `pp` in `main`'s stack frame, and `argv` above them where `kexec()` left it. Two results are the point of the program:
 
-| Output                        | Why                                                                                                                       |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **`*c=11`**                   | `*(char *)&g` reads one byte. RISC-V is little-endian, so it is the low byte of `11`; the pointer's type chose the width. |
-| **`func=0x0000000000000000`** | `main` is linked at address 0. A valid function pointer equals null here.                                                 |
+| Output                    | Why                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `*c=11`                   | `*(char *)&g` reads one byte. RISC-V is little-endian, so it is the low byte of `11`; the pointer's type chose the width. |
+| `func=0x0000000000000000` | `main` is linked at address 0. A valid function pointer equals null here.                                                 |
 
 The lecture passes a function pointer straight to `%p` and **never** uses `main`'s parameters. Practice programs here build with `-Wextra -pedantic` (`STRICT_CFLAGS` in the [Makefile](../Makefile)), which rejects both, so `ptr.c` casts through `uint64` and uses `argc`/`argv` to print the stack layout the lecture draws for `ls.c`.
 
@@ -618,7 +670,7 @@ sizeof: f=36 g=24 h=32
 
 The first two addresses are guaranteed; the last two are loads from whatever this binary has at `0x1000`, which happens to be `umalloc.c`'s zeroed `freep`. The [Homework 2 section](10-c-in-xv6.md#homework-2-struct-addresses) has the 32-bit answer the handout asks for and the table of which expressions touch memory.
 
-### `str` — where a string may be written
+### `str` — writable stack versus read-only literal
 
 ```text
 $ str
@@ -631,12 +683,17 @@ usertrap(): unexpected scause 0xf pid=3
 
 Both writes are one byte past a 4-byte string, but only one is caught:
 
-| Write             | Lands in                                              | Result                                                                                           |
-| ----------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| **`s1[4] = 'D'`** | `main`'s stack frame, mapped writable                 | nothing happens; **undefined behaviour** that can corrupt the frame                              |
-| **`s[4] = 'D'`**  | `.rodata`, in the text segment mapped without `PTE_W` | store page fault (`scause` `0xf`); `usertrap()` kills the process, so `not reached` never prints |
+| Write         | Lands in                                              | Result                                                                                           |
+| ------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `s1[4] = 'D'` | `main`'s stack frame, mapped writable                 | nothing happens; **undefined behaviour** that can corrupt the frame                              |
+| `s[4] = 'D'`  | `.rodata`, in the text segment mapped without `PTE_W` | store page fault (`scause` `0xf`); `usertrap()` kills the process, so `not reached` never prints |
 
-`stval` is the faulting address: the literal `"123"` sits at `0x910` (`objdump -s -j .rodata user/_str`), so `s + 4` is `0x914`, and `sepc` `0x86` is the `sb` in `user/str.asm`. The fault comes from the page permission, not from being past the end, so `s[0] = 'D'` would fault too. The lecture's version keeps `s` global and only commits the silent `s1[4]` write; the practice version adds the literal write to show the contrast.
+The fault report identifies both the destination and the store:
+
+- **`stval = 0x914`:** the faulting address is `s + 4`; `objdump -s -j .rodata user/_str` places the literal `"123"` at `0x910`.
+- **`sepc = 0x86`:** the faulting instruction is the `sb` in `user/str.asm`.
+
+**Page permissions cause the fault**, not the array boundary: `s[0] = 'D'` would fault too. The lecture keeps `s` global and performs only the silent `s1[4]` write; this practice version adds the literal write to expose the permission difference.
 
 ## Lecture 3 — the user/kernel boundary
 
@@ -667,7 +724,7 @@ isolate: read() into TRAPFRAME 0x0000003FFFFFE000 returned -1
 isolate: read() into a user buffer returned 2: "hi"
 ```
 
-The first two runs die and the last two survive, which is the lecture's split between hardware isolation and a careful system-call interface; the [boundary table](11-os-design-in-xv6.md#where-the-boundary-is-enforced) names the check behind each line. Two program-specific findings:
+The first two runs die and the last two survive, which is the lecture's split between hardware isolation and a careful system-call interface; the [boundary table](11-os-design-in-xv6.md#program-isolation-hardware-faults-and-kernel-checks) names the check behind each line. Two program-specific findings:
 
 | Finding                                  | Why                                                                                                                                      |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
@@ -685,36 +742,49 @@ forkfill: reaped 61 children
 forkfill: fork works again
 ```
 
-61 is `NPROC` (64) minus `init`, `sh`, and `forkfill`. Each child closes its inherited write end before blocking in `read()`, so the parent's single `close(p[1])` releases all of them at once; a child that kept `p[1]` would hold the pipe open forever, the same protocol as [`ex8pipefork`](#closing-unused-ends-is-protocol-not-hygiene). Running it twice gives 61 both times, which shows the reaped slots really returned to `UNUSED`.
+**61 children fill the remaining process slots:** `NPROC` is 64, with `init`, `sh`, and `forkfill` already occupying three.
 
-## Regression suite
+1. Each child closes its inherited write end before blocking in `read()`.
+2. The parent closes its sole remaining `p[1]`, releasing all the readers at once.
+3. The parent reaps the children; a second run again finds 61 slots, showing they returned to `UNUSED`.
+
+A child that kept `p[1]` would hold the pipe open forever, the same protocol as [`ex8pipefork`](#closing-unused-ends-is-protocol-not-hygiene).
+
+## grade-exercises: coverage and mutation checks
 
 [`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises, the four Lecture 2 programs, and the two Lecture 3 programs: eighteen tests in about twenty seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose **cannot** drift away from the programs without something going red.
 
-| Test              | The claim it pins                                                                                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`ex1copy`** ×3  | Filter semantics: a finite pipe is copied byte for byte, `Ctrl-d` at an empty position ends an interactive run, and a closed reader produces `write error` rather than a hang. |
-| **`ex2create`**   | `open()` returns **3**, and `Hello` reaches the disk.                                                                                                                          |
-| **`ex3fork`**     | Both branches run, and each writes its **own** `x` — the address spaces are copies, not shared.                                                                                |
-| **`ex4exec`**     | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` **never** runs.                                             |
-| **`ex5forkexec`** | Every byte the child wrote is out **before** the parent's status line.                                                                                                         |
-| **`ex6redirect`** | The redirected text reaches the console **only** via `cat`, **never** while the program runs.                                                                                  |
-| **`ex7pipe`**     | `pipe()` returns descriptors 3 and 4, and the bytes come back.                                                                                                                 |
-| **`ex8pipefork`** | All 17 bytes cross the process boundary.                                                                                                                                       |
-| **`ex9ls`** ×2    | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage.                                     |
-| **`array`**       | Values after index and pointer writes, `a + 1` moving 4 bytes and `b + 1` moving 1, and printed addresses equal to `nm`'s.                                                     |
-| **`ptr`**         | Writes through `p`, `q`, `c`, and `pp`; `p` and `func` equal `nm`'s `g` and `main`; `argv` strings in order with a `0` terminator.                                             |
-| **`str`**         | Index and pointer access agree, the `s1[4]` overflow is silent, and `s[4]` raises a store fault at exactly the literal's address + 4 with the next line **never** printed.     |
-| **`hwstruct`**    | RV64 sizes 36/24/32, the two guaranteed addresses, and all four lines printing without a fault.                                                                                |
-| **`isolate`**     | `csr` and `kload` die with `scause` 2 and `0xd`, `stval` naming the `csrr` encoding and `TRAMPOLINE`; `badsys` and `kcopy` return `-1`; `"hi"` is kept.                        |
-| **`forkfill`**    | `fork()` fails after exactly 61 children, all 61 are reaped, and a second run finds the same 61 free slots.                                                                    |
+| Test             | The claim it pins                                                                                                                                                              |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`ex1copy`** ×3 | Filter semantics: a finite pipe is copied byte for byte, `Ctrl-d` at an empty position ends an interactive run, and a closed reader produces `write error` rather than a hang. |
+| `ex2create`      | `open()` returns **3**, and `Hello` reaches the disk.                                                                                                                          |
+| `ex3fork`        | Both branches run, and each writes its **own** `x` — the address spaces are copies, not shared.                                                                                |
+| `ex4exec`        | `echo`'s output appears and `ex4exec` prints nothing of its own, because the statement after a successful `exec()` **never** runs.                                             |
+| `ex5forkexec`    | Every byte the child wrote is out **before** the parent's status line.                                                                                                         |
+| `ex6redirect`    | The redirected text reaches the console **only** via `cat`, **never** while the program runs.                                                                                  |
+| `ex7pipe`        | `pipe()` returns descriptors 3 and 4, and the bytes come back.                                                                                                                 |
+| `ex8pipefork`    | All 17 bytes cross the process boundary.                                                                                                                                       |
+| **`ex9ls`** ×2   | `.` and `..` are listed, free slots are skipped, and a plain file and a missing path are both rejected with a message rather than garbage.                                     |
+| `array`          | Values after index and pointer writes, `a + 1` moving 4 bytes and `b + 1` moving 1, and printed addresses equal to `nm`'s.                                                     |
+| `ptr`            | Writes through `p`, `q`, `c`, and `pp`; `p` and `func` equal `nm`'s `g` and `main`; `argv` strings in order with a `0` terminator.                                             |
+| `str`            | Index and pointer access agree, the `s1[4]` overflow is silent, and `s[4]` raises a store fault at exactly the literal's address + 4 with the next line **never** printed.     |
+| `hwstruct`       | RV64 sizes 36/24/32, the two guaranteed addresses, and all four lines printing without a fault.                                                                                |
+| `isolate`        | `csr` and `kload` die with `scause` 2 and `0xd`, `stval` naming the `csrr` encoding and `TRAMPOLINE`; `badsys` and `kcopy` return `-1`; `"hi"` is kept.                        |
+| `forkfill`       | `fork()` fails after exactly 61 children, all 61 are reaped, and a second run finds the same 61 free slots.                                                                    |
 
 Several of these pin _kernel_ invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
 
 > [!IMPORTANT]
-> Two of these assertions were **vacuous when first written**, and only mutation testing found it. Deleting `ex9ls`'s `inum == 0` skip did not fail the test, because a freshly built `fs.img` has no free slots to leak and a `.strip()` was deleting the trailing blank lines that would have proved it. Deleting `ex5forkexec`'s `wait()` did not fail it either, because with three harts the child usually wins the race anyway. The suite now creates a hole on purpose and pins that test to `CPUS=1`. **If you add a test here, break the code deliberately and confirm it goes red** — a green test that cannot fail is worse than no test, because it is trusted.
+> **When adding a test, deliberately break the code and confirm the test goes red.** Mutation testing exposed two initially vacuous assertions:
 
-## Adding the next one
+| Mutation that initially passed      | Why the test missed it                                                       | Coverage correction                                             |
+| ----------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **Delete ex9ls's `inum == 0` skip** | A fresh `fs.img` has no free slots, and `.strip()` hid trailing blank lines. | Create a directory hole deliberately and preserve the evidence. |
+| **Delete ex5forkexec's wait()**     | With three harts the child usually wins the race anyway.                     | Pin the ordering test to `CPUS=1`.                              |
+
+A trusted green test that cannot fail is worse than no test.
+
+## Add a lecture exercise: naming and verification procedure
 
 The naming rule is `ex<N><verb>`: `N` from the lecture's own numbering, verb from the lecture's own wording, and the whole guest command name at most **14 bytes** because `DIRSIZ` in `kernel/fs.h` bounds every filename in `fs.img`. When the lecture's file already has a descriptive name, as Lecture 2's `ptr.c` does, keep it.
 

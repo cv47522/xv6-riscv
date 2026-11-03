@@ -11,9 +11,9 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#exec
 > [!IMPORTANT]
 > This note contains no `find` implementation or pseudocode. Its C quotation comes verbatim from the existing lecture example `user/ex5forkexec.c`. The one exception is the final [Solution walkthrough](#solution-walkthrough), a marked spoiler; stop before it if you are still deriving.
 
-## What the exercise asks for
+## What the exercise asks for: `find -exec`
 
-### Contract
+### `find -exec` contract
 
 | Contract             | Required behavior                                                                                                    |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -25,7 +25,7 @@ MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#exec
 
 The handout's wording says “add a `-exec cmd`,” while its actual example is `find . wc -exec echo hi`: `wc` is the sought name, `echo hi` is the command, and the matched `./wc` is appended after `hi`. This is the exercise's syntax, not the host Unix `find -exec ... ;` grammar. [`user/sh.c`](../../user/sh.c) passes `-exec` as an ordinary argument; it does not interpret it.
 
-### What the grader checks
+### `find -exec` grader checks
 
 The three tests in [`grade-lab-util`](../../grade-lab-util) total **30 points**; none installs a breakpoint.
 
@@ -39,24 +39,30 @@ In the first regex, the dot is an unescaped wildcard despite the end anchor. In 
 
 [`user/findtest.sh`](../../user/findtest.sh), installed by `UEXTRA` in the [Makefile](../../Makefile), creates three files containing `hello` and searches for their basename `b`. The script is redirected input to `sh`; its commands are not echoed like terminal input, although the shell still prints prompts. The driver's `DONE` marker ends its scripted interaction; the test's assertion is the occurrence count, not a separate `DONE` match.
 
-### What the grader does not prove
+### `find -exec` grader evidence limits
 
-Printing a matching path could satisfy `exec` without executing a child. The other tests count text anywhere in the transcript and **do not** inspect child status, failures, individual output lines, or parent/child ordering. Extra output without `hello` is not rejected. None directly proves a `fork`, `exec`, or `wait` call; keep the handout's lifetime requirement in the [contract](#contract).
+| Passing observation                     | What remains unproven                                                       |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| **`exec` path line matches**            | A child executed; printing the path alone could pass.                       |
+| **Transcript occurrence count matches** | Child status, failures, individual output lines, and parent/child ordering. |
+| **No count failure**                    | Absence of extra output without `hello`; it is not rejected.                |
 
-## Prerequisites
+None of the tests directly proves a `fork`, `exec`, or `wait` call. Keep the handout's lifetime requirement in the [contract](#find--exec-contract).
 
-| When                | Read                                                                                                                                                                                                                                            | Ownership                                                                                                                                             |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Read first**      | [`04-util-find.md`](04-util-find.md)                                                                                                                                                                                                            | The same target file's traversal, matching, path, and directory constraints.                                                                          |
-| **Read first**      | [`The_Process_Abstraction.md`](../../../operating-system/The_Process_Abstraction.md#7-the-process-api-fork--exec--wait)                                                                                                                         | The sibling study repository's portable fork/exec/wait concept; then compare the actual xv6 example [`user/ex5forkexec.c`](../../user/ex5forkexec.c). |
-| **Read first**      | [`C_Command_Line_Arguments.md`](../../../c-programming/C_Command_Line_Arguments.md#reading-the-arguments)                                                                                                                                       | How argument indices and pointer arrays represent command words.                                                                                      |
-| **Use when needed** | [`book/ch01-operating-system-interfaces.md`](../book/ch01-operating-system-interfaces.md), [`07-exercises.md`](../07-exercises.md#ex5forkexec--the-shells-execution-model), and [`05-syscall-reference.md`](../05-syscall-reference.md#process) | This tree's process mechanism, example behavior, and call contracts.                                                                                  |
-| **Use when needed** | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise), [`03-lab-workflow.md`](../03-lab-workflow.md), and [`06-build-artifacts.md`](../06-build-artifacts.md)                                        | User-program mechanics, grading, and generated syscall stubs.                                                                                         |
+## `find -exec` prerequisites and references
+
+| When                | Read                                                                                                                                                                                                                                                                                | Ownership                                                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Read first**      | [`04-util-find.md`](04-util-find.md)                                                                                                                                                                                                                                                | The same target file's traversal, matching, path, and directory constraints.                                                                          |
+| **Read first**      | [`The_Process_Abstraction.md`](../../../operating-system/The_Process_Abstraction.md#7-the-process-api-fork--exec--wait)                                                                                                                                                             | The sibling study repository's portable fork/exec/wait concept; then compare the actual xv6 example [`user/ex5forkexec.c`](../../user/ex5forkexec.c). |
+| **Read first**      | [`C_Command_Line_Arguments.md`](../../../c-programming/C_Command_Line_Arguments.md#reading-the-arguments)                                                                                                                                                                           | How argument indices and pointer arrays represent command words.                                                                                      |
+| **Use when needed** | [`book/ch01-operating-system-interfaces.md`](../book/ch01-operating-system-interfaces.md), [`07-exercises.md`](../07-exercises.md#ex5forkexec--the-shells-execution-model), and [`05-syscall-reference.md`](../05-syscall-reference.md#process-creation-exit-waiting-and-execution) | This tree's process mechanism, example behavior, and call contracts.                                                                                  |
+| **Use when needed** | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise), [`03-lab-workflow.md`](../03-lab-workflow.md), and [`06-build-artifacts.md`](../06-build-artifacts.md)                                                                            | User-program mechanics, grading, and generated syscall stubs.                                                                                         |
 
 > [!NOTE]
 > The sibling notes and their hosted-C examples teach concepts, not xv6 API signatures. [`user/user.h`](../../user/user.h) is the callable interface in this freestanding tree; `exec()` here takes a path and a null-terminated vector.
 
-## The code to read first
+## Code to read first for `find -exec`
 
 | File                                                                                                                               | Contributes                                                                                              | Does not contribute                                     |
 | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -145,9 +151,15 @@ flowchart TD
 
 _Pink requests process creation, blue routes or waits, yellow runs the replacement image, cyan completes the parent, and red reports failures._
 
-The parent and child run concurrently after `fork()`. The parent may call `wait()` before the child finishes, or reap a child that already exited; the dashed arrows mark the child-exit dependency of successful reaping, not when the parent calls `wait()`. The parent's initial status message can interleave with child output because it precedes `wait()`; only the post-wait message is ordered after child exit. The diagram describes existing `ex5forkexec`, not the target search routine.
+**Ordering in existing `ex5forkexec`:**
 
-## The concept underneath
+- **Before `wait()`:** the parent's initial status message can interleave with child output.
+- **After successful `wait()`:** the final parent message follows child exit.
+- **Dashed arrows:** successful reaping depends on child exit; they do not fix when the parent calls `wait()`.
+
+Parent and child run concurrently after `fork()`. The parent may wait before the child finishes or reap an already exited child. The diagram describes existing `ex5forkexec`, not the target search routine.
+
+## The concept underneath `find -exec`: argument vectors and child lifetimes
 
 | Limit or interface     | Value in this tree                             | Source                                                                           | Consequence                                                                                         |
 | ---------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -161,19 +173,19 @@ The parent and child run concurrently after `fork()`. The parent may call `wait(
 
 `sys_exec()` in [`kernel/sysfile.c`](../../kernel/sysfile.c) fetches pointers until it sees zero or reaches `MAXARG`; [`kexec()` in `kernel/exec.c`](../../kernel/exec.c) copies those strings into the new program's stack. There is no kernel feature that appends a path to the vector. The receiving program sees only the ordered strings it was given. This explains why `echo` and `grep` need no changes for the exercise.
 
-`wait()` reaps an exited child and may block until one exits. The handout's parent-wait hint establishes the lifetime requirement; [the grader limits](#what-the-grader-does-not-prove) explain why a passing output test is weaker evidence. If multiple children were outstanding, `wait()` would return any reaped child's pid; the existing example has only one, which makes its association unambiguous.
+`wait()` reaps an exited child and may block until one exits. The handout's parent-wait hint establishes the lifetime requirement; [the grader limits](#find--exec-grader-evidence-limits) explain why a passing output test is weaker evidence. If multiple children were outstanding, `wait()` would return any reaped child's pid; the existing example has only one, which makes its association unambiguous.
 
-## Deriving it
+## Deriving `find -exec`: decisions and traps
 
-**Contract:** use the [requirements above](#contract), including plain `find` compatibility; derive the command and lifetime choices from these questions.
+**Contract:** use the [requirements above](#find--exec-contract), including plain `find` compatibility; derive the command and lifetime choices from these questions.
 
-| Decision for `user/find.c`           | Source-backed question to settle                                                                                                                                                 |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Recognize the optional form**      | Which `argv` entries does [`user/sh.c`](../../user/sh.c) pass for the handout's `find . wc -exec echo hi`, and how will the requested name stay distinct from command words?     |
-| **Form the child's argument vector** | Where do the command name, fixed arguments, matched path, and final null pointer belong under [`sys_exec()`](../../kernel/sysfile.c)'s `MAXARG` boundary?                        |
-| **Keep the search alive**            | Which branch of [`ex5forkexec.c`](../../user/ex5forkexec.c) survives successful `exec`, and which branch can continue visiting later matches?                                    |
-| **Account for one invocation**       | What does [`wait()`](../05-syscall-reference.md#process) return, and how would you handle `fork` failure, `exec` failure, or a child exit without losing the rest of the search? |
-| **Preserve plain search**            | Which observations in [`04-util-find.md`](04-util-find.md#what-the-exercise-asks-for) should still hold when there is no `-exec` marker?                                         |
+| Decision for `user/find.c`           | Source-backed question to settle                                                                                                                                                                                     |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Recognize the optional form**      | Which `argv` entries does [`user/sh.c`](../../user/sh.c) pass for the handout's `find . wc -exec echo hi`, and how will the requested name stay distinct from command words?                                         |
+| **Form the child's argument vector** | Where do the command name, fixed arguments, matched path, and final null pointer belong under [`sys_exec()`](../../kernel/sysfile.c)'s `MAXARG` boundary?                                                            |
+| **Keep the search alive**            | Which branch of [`ex5forkexec.c`](../../user/ex5forkexec.c) survives successful `exec`, and which branch can continue visiting later matches?                                                                        |
+| **Account for one invocation**       | What does [`wait()`](../05-syscall-reference.md#process-creation-exit-waiting-and-execution) return, and how would you handle `fork` failure, `exec` failure, or a child exit without losing the rest of the search? |
+| **Preserve plain search**            | Which observations in [`04-util-find.md`](04-util-find.md#what-the-exercise-asks-for-find) should still hold when there is no `-exec` marker?                                                                        |
 
 | Trap                                                           | Observable consequence                                                                               | Source to inspect                                                                                               |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -185,7 +197,7 @@ The parent and child run concurrently after `fork()`. The parent may call `wait(
 | **Continue in the child after a failed `exec`**                | The child can accidentally continue the search as a second searcher on the shared directory offsets. | [`user/ex5forkexec.c`](../../user/ex5forkexec.c)                                                                |
 | **Assume a count of five means five file hits**                | The grader counts the echoed command's `hello` as well as the script's four matching lines.          | [`grade-lab-util`](../../grade-lab-util), [`user/findtest.sh`](../../user/findtest.sh)                          |
 
-## Verifying it
+## Verifying `find -exec`: build, guest checks, and grading
 
 1. Build and boot after the plain `find` exercise is registered:
 
@@ -208,11 +220,11 @@ The parent and child run concurrently after `fork()`. The parent may call `wait(
     ./grade-lab-util find exec
     ```
 
-`gradelib.py` selects tests by case-insensitive title substrings, so the two filter words select both sets. Use [the evidence limits](#what-the-grader-does-not-prove) rather than treating an occurrence count as direct process evidence. The focused failure logs are `xv6.out.find_exec`, `xv6.out.find_exec_args`, and `xv6.out.test_find_sh`; [docs 03](../03-lab-workflow.md#grading) owns transcript handling.
+`gradelib.py` selects tests by case-insensitive title substrings, so the two filter words select both sets. Use [the evidence limits](#find--exec-grader-evidence-limits) rather than treating an occurrence count as direct process evidence. The focused failure logs are `xv6.out.find_exec`, `xv6.out.find_exec_args`, and `xv6.out.test_find_sh`; [docs 03](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts) owns transcript handling.
 
 These are future-implementation checks, not claimed command output. [Docs 02](../02-build-boot-and-usage.md) covers rebuilding or preserving `fs.img`. For process behavior, the source-backed lecture example and [chapter 1](../book/ch01-operating-system-interfaces.md) provide the mechanism; no extra kernel-debugger recipe is needed for this note.
 
-## Questions
+## Questions about `find -exec`: argument vectors and child lifetimes
 
 1. For `find . wc -exec echo hi`, what are the command-name and fixed-argument words before the matched path is added, according to the [handout](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html#exec)?
 2. Why does the line following `exec("echo", argv)` in [`ex5forkexec.c`](../../user/ex5forkexec.c) execute only on failure?
@@ -235,7 +247,7 @@ These are future-implementation checks, not claimed command output. [Docs 02](..
 | **`find()`**              | Unchanged traversal; at a match it prints when `cmd` is `0`, otherwise it calls `run()`.                               |
 | **`run()`**               | One fork, one child `exec`, and one parent `wait` per matched path.                                                    |
 
-### Where the fork belongs
+### Why `find -exec` forks at each match
 
 | Placement of fork/exec                         | Command runs   | Receives the matched path | Search survives                 |
 | ---------------------------------------------- | -------------- | ------------------------- | ------------------------------- |
@@ -245,7 +257,7 @@ These are future-implementation checks, not claimed command output. [Docs 02](..
 
 `main()` executes once per `find` command, so any fork placed there can produce at most one command, and only `find()` knows a matched path. The process split therefore has to happen at the match site. Only the child execs; the parent returns into `find()`'s loop and keeps reading directory records.
 
-### One match with `-exec`
+### One `-exec` match: fork, exec, and wait
 
 ```mermaid
 flowchart TD
@@ -279,7 +291,7 @@ A `-1` from `run()` makes `find()`'s status sticky, as a `stat()` failure does, 
 
 Waiting before the next match has two effects. Command output appears in search order, and each child is reaped at once instead of holding a process slot until `fork()` fails.
 
-### The argument vectors
+### `find` and child argument-vector layouts
 
 For `find . b -exec grep hello` matching `./a/b`:
 
@@ -293,7 +305,7 @@ For `find . b -exec grep hello` matching `./a/b`:
 - **Terminator:** the last slot is the integer `0`. `"\0"` would be a non-null pointer to an empty string, which `sys_exec()` accepts as one more argument.
 - **Fixed array:** `child_argv[MAXARG]` replaces a VLA because C99 (`-std=gnu99`) forbids initializing a variable-length array. Its 256 bytes exist only while `run()` is active, **never** once per recursion frame.
 
-### Failure modes the source guards
+### `find -exec` argument and child-failure guards
 
 > [!WARNING]
 > A failed child must `exit()`, never return into `find()`. `kfork()` in [`kernel/proc.c`](../../kernel/proc.c) gives the child `filedup()` copies of every open directory descriptor, and these share one `struct file` and its read offset with the parent. A second searcher would consume dirents the parent still has to read.
@@ -309,7 +321,7 @@ For `find . b -exec grep hello` matching `./a/b`:
 
 Testing `argc == 3` first is not cosmetic. With three arguments, `argv[3]` is the null pointer, and user text is linked at address `0` by [`user/user.ld`](../../user/user.ld), so `strcmp(argv[3], "-exec")` reads instruction bytes instead of faulting and silently rejects the plain form.
 
-### Decisions, answered
+### Answers to the `find -exec` derivation decisions
 
 | Decision                             | What `user/find.c` does                                                                                       |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------- |

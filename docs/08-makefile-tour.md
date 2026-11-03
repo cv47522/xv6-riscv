@@ -1,4 +1,4 @@
-# The Build: A Tour of the Makefile
+# xv6 Makefile: build targets, rules, and toolchains
 
 ---
 
@@ -17,9 +17,9 @@ How [`Makefile`](../Makefile) turns this tree into a bootable machine: where the
 >
 > What follows is only the part that is specific to building an operating system.
 
-## The three outputs
+## Build outputs: kernel ELF, user ELFs, and fs.img
 
-Everything the Makefile does exists to produce exactly three kinds of thing. Keep them separate in your head and the rest of the file reads easily.
+The build produces a kernel ELF, one ELF per user program, and a filesystem image. Their toolchains and runtime roles differ:
 
 | Output          | What it is                                                          | Built by                        | Runs on              |
 | --------------- | ------------------------------------------------------------------- | ------------------------------- | -------------------- |
@@ -30,9 +30,15 @@ Everything the Makefile does exists to produce exactly three kinds of thing. Kee
 `make qemu` then boots the emulator with the first as its kernel and the third as its disk. There is no bootloader and no installer step; QEMU loads the ELF and jumps to it.
 
 > [!IMPORTANT]
-> **Cross compilation is the fact that explains almost every unusual flag.** Your host is x86-64; every kernel and user object here is RISC-V. Nothing built for xv6 can run on your machine, and nothing from your host's libc can be linked in. `-ffreestanding`, `-nostdlib`, the fourteen `-fno-builtin-*` flags, and `-mcmodel=medany` all follow from that one sentence. The flags themselves are annotated inline in the [Makefile](../Makefile); the reasoning is in [06-build-artifacts.md § Why you cannot use the host's headers](06-build-artifacts.md#why-you-cannot-use-the-hosts-headers).
+> **Cross compilation explains almost every unusual flag.** The host is x86-64; every kernel and user object is RISC-V.
 
-## Where the build starts
+- **Execution:** nothing built for xv6 can run directly on this host.
+- **Libraries:** the host's libc cannot be linked into those objects.
+- **Build flags:** `-ffreestanding`, `-nostdlib`, fourteen `-fno-builtin-*` flags, and `-mcmodel=medany` support the target environment.
+
+The [Makefile](../Makefile) annotates the flags individually; [06-build-artifacts.md § Why you cannot use the host's headers](06-build-artifacts.md#why-you-cannot-use-the-hosts-headers) explains the reasoning.
+
+## Default goal: why bare make builds only the kernel
 
 A Makefile's **default goal** is the target of its first rule, not a target named `all`. This Makefile has no `all`, and its first rule is the kernel link at [`Makefile:316`](../Makefile).
 
@@ -41,30 +47,37 @@ $ make -p -n | grep -m1 DEFAULT_GOAL
 .DEFAULT_GOAL := kernel/kernel
 ```
 
-So a bare `make` compiles and links the kernel and **stops**. It builds no user programs and no filesystem image, because nothing in the kernel's dependency chain mentions them. That is occasionally what you want — it is the fastest way to check that a kernel edit still compiles — but it is **never** enough to boot. `make qemu` is the real entry point.
+Choose the goal for the result you need:
 
-## Every target, and when you type it
+| Command     | Result                                                        | Use                                     |
+| ----------- | ------------------------------------------------------------- | --------------------------------------- |
+| `make`      | Compiles and links only the kernel.                           | Fast compile check after a kernel edit. |
+| `make qemu` | Builds the kernel, user programs, and image, then boots QEMU. | Run xv6.                                |
 
-| Target                   | Depends on                                   | What it is for                                                                  |
-| ------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------- |
-| **`kernel/kernel`**      | `$(OBJS) $(OBJS_KCSAN) kernel/kernel.ld`     | The default goal. Compile-check the kernel without booting.                     |
-| **`qemu`**               | `check-qemu-version newfs.img kernel fs.img` | The one you type. Rotates `fs.img` aside first, so every boot starts clean.     |
-| **`qemu-fs`**            | `check-qemu-version kernel fs.img`           | Same, but keeps the existing image — guest files survive a reboot.              |
-| **`qemu-gdb`**           | `kernel .gdbinit fs.img`                     | Boots halted with a gdb stub. Run `gdb` in a second terminal.                   |
-| **`fs.img`**             | `mkfs/mkfs README $(UEXTRA) $(UPROGS)`       | Rebuild the image alone, e.g. after adding a program to `UPROGS`.               |
-| **`newfs.img`**          | nothing                                      | `mv -f fs.img fs.img.bk`. Never creates a file called `newfs.img` — see below.  |
-| **`grade`**              | nothing (runs `make clean` itself)           | Runs `./grade-lab-$(LAB)`. See [03-lab-workflow.md](03-lab-workflow.md).        |
-| **`clean`**              | nothing                                      | Deletes every build product, `fs.img` included. Guest files are lost.           |
-| **`.gdbinit`**           | `.gdbinit.tmpl-riscv`                        | Substitutes your per-uid gdb port into the template.                            |
-| **`print-gdbport`**      | nothing                                      | Prints that port, for attaching gdb by hand.                                    |
-| **`check-qemu-version`** | nothing                                      | Refuses to boot on QEMU older than 7.2.                                         |
-| **`tags`**               | `$(OBJS)`                                    | `etags` index of the kernel, for Emacs.                                         |
-| **`fmt`**                | nothing                                      | `clang-format -i` over the whole tree. Avoid mid-lab — it wrecks future merges. |
-| **`submit-check`**       | nothing                                      | Branch and working-tree sanity checks before hand-in.                           |
-| **`zipball`**            | `clean submit-check`                         | `git archive` of `HEAD` into `lab.zip`. Uncommitted work is **not** included.   |
-| **`ph`, `barrier`**      | `notxv6/*.c`                                 | Only under `LAB=thread`. Host pthread programs, not xv6 programs at all.        |
+A bare `make` stops after the kernel because its dependency chain mentions neither user programs nor the filesystem image. **It is never enough to boot.**
 
-## The goal graph
+## Make targets: prerequisites and use cases
+
+| Target               | Depends on                                   | What it is for                                                                  |
+| -------------------- | -------------------------------------------- | ------------------------------------------------------------------------------- |
+| `kernel/kernel`      | `$(OBJS) $(OBJS_KCSAN) kernel/kernel.ld`     | The default goal. Compile-check the kernel without booting.                     |
+| `qemu`               | `check-qemu-version newfs.img kernel fs.img` | The one you type. Rotates `fs.img` aside first, so every boot starts clean.     |
+| `qemu-fs`            | `check-qemu-version kernel fs.img`           | Same, but keeps the existing image — guest files survive a reboot.              |
+| `qemu-gdb`           | `kernel .gdbinit fs.img`                     | Boots halted with a gdb stub. Run `gdb` in a second terminal.                   |
+| `fs.img`             | `mkfs/mkfs README $(UEXTRA) $(UPROGS)`       | Rebuild the image alone, e.g. after adding a program to `UPROGS`.               |
+| `newfs.img`          | nothing                                      | `mv -f fs.img fs.img.bk`. Never creates a file called `newfs.img` — see below.  |
+| `grade`              | nothing (runs `make clean` itself)           | Runs `./grade-lab-$(LAB)`. See [03-lab-workflow.md](03-lab-workflow.md).        |
+| `clean`              | nothing                                      | Deletes every build product, `fs.img` included. Guest files are lost.           |
+| `.gdbinit`           | `.gdbinit.tmpl-riscv`                        | Substitutes your per-uid gdb port into the template.                            |
+| `print-gdbport`      | nothing                                      | Prints that port, for attaching gdb by hand.                                    |
+| `check-qemu-version` | nothing                                      | Refuses to boot on QEMU older than 7.2.                                         |
+| `tags`               | `$(OBJS)`                                    | `etags` index of the kernel, for Emacs.                                         |
+| `fmt`                | nothing                                      | `clang-format -i` over the whole tree. Avoid mid-lab — it wrecks future merges. |
+| `submit-check`       | nothing                                      | Branch and working-tree sanity checks before hand-in.                           |
+| `zipball`            | `clean submit-check`                         | `git archive` of `HEAD` into `lab.zip`. Uncommitted work is **not** included.   |
+| **`ph`, `barrier`**  | `notxv6/*.c`                                 | Only under `LAB=thread`. Host pthread programs, not xv6 programs at all.        |
+
+## make qemu: dependency graph from targets to sources
 
 What `make qemu` pulls in, from the command down to the sources. Read it bottom-up to see what a given edit invalidates.
 
@@ -108,7 +121,7 @@ flowchart TD
 
 Three subtrees, three toolchains: the left branch is cross-compiled and linked at `0x80000000`, the right branch is cross-compiled and linked at `0`, and `mkfs/mkfs` alone is built with your host's `gcc`.
 
-## A cold build, in order
+## Cold build: environment probes through QEMU boot
 
 What actually runs on a clean tree, phase by phase. The bands mark phases; the notes name them.
 
@@ -174,24 +187,24 @@ sequenceDiagram
 
 Phases 2 and 4 are where `make` earns its keep on rebuilds: everything is keyed on timestamps plus the `.d` files, so editing one `.c` re-runs one compile and one link, and editing a header re-runs every compile that read it.
 
-## The variables that decide what gets built
+## Build variables: lab selection, objects, flags, and QEMU
 
-| Variable         | Set where                              | What it controls                                                                                                      |
-| ---------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| **`LAB`**        | `conf/lab.mk`, via `-include`          | Which `ifeq ($(LAB),…)` blocks activate, which `-D` flags are set, which grader `make grade` runs                     |
-| **`K`, `U`**     | Literal `kernel` and `user`            | Pure readability. `$K/proc.o` is `kernel/proc.o`                                                                      |
-| **`OBJS`**       | Explicit list                          | Every kernel object. `entry.o` is first because `kernel.ld` places it at `0x80000000`                                 |
-| **`OBJS_KCSAN`** | Explicit list                          | Five objects the race detector must not instrument — they run before the kernel is ready, or _are_ what it depends on |
-| **`TOOLPREFIX`** | `$(shell …)` probe                     | The cross-toolchain prefix, e.g. `riscv64-linux-gnu-`. Override on the command line if yours is unusual               |
-| **`CFLAGS`**     | Accumulated with `+=` across ~60 lines | The freestanding RISC-V compile. Read the annotated block in the Makefile once, then **never** again                  |
-| **`XCFLAGS`**    | `-DSOL_$(LABUPPER) -DLAB_$(LABUPPER)`  | The subset of flags that host-compiled code (`mkfs`, `notxv6/`) also needs                                            |
-| **`LDFLAGS`**    | `-z max-page-size=4096`                | Stops the linker aligning segments to its default, much larger page size                                              |
-| **`ULIB`**       | Four objects                           | xv6's entire C library. Linked into every user program                                                                |
-| **`UPROGS`**     | Explicit list + per-lab additions      | Which programs get built _and_ copied into `fs.img`                                                                   |
-| **`UEXTRA`**     | Per-lab only                           | Non-executable files that still belong in the image (`findtest.sh` and the `sixfive` fixtures)                        |
-| **`CPUS`**       | `3`, or `1` under `LAB=fs`             | Emulated harts. `make CPUS=1 qemu` makes scheduling deterministic while debugging                                     |
-| **`GDBPORT`**    | `id -u % 5000 + 25000`                 | A per-user gdb stub port, so shared machines **do not** collide                                                       |
-| **`QEMUOPTS`**   | Accumulated with `+=`                  | The machine definition: RAM at `0x80000000`, no firmware, `fs.img` as a virtio disk                                   |
+| Variable     | Set where                              | What it controls                                                                                                      |
+| ------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `LAB`        | `conf/lab.mk`, via `-include`          | Which `ifeq ($(LAB),…)` blocks activate, which `-D` flags are set, which grader `make grade` runs                     |
+| **`K`, `U`** | Literal `kernel` and `user`            | Pure readability. `$K/proc.o` is `kernel/proc.o`                                                                      |
+| `OBJS`       | Explicit list                          | Every kernel object. `entry.o` is first because `kernel.ld` places it at `0x80000000`                                 |
+| `OBJS_KCSAN` | Explicit list                          | Five objects the race detector must not instrument — they run before the kernel is ready, or _are_ what it depends on |
+| `TOOLPREFIX` | `$(shell …)` probe                     | The cross-toolchain prefix, e.g. `riscv64-linux-gnu-`. Override on the command line if yours is unusual               |
+| `CFLAGS`     | Accumulated with `+=` across ~60 lines | The freestanding RISC-V compile. Read the annotated block in the Makefile once, then **never** again                  |
+| `XCFLAGS`    | `-DSOL_$(LABUPPER) -DLAB_$(LABUPPER)`  | The subset of flags that host-compiled code (`mkfs`, `notxv6/`) also needs                                            |
+| `LDFLAGS`    | `-z max-page-size=4096`                | Stops the linker aligning segments to its default, much larger page size                                              |
+| `ULIB`       | Four objects                           | xv6's entire C library. Linked into every user program                                                                |
+| `UPROGS`     | Explicit list + per-lab additions      | Which programs get built _and_ copied into `fs.img`                                                                   |
+| `UEXTRA`     | Per-lab only                           | Non-executable files that still belong in the image (`findtest.sh` and the `sixfive` fixtures)                        |
+| `CPUS`       | `3`, or `1` under `LAB=fs`             | Emulated harts. `make CPUS=1 qemu` removes cross-hart execution while debugging; timer preemption still occurs.       |
+| `GDBPORT`    | `id -u % 5000 + 25000`                 | A per-user gdb stub port, so shared machines **do not** collide                                                       |
+| `QEMUOPTS`   | Accumulated with `+=`                  | The machine definition: RAM at `0x80000000`, no firmware, `fs.img` as a virtio disk                                   |
 
 ## Three link steps, three flag sets
 
@@ -212,7 +225,7 @@ The single most instructive comparison inside this Makefile is against itself. T
 > [!TIP]
 > `mkfs` is compiled with `$(XCFLAGS)` and includes `kernel/fs.h` and `kernel/param.h` as _prerequisites_, not merely as headers. That is deliberate: the tool writes an on-disk layout the kernel will parse, so changing `FSSIZE` or the inode constants must force `mkfs` to be rebuilt or the image and the kernel silently disagree.
 
-## The rules, one at a time
+## Compilation, linking, and image rules
 
 ### Kernel objects: two pattern rules, one deliberate asymmetry
 
@@ -224,11 +237,18 @@ $K/%.o: $K/%.S
 	$(CC) -march=rv64gc -g -c -o $@ $<
 ```
 
-The `.S` rule passes **no `$(CFLAGS)`** — no optimiser, no sanitiser, no `-MD`. `entry.S`, `swtch.S`, `trampoline.S`, and `kernelvec.S` set up stacks, switch contexts, and run with no valid C environment; instrumenting or optimising them would be meaningless at best. The `.c` rule adds `$(EXTRAFLAG)`, which is empty unless you built with `KCSAN=1`.
+The two rules deliberately pass different flags:
 
-### User objects: there is no rule at all
+| Input | Flags                                                                    | Reason                                                              |
+| ----- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| `.S`  | Bare `-march=rv64gc -g`; no `$(CFLAGS)`, optimiser, sanitiser, or `-MD`. | Stack setup and context switches run without a valid C environment. |
+| `.c`  | `$(CFLAGS)` plus `$(EXTRAFLAG)`.                                         | Normal kernel C compilation; `EXTRAFLAG` is empty unless `KCSAN=1`. |
 
-Nothing in the Makefile says how to turn `user/ex1copy.c` into `user/ex1copy.o`. Make's **built-in** implicit rule does it, and because the Makefile has already assigned `CC` and `CFLAGS`, the built-in rule silently picks up the cross compiler and every freestanding flag:
+`entry.S`, `swtch.S`, `trampoline.S`, and `kernelvec.S` perform that early setup and switching. Instrumenting or optimising them as C would be meaningless at best.
+
+### User objects: Make uses its built-in compilation rule
+
+**Make's built-in implicit rule compiles user objects.** There is no explicit rule for `user/ex1copy.c` → `user/ex1copy.o`; the built-in rule uses the assigned `CC` and `CFLAGS`, including the cross compiler and every freestanding flag:
 
 ```bash
 $ make -n user/_ex1copy | head -1
@@ -263,7 +283,7 @@ $U/usys.S : $U/usys.pl
 
 `usys.S` is the user side of the system call interface: four instructions per call, loading the syscall number into `a7` and executing `ecall`. It is generated, `.gitignore`d, and deleted by `make clean`. **Edit `usys.pl`, never `usys.S`** — the reasoning is in [06-build-artifacts.md § Why generate `usys.S` instead of writing it](06-build-artifacts.md#why-generate-usyss-instead-of-writing-it).
 
-### `fs.img`
+### fs.img: prerequisites determine which programs are imported
 
 ```makefile
 fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
@@ -272,7 +292,7 @@ fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
 
 The prerequisite list and the argument list are the same list. That is the whole reason a program missing from `UPROGS` still compiles and still fails at runtime with `exec … failed`: it was **never** an argument, so it was **never** imported.
 
-## Make features this file uses that a simple one does not
+## Make features: lab configuration, dependency tracking, and rebuilds
 
 | Feature                                | Where                                                              | Why it is needed here                                                                                                                                            |
 | -------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -281,7 +301,7 @@ The prerequisite list and the argument list are the same list. That is the whole
 | **`-include` for generated rules**     | `-include kernel/*.d user/*.d`                                     | Header dependency tracking. 18 shared headers make this mandatory — see [06 § Why this tree needs `.d` files](06-build-artifacts.md#why-this-tree-needs-d-files) |
 | **`$(shell …)` as a capability probe** | `TOOLPREFIX`, `-fno-stack-protector`, `-dumpspecs`, `QEMU_VERSION` | The build adapts to whichever toolchain and emulator you happen to have, instead of failing obscurely                                                            |
 | **`-` recipe prefix**                  | `-mv -f fs.img fs.img.bk`                                          | "Ignore failure": there may be no `fs.img` yet                                                                                                                   |
-| **`.PRECIOUS: %.o`**                   | near the user rules                                                | Without it Make treats `cat.o` as an intermediate of `_cat` and deletes it after the first build, so every rebuild recompiles everything                         |
+| `.PRECIOUS: %.o`                       | near the user rules                                                | Without it Make treats `cat.o` as an intermediate of `_cat` and deletes it after the first build, so every rebuild recompiles everything                         |
 | **`ifeq ($(LAB),…)` blocks**           | twenty of them, across eleven labs                                 | One Makefile serves every lab. Nothing switches on unless `conf/lab.mk` says so                                                                                  |
 | **Recursive `$(MAKE)`**                | inside `grade`                                                     | Forces a `clean` before grading, since graders rebuild with lab-specific `-D` flags                                                                              |
 
@@ -304,20 +324,22 @@ Nothing named `newfs.img` is ever produced, so the target is permanently out of 
 .PHONY: fmt
 ```
 
-`qemu`, `qemu-fs`, `qemu-gdb`, `newfs.img`, and `tags` are **not** declared phony. They work only because no file of those names happens to exist in the repo root. Create a file called `qemu` and `make qemu` reports it up to date and does nothing. [C_Project_Build_Tool.md § What is .PHONY?](../../c-programming/C_Project_Build_Tool.md#what-is-phony) covers the mechanism; this Makefile is a live example of the gap, and worth remembering before you name a scratch file after a target.
+**Avoid naming scratch files after undeclared phony targets.** `qemu`, `qemu-fs`, `qemu-gdb`, `newfs.img`, and `tags` work because no files with those names exist in the repo root.
 
-## Side by side with a simple project Makefile
+A file called `qemu` can make `make qemu` report the target up to date and do nothing. [C_Project_Build_Tool.md § What is .PHONY?](../../c-programming/C_Project_Build_Tool.md#what-is-phony) explains the mechanism; this Makefile demonstrates the gap.
+
+## Compare xv6 with operating-system/codes/Makefile
 
 The comparison below is against [`operating-system/codes/Makefile`](../../operating-system/codes/Makefile) — a multi-program, hosted, auto-discovering build, and a good example of the shape most C projects should have. Its constructs are explained in [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md).
 
-### At a glance
+### Build architecture and outputs compared
 
 | Aspect                    | `operating-system/codes/Makefile`           | `xv6-riscv/Makefile`                                                                                                  |
 | ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | **Length**                | ~180 lines                                  | ~730 lines                                                                                                            |
 | **Compiler**              | `CC = gcc`                                  | `CC = $(TOOLPREFIX)gcc`, prefix probed at run time                                                                    |
 | **Target machine**        | The one you are typing on                   | Emulated RISC-V; nothing built runs on the host                                                                       |
-| **`CFLAGS`**              | `-g -Wall -Wextra -std=c11 -pedantic`       | ~30 flags, most of them removing a hosted assumption                                                                  |
+| `CFLAGS`                  | `-g -Wall -Wextra -std=c11 -pedantic`       | ~30 flags, most of them removing a hosted assumption                                                                  |
 | **C library**             | glibc, linked automatically                 | `$(ULIB)`: four objects you compile yourself                                                                          |
 | **Default goal**          | `all`, which prints a usage message         | `kernel/kernel`, which links the kernel                                                                               |
 | **Source discovery**      | `wildcard` and `find`                       | Explicit `OBJS` and `UPROGS` lists                                                                                    |
@@ -333,10 +355,10 @@ The comparison below is against [`operating-system/codes/Makefile`](../../operat
 | **Ergonomics**            | `help`, `list`, `print-%`, colourised echo  | None. Read the comments instead                                                                                       |
 | **Run target**            | `make run FILE=prog` runs a host binary     | `make qemu` boots an emulator                                                                                         |
 | **Test target**           | `make test` — unit tests plus shell scripts | `make grade` — boots QEMU and matches console output                                                                  |
-| **`clean`**               | `rm -rf obj bin`                            | An eleven-pattern list, because products are flat                                                                     |
+| `clean`                   | `rm -rf obj bin`                            | An eleven-pattern list, because products are flat                                                                     |
 | **Final output**          | N host executables                          | One kernel ELF, N user ELFs, and a filesystem image                                                                   |
 
-### Same idea, different spelling
+### Shared Make constructs: equivalent rules and variables
 
 Several constructs are the _same_ Make feature solving the same problem, which makes them the fastest way to read the unfamiliar file.
 
@@ -363,7 +385,7 @@ The simple Makefile finds its programs with `find src/main -type f -name '*.c'`,
 > [!NOTE]
 > The cost is one line of Makefile per new program, and the benefit is that `exec … failed` is the _only_ failure mode — a program is either in the image or it is not. There is no partially-installed state. The checklist for adding one is in [02-build-boot-and-usage.md § Adding and running a user exercise](02-build-boot-and-usage.md#adding-and-running-a-user-exercise).
 
-## Recipes
+## Change the build: programs, kernel sources, syscalls, and labs
 
 ### Add a user program
 
@@ -404,7 +426,7 @@ $ make qemu
 
 The `make clean` is not optional: `LAB` changes `-DLAB_*`, which changes struct layouts and constants in the kernel headers, and stale objects would link silently against the old ones. [03-lab-workflow.md](03-lab-workflow.md) covers the rest.
 
-### Inspect what Make is thinking
+### Inspect commands and rebuild decisions with make -n and make -d
 
 ```bash
 make -n qemu                       # print the commands without running them
@@ -415,7 +437,7 @@ make -d kernel/kernel 2>&1 | less  # why Make decided something was out of date
 
 `make -n` is the single most useful of these when a build does something you did not expect. The simple Makefile offers `make print-CFLAGS` for the same purpose; xv6 has no such helper, so `make -n` is the substitute.
 
-## When the build misbehaves
+## Build troubleshooting: symptoms, causes, and fixes
 
 | Symptom                                                  | Cause                                                      | Fix                                                                                                                 |
 | -------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -431,7 +453,7 @@ make -d kernel/kernel 2>&1 | less  # why Make decided something was out of date
 
 `fs.img.bk` is worth knowing about: `clean` does not remove it, so a stale 2 MB file can sit in the repo indefinitely. It is `.gitignore`d, and deleting it by hand is safe.
 
-## Cross references
+## Build syntax, artifacts, toolchain, and workflow references
 
 For a smaller RISC-V build that connects C, assembly, a linker script, and the resulting ELF, see [the assembly build-pipeline exercise](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md#build-pipeline-from-source-files-to-an-elf).
 

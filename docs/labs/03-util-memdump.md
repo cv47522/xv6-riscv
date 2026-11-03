@@ -11,9 +11,9 @@ MIT's [`memdump` exercise](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html
 > [!IMPORTANT]
 > This note contains no solution or pseudocode, and it does not acquire one now that the exercise is graded. It records the target contract, the current grader's observations, existing non-target code, source-backed decisions, and common traps. The finished body and the two policy choices the handout leaves open are recorded in the banner comment of [`user/memdump.c`](../../user/memdump.c) itself.
 
-## What the exercise asks for
+## What the exercise asks for: `memdump`
 
-### Contract
+### `memdump` contract
 
 | Concern                    | Contract to preserve                                                                                                                                                                                                  |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,7 +37,7 @@ The format is a small language over successive parts of the region. Its characte
 
 For every fixed-width item, too few remaining bytes **must** produce `memdump: not enough data for 'X'` and stop, where `X` is the current format character. `S` is deliberately different: absence of a NUL within the valid region is not permission to read farther, so it prints only the bytes still covered by `len`.
 
-### What the local grader checks
+### `memdump` local grader checks
 
 The three tests in [`grade-lab-util`](../../grade-lab-util) total **25 points**. None installs a breakpoint; all assertions search the combined console transcript.
 
@@ -47,7 +47,7 @@ The three tests in [`grade-lab-util`](../../grade-lab-util) total **25 points**.
 | **`memdump, format ii, S, p`**                     | 10     | `echo abcdefgh12345678` piped to `memdump ii`, `memdump S`, and `memdump p`                                                            | Prefixes `^1684234849`, `^1751606885`, `^abcdefgh12345678`, `^6867666564636261`                                            | None              |
 | **`memdump, formats h c, bounds checking, usage`** | 5      | `echo abcdefgh` piped to `memdump h` and `memdump c`; `echo a` piped to `memdump i`; `echo abc` piped to `memdump ii`; `memdump a b c` | Exact values `^25185$`, `^a$`, `^174285409$`; diagnostic prefix `memdump: not enough data`; usage prefix `^Usage: memdump` | `^2657$`          |
 
-### What the grader does not prove
+### `memdump` grader evidence limits
 
 | Observation                           | Unchecked behavior                                                                                                   |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
@@ -57,9 +57,9 @@ The three tests in [`grade-lab-util`](../../grade-lab-util) total **25 points**.
 
 [`assert_lines_match()`](../../gradelib.py) applies `re.match()` to each line and removes a required expression after a match. Lines can arrive in any order, and matching one command's output can satisfy another command's expectation. Start-only patterns permit trailing text; only the `$`-anchored values above require an exact line.
 
-The 2026 checks require the full eight-byte `p` value and a shortage diagnostic, but piped `S` data is followed by convenient zero-fill in the starter. Correct-looking text therefore **cannot** prove that the scan respected `len`. [Verification](#verifying-it) distinguishes that coincidence from a useful boundary check.
+The 2026 checks require the full eight-byte `p` value and a shortage diagnostic, but piped `S` data is followed by convenient zero-fill in the starter. Correct-looking text therefore **cannot** prove that the scan respected `len`. [Verification](#verifying-memdump-build-guest-checks-and-grading) distinguishes that coincidence from a useful boundary check.
 
-## Prerequisites
+## `memdump` prerequisites and references
 
 | When                                     | Read                                                                                                                                            | Why it matters here                                                                                                                                         |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ The 2026 checks require the full eight-byte `p` value and a shortage diagnostic,
 | **Worked comparison**                    | [`bounded_cursor_walk.c`](../../../c-programming/notes/src/main/pointers/arithmetic/bounded_cursor_walk.c)                                      | Tabulates which bounds predicates over-read, then walks a TLV stream and NUL-separated fields with a cursor that never passes `len`; it is not `memdump`.   |
 | **Worked comparison**                    | [`read_short_chunks.c`](../../../c-programming/notes/src/main/library/io_streams/file_descriptors/read_short_chunks.c)                          | Reproduces a two-`write()` sender, then contrasts per-chunk processing with accumulating at `buf + total` until EOF or a full buffer.                       |
 
-## The code to read first
+## Code to read first for `memdump`
 
 | Source                                                                         | Contributes                                                                                                                          | Deliberately does not contribute                                           |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
@@ -90,17 +90,17 @@ Everything else this exercise touches is owned elsewhere and is deliberately not
 | Topic                                            | Owner                                                                                                     |
 | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
 | **Program layout and `UPROGS`**                  | [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise)          |
-| **Grading and failed transcripts**               | [`03-lab-workflow.md`](../03-lab-workflow.md#grading)                                                     |
+| **Grading and failed transcripts**               | [`03-lab-workflow.md`](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts)               |
 | **The `read()` return contract**                 | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                             |
 | **What `printf` can and cannot format**          | [`05-syscall-reference.md`](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) |
 | **The reusable byte-stream explanation**         | [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter)                               |
 | **Address spaces and user virtual addresses**    | [`book/ch02`](../book/ch02-operating-system-organization.md), [`book/ch03`](../book/ch03-page-tables.md)  |
-| **Object representation, pointers, and padding** | The sibling C notes listed under [Prerequisites](#prerequisites)                                          |
+| **Object representation, pointers, and padding** | The sibling C notes listed under [Prerequisites](#memdump-prerequisites-and-references)                   |
 
 > [!NOTE]
 > `memdump()` traverses user-space objects; the argument form finishes all input reads before the target runs. Because the linked book chapters remain placeholders, this note holds one fact on loan: every example address is a user virtual address in this process.
 
-## How the starter reaches the target
+## How starter `main()` calls `memdump()`
 
 ![Three argc paths in user memdump.c: five built-in example calls passing sizeof, a standard-input path that reads into a 512-byte buffer and passes n, and a usage error; the first two converge on the three-argument memdump function the exercise fills in](fig/util-memdump-entry-paths.svg)
 
@@ -109,7 +109,10 @@ _The figure maps the original handout starter, not the added local edge probes. 
 > [!IMPORTANT]
 > Each caller supplies the valid extent while it still knows the original object: the five examples pass `sizeof(object)`, standard input passes the accumulated byte count `n`, and the `argc > 2` usage path never calls `memdump()`.
 
-The current local `main()` also includes four `Edge` probe groups on its no-argument path; [verification](#verifying-it) explains what they test. Inside `memdump()`, `sizeof(data)` would measure only the pointer. The extent **must** therefore cross the call boundary as `len`, remain paired with the cursor, and justify each access before it occurs.
+- **Local additions:** the current `main()` includes four `Edge` probe groups on its no-argument path; [verification](#verifying-memdump-build-guest-checks-and-grading) explains what they test.
+- **Extent invariant:** `len` crosses the call boundary, stays paired with the cursor, and justifies each access before it occurs.
+
+Inside `memdump()`, `sizeof(data)` would measure only the pointer. The caller must therefore pass the valid extent explicitly.
 
 ## `memmove()` as the existing byte walker
 
@@ -147,7 +150,7 @@ memmove(void *vdst, const void *vsrc, int n)
 
 Hosted sibling examples cover the same facts: [`pointer_generic_void.c`](../../../c-programming/notes/src/main/pointers/basics/pointer_generic_void.c) tests `void *`, [`pointer_type_casting.c`](../../../c-programming/notes/src/main/pointers/basics/pointer_type_casting.c) compares typed views, and [`array_memory.c`](../../../c-programming/notes/src/main/arrays_and_strings/arrays/array_memory.c) shows contiguous bytes. Their headers and output functions are not xv6 APIs.
 
-## The concept underneath
+## The concept underneath `memdump`: bounded byte views and stored pointers
 
 | Question                              | Fast answer                                                                                         |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -157,7 +160,7 @@ Hosted sibling examples cover the same facts: [`pointer_generic_void.c`](../../.
 | **Why carry `len` separately?**       | A pointer contains no capacity or valid-content length, so the address alone cannot justify a load. |
 | **What is the crucial string split?** | `s` reads a stored pointer and follows it; `S` reads characters directly from the bounded region.   |
 
-### Why `char *data`
+### Why `memdump` uses a `char *data` byte cursor
 
 `memdump("ii", (char *)a, sizeof(a))` crosses three type views without changing the object:
 
@@ -223,7 +226,7 @@ Because `data` has type `char *`, dereferencing it directly yields one `char`. T
 
 Lowercase `s` thus consumes a pointer-sized slot and follows one stored address; uppercase `S` starts at a character byte and follows no pointer. [`pointer_to_pointer_lifecycle.c`](../../../c-programming/notes/src/main/pointers/array_of_pointers/pointer_to_pointer_lifecycle.c) visualizes the same separation between pointer storage and the character row it reaches.
 
-### Structure layout
+### `struct sss` member offsets and tail padding
 
 The RISC-V compiler lays out the starter's `struct sss` in declaration order with the offsets below. The five members are naturally aligned without internal padding; the complete object has one trailing padding byte so that its 24-byte size remains a multiple of the structure's eight-byte alignment.
 
@@ -238,7 +241,7 @@ The RISC-V compiler lays out the starter's `struct sss` in declaration order wit
 
 The declaration-to-offset mapping is **implementation-defined**, not a universal serialization format. [`structure_size_padding_bytes.c`](../../../c-programming/notes/src/main/custom_data_types/structures/structure_size_padding_bytes.c) owns the longer alignment and padding explanation.
 
-### Array initialization
+### Initializing `struct sss.bytes`: copying versus assignment
 
 | Form                                            | Valid? | Effect                                                                                                                                                                                     |
 | ----------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -250,7 +253,7 @@ The declaration-to-offset mapping is **implementation-defined**, not a universal
 
 Initialization is starter context, not part of the `memdump` contract. [`array_basic.c`](../../../c-programming/notes/src/main/arrays_and_strings/arrays/array_basic.c) and [`student.c`](../../../c-programming/notes/src/main/custom_data_types/structures/student.c) own the general array and structure rules.
 
-### The five starter layouts
+### The five starter memory layouts and format views
 
 **Why a third figure:** the entry figure explains callers, the pointer graph explains indirection, and this spatial drawing shows byte offsets and member boundaries. None can replace the other without losing a different relationship.
 
@@ -267,7 +270,7 @@ Examples 4 and 5 pass the _same_ structure address and get different answers, be
 
 Those five `c` items cross a member boundary: four come from `num1` (`w`, `o`, `r`, `l`) and the fifth is the low byte of `num2` (`d`). That is the point of the example — the format describes bytes to consume, and **never** asks the compiler for member names or types.
 
-### Why 512 bytes
+### The 512-byte buffer: capacity versus valid extent
 
 | Quantity                    | What it establishes                        | What remains unknown                                                                 |
 | --------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------ |
@@ -279,11 +282,11 @@ The 512-byte capacity follows `user/cat.c` and `user/wc.c`; it is a convention, 
 > [!WARNING]
 > Zero fill cannot replace `len`: short input gains plausible padding that hides overreads, while a full 512-byte input leaves no spare terminator. For `a\n`, ignoring `n == 2` reads two padded zeros and prints the grader's forbidden `2657` (`0x00000a61`) instead of refusing.
 
-## Deriving it
+## Deriving `memdump`: decisions and traps
 
-**Contract:** use the [single requirements table](#contract) and [format table](#what-the-exercise-asks-for) above.
+**Contract:** use the [single requirements table](#memdump-contract) and [format table](#what-the-exercise-asks-for-memdump) above.
 
-### Decisions and evidence
+### `memdump` decisions and source evidence
 
 | Decision to derive           | Evidence to consult                                                                                                                                                                        |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -299,7 +302,7 @@ The 512-byte capacity follows `user/cat.c` and `user/wc.c`; it is a convention, 
 
 For the string-output decision, [docs 05](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) records why local `strlen()` and `%s` **cannot** enforce `len` and which hosted-C alternatives are unavailable. Use the local declarations when looking for an output primitive with an explicit byte count.
 
-### Traps
+### `memdump` bounds, type, and cursor traps
 
 | Trap                                             | Failure                                                                                                                                                                                      | Evidence                                                                   |
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -323,7 +326,7 @@ For the string-output decision, [docs 05](../05-syscall-reference.md#printf-conv
 | **Expecting a stable pointer value**             | Link layout and runtime placement may change the address without changing its relationships.                                                                                                 | 2026 handout's Example 4 caveat                                            |
 | **Using `%x` for `p`**                           | The output truncates to `64636261` instead of the required `6867666564636261`.                                                                                                               | `user/printf.c`, `grade-lab-util`                                          |
 
-## Verifying it
+## Verifying `memdump`: build, guest checks, and grading
 
 One build covers the starter, the build registration, and the body once it exists:
 
@@ -351,7 +354,7 @@ $ echo abcdefgh | memdump z
 | **`echo abcdefgh \| memdump z`**    | Check the chosen unknown-format policy against its source documentation; the handout does not define it.                                                                          |
 | **In-region NUL, then a directive** | The original handout and grader omit it; the local `Edge 2` group probes the recorded continuation policy. Distinct trailing bytes expose cursor errors and a literal NUL output. |
 
-The `Sc` pipe case can display the right string even if an unbounded scan reaches zero-fill beyond `len`. The later shortage checks cursor and remaining-length accounting, but **cannot** prove that the earlier scan stayed in bounds. The nonzero filler in [Edge 1](#local-boundary-probes) removes that coincidence.
+The `Sc` pipe case can display the right string even if an unbounded scan reaches zero-fill beyond `len`. The later shortage checks cursor and remaining-length accounting, but **cannot** prove that the earlier scan stayed in bounds. The nonzero filler in [Edge 1](#local-memdump-boundary-probes-edge-1-through-edge-4) removes that coincidence.
 
 Exit QEMU with `Ctrl-a` then `x`, then run the focused grader:
 
@@ -371,7 +374,7 @@ The two example tests share `test_memdump_examples`, so their failure logs share
 
 One successful short-input probe therefore does not establish the bounded-`S` contract. Compare both an in-region NUL and nonzero bytes immediately beyond the declared region; neither zero-fill nor a nearby accidental terminator should decide where reading stops. [Docs 05](../05-syscall-reference.md#printf-conversions-and-the-missing-bounded-string) owns the available output primitives and their bounds.
 
-### Local boundary probes
+### Local `memdump` boundary probes: Edge 1 through Edge 4
 
 | Group in the current `main()` | What it distinguishes                                                                                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -380,9 +383,16 @@ One successful short-input probe therefore does not establish the bounded-`S` co
 | **Edge 3**                    | `Sc` with an extent of 3 over `"ab"` places NUL inside the region; a later fixed-width item then tests the recorded consumption policy. An extent of 2 would test region exhaustion instead.      |
 | **Edge 4**                    | A zero-length `S` region **must** be handled without reading even one byte.                                                                                                                       |
 
-These are current local checks in [`main()`](../../user/memdump.c), not extra grader assertions or a required continuation policy for every implementation. The important distinction is whether NUL falls inside the valid extent or just beyond it: only the former exposes writing NUL as data, while zero-fill can hide an unbounded scan in the latter. **Do not** add target-body code to this note to explain the probes.
+**Probe scope:** these are current local checks in [`main()`](../../user/memdump.c), not extra grader assertions or a required continuation policy for every implementation.
 
-## Questions
+| NUL position                     | What the probe can reveal             |
+| -------------------------------- | ------------------------------------- |
+| **Inside the valid extent**      | Exposes writing NUL as data.          |
+| **Just beyond the valid extent** | Zero-fill can hide an unbounded scan. |
+
+**Do not** add target-body code to this note to explain the probes.
+
+## Questions about `memdump`: bounded byte views and stored pointers
 
 1. **Why does casting `a` to `char *` preserve its address but change `+ 1`?** Compare array decay in `array_basic.c` with typed increments in `pointer_type_casting.c`.
 2. **Why does lowercase `s` need `&s`, and which eight bytes does it consume first?** Contrast Example 3 with direct `S` in the pointer graph.

@@ -11,36 +11,36 @@ The shell challenge in MIT's [2026 util lab](https://pdos.csail.mit.edu/6.1810/2
 > [!IMPORTANT]
 > No solution or pseudocode. `user/sh.c` is quoted only as it stands unmodified in this tree; [the prompt note](08-util-sh-prompt.md) records that quoting rule and the other shell notes. Kernel quotations are not targets.
 
-## What the exercise asks for
+## What the exercise asks for: shell `wait`
 
-### Contract
+### shell `wait` contract
 
-| Aspect                  | Requirement or local convention                                                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Target**              | Handout: modify `user/sh.c`. No new program, Makefile entry, or kernel change is required.                                                                         |
-| **Command**             | Handout: support `wait`. Conventional meaning, adopted here: a command that returns once the shell's background jobs have exited.                                  |
-| **Background jobs**     | Existing behavior to keep: `cmd &` returns to the prompt without waiting for `cmd`.                                                                                |
-| **Foreground commands** | Existing behavior to keep: the shell prompts again only after a foreground command has finished.                                                                   |
-| **No background jobs**  | Not specified. `wait` with nothing to wait for should return promptly; whether it prints anything is your policy.                                                  |
-| **Status reporting**    | Not specified. Printing each job's pid or exit status is an optional extension.                                                                                    |
-| **Prompt**              | Required by the grader for every test: keep the console prompt exactly `$ `. See [the harness dependency](08-util-sh-prompt.md#the-harness-depends-on-the-prompt). |
+| Aspect                  | Requirement or local convention                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Target**              | Handout: modify `user/sh.c`. No new program, Makefile entry, or kernel change is required.                                                                                  |
+| **Command**             | Handout: support `wait`. Conventional meaning, adopted here: a command that returns once the shell's background jobs have exited.                                           |
+| **Background jobs**     | Existing behavior to keep: `cmd &` returns to the prompt without waiting for `cmd`.                                                                                         |
+| **Foreground commands** | Existing behavior to keep: the shell prompts again only after a foreground command has finished.                                                                            |
+| **No background jobs**  | Not specified. `wait` with nothing to wait for should return promptly; whether it prints anything is your policy.                                                           |
+| **Status reporting**    | Not specified. Printing each job's pid or exit status is an optional extension.                                                                                             |
+| **Prompt**              | Required by the grader for every test: keep the console prompt exactly `$ `. See [the harness dependency](08-util-sh-prompt.md#why-the-grader-requires-the-exact---prompt). |
 
-### What the grader checks
+### shell `wait` grader checks
 
 > [!NOTE]
 > **No test.** No test in [`grade-lab-util`](../../grade-lab-util) uses `&` or `wait`. Because every QEMU test is paced on the prompt, the whole suite is still the regression check that foreground commands finish before the shell prompts again.
 
-## Prerequisites
+## shell `wait` prerequisites and references
 
 | When                | Read                                                                                                                        | Why it matters here                                                             |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | **Read first**      | [`book/ch01-operating-system-interfaces.md`](../book/ch01-operating-system-interfaces.md#the-shell-is-just-another-program) | Owns `runcmd()`'s cases, including `BACK`, and why `cd` runs without forking.   |
 | **Read first**      | [`The_Process_Abstraction.md`](../../../operating-system/The_Process_Abstraction.md#init--pid-1)                            | The sibling repository's portable account of orphans, reparenting, and reaping. |
 | **Read first**      | [`05-util-find-exec.md`](05-util-find-exec.md#ex5forkexecs-main-line-by-line)                                               | `wait()`'s pid and status results, walked through on `ex5forkexec`.             |
-| **Use when needed** | [`05-syscall-reference.md`](../05-syscall-reference.md#process)                                                             | `wait`'s declaration and its `-1` result.                                       |
-| **Use when needed** | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-harness-depends-on-the-prompt)                                            | Why the console prompt is a grading interface.                                  |
+| **Use when needed** | [`05-syscall-reference.md`](../05-syscall-reference.md#process-creation-exit-waiting-and-execution)                         | `wait`'s declaration and its `-1` result.                                       |
+| **Use when needed** | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#why-the-grader-requires-the-exact---prompt)                                   | Why the console prompt is a grading interface.                                  |
 
-## The code to read first
+## Code to read first for shell `wait`
 
 | File                                     | Contributes                                                                                                      | Does not contribute                                       |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -107,8 +107,8 @@ And this is the `BACK` case of `runcmd()` in the same file, which runs inside th
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **The `cd` test in `main()`**              | The one builtin. It runs in the shell process itself because the effect, a new `p->cwd`, must outlive the command. A `wait` builtin has the same constraint. |
 | **`fork1()` then `runcmd(parsecmd(cmd))`** | Parsing happens in the child. A syntax error reaches `panic()`, which calls `exit(1)` and ends only that child.                                              |
-| **`wait(0)` in `main()`**                  | Waits for *any one* child, discards its status, and ignores which pid returned.                                                                              |
-| **`fork1()` in `BACK`**                    | The background job is a *grandchild* of the shell.                                                                                                           |
+| **`wait(0)` in `main()`**                  | Waits for _any one_ child, discards its status, and ignores which pid returned.                                                                              |
+| **`fork1()` in `BACK`**                    | The background job is a _grandchild_ of the shell.                                                                                                           |
 | **`break` then `exit(0)` in `BACK`**       | The intermediate child exits at once, so `main()`'s `wait(0)` returns and the shell prompts while the job runs.                                              |
 
 ```mermaid
@@ -136,7 +136,7 @@ _Legend: blue marks long-lived processes, yellow the processes `&` creates, and 
 
 `kwait()` in [`kernel/proc.c`](../../kernel/proc.c) scans only for processes whose `parent` is the caller. After `reparent()`, the job's `parent` is `initproc`, so the shell has no record of it in the kernel either. `init`'s inner loop eventually reaps it as "a parentless process" and does nothing else.
 
-## The concept underneath
+## The concept underneath shell `wait`: direct children and foreground ordering
 
 | Kernel fact               | Behavior                                                                                  | Source                                   |
 | ------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------- |
@@ -149,11 +149,14 @@ _Legend: blue marks long-lived processes, yellow the processes `&` creates, and 
 > [!IMPORTANT]
 > **The shell can wait only for processes it forked itself.** As long as `&` is implemented by an intermediate child, a `wait` builtin in the shell finds no children and returns `-1` at once, however many jobs are running.
 
-That rule creates the second constraint. Once background jobs are the shell's own children, `main()`'s foreground `wait(0)` can return a finished background job instead of the foreground command, because `kwait()` returns whichever child it finds first. The shell would then prompt while the foreground command is still running. A design that makes jobs direct children **must** also decide which pid each wait is for.
+> [!WARNING]
+> **Direct children also require pid-aware foreground waiting.** A foreground `wait(0)` may reap a finished background job while the foreground command is still running.
 
-## Deriving it
+`kwait()` returns whichever child it finds first. Without deciding which pid each wait is for, the shell would prompt before the foreground command finishes.
 
-**Contract:** use the [requirements above](#contract); settle each question from the named source.
+## Deriving shell `wait`: decisions and traps
+
+**Contract:** use the [requirements above](#shell-wait-contract); settle each question from the named source.
 
 | Decision for `user/sh.c`                 | Source-backed question to settle                                                                                                                                            |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -164,16 +167,16 @@ That rule creates the second constraint. Once background jobs are the shell's ow
 | **Keep foreground commands synchronous** | Which pid does a foreground `wait` need, and what **must** happen to a background job reaped while waiting for it?                                                          |
 | **Scope `&`**                            | `a & ; b` and `(a &)` run their `BACK` inside further children created by `LIST` and `parseblock()`. Which of these will your `wait` cover, and will you document the rest? |
 
-| Trap                                                    | Observable consequence                                                                                       | Source to inspect                                                                     |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| **Adding `wait` only as a builtin**                     | It **always** returns immediately: the jobs already belong to `init`.                                        | `reparent()` in [`kernel/proc.c`](../../kernel/proc.c)                                |
-| **Running `wait` in a forked child**                    | The child has no children of its own, so `wait()` returns `-1`.                                              | `kwait()` in [`kernel/proc.c`](../../kernel/proc.c)                                   |
-| **Matching `"wait "` with a trailing space**            | Plain `wait` falls through to `exec`, which prints `exec wait failed`.                                       | `main()` in [`user/sh.c`](../../user/sh.c)                                            |
-| **Ignoring the pid from the foreground `wait`**         | A finished background job releases the prompt early, and the grader may type the next command too soon.      | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#the-harness-depends-on-the-prompt)      |
-| **Calling `parsecmd()` in the shell process unguarded** | A typo such as `echo (` makes `panic()` exit the shell; `init` then starts a new one, losing its `cd` state. | `panic()` in [`user/sh.c`](../../user/sh.c), [`user/init.c`](../../user/init.c)       |
-| **Never reaping finished jobs**                         | Zombies accumulate until `fork()` fails with `NPROC` slots in use, and `fork1()` panics.                     | [`kernel/param.h`](../../kernel/param.h), `fork1()` in [`user/sh.c`](../../user/sh.c) |
+| Trap                                                    | Observable consequence                                                                                       | Source to inspect                                                                         |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| **Adding `wait` only as a builtin**                     | It **always** returns immediately: the jobs already belong to `init`.                                        | `reparent()` in [`kernel/proc.c`](../../kernel/proc.c)                                    |
+| **Running `wait` in a forked child**                    | The child has no children of its own, so `wait()` returns `-1`.                                              | `kwait()` in [`kernel/proc.c`](../../kernel/proc.c)                                       |
+| **Matching `"wait "` with a trailing space**            | Plain `wait` falls through to `exec`, which prints `exec wait failed`.                                       | `main()` in [`user/sh.c`](../../user/sh.c)                                                |
+| **Ignoring the pid from the foreground `wait`**         | A finished background job releases the prompt early, and the grader may type the next command too soon.      | [`08-util-sh-prompt.md`](08-util-sh-prompt.md#why-the-grader-requires-the-exact---prompt) |
+| **Calling `parsecmd()` in the shell process unguarded** | A typo such as `echo (` makes `panic()` exit the shell; `init` then starts a new one, losing its `cd` state. | `panic()` in [`user/sh.c`](../../user/sh.c), [`user/init.c`](../../user/init.c)           |
+| **Never reaping finished jobs**                         | Zombies accumulate until `fork()` fails with `NPROC` slots in use, and `fork1()` panics.                     | [`kernel/param.h`](../../kernel/param.h), `fork1()` in [`user/sh.c`](../../user/sh.c)     |
 
-## Verifying it
+## Verifying shell `wait`: build, guest checks, and grading
 
 1. Build and boot:
 
@@ -231,9 +234,9 @@ To observe the reparenting directly, stop in the kernel when the intermediate ch
     finish
     ```
 
-The breakpoint is set after boot so that unrelated exits during startup **do not** stop it. `reparent()` is also called by every later `exit`, so compare `p->pid` with the pids `Ctrl-p` printed. [Docs 09](../09-debugging-xv6.md#manually-debugging-an-xv6-user-program) covers stopping in user code instead.
+The breakpoint is set after boot so that unrelated exits during startup **do not** stop it. `reparent()` is also called by every later `exit`, so compare `p->pid` with the pids `Ctrl-p` printed. [Docs 09](../09-debugging-xv6.md#debug-usersleep-manually-with-add-symbol-file-and-hbreak) covers stopping in user code instead.
 
-## Questions
+## Questions about shell `wait`: direct children and foreground ordering
 
 1. In the unmodified shell, which process forks the background job, and which process is its parent one tick after the prompt returns?
 2. Why does `cd` have to run in `main()` itself, and which part of that reasoning applies to `wait`?

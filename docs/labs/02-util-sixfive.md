@@ -11,9 +11,9 @@ MIT's [`sixfive` exercise](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html
 > [!IMPORTANT]
 > This note contains no solution or pseudocode. It records existing code, the target contract, a source-backed token model, implementation decisions, and common traps.
 
-## What the exercise asks for
+## What the exercise asks for: `sixfive`
 
-### Contract
+### `sixfive` contract
 
 | Aspect                  | Requirement, hint, or local convention                                                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -30,7 +30,7 @@ MIT's [`sixfive` exercise](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html
 
 For example, `/6,` contains the decimal token 6, while `xv6` is one nondecimal token. The separator set contains space, hyphen, carriage return, tab, newline, period, slash, and comma. Neither file start nor EOF is a byte inside that set.
 
-### What the grader checks
+### `sixfive` grader checks
 
 The four tests in [`grade-lab-util`](../../grade-lab-util) total **35 points**. None installs a breakpoint. Each checks the complete, ordered output between a command and its following marker command.
 
@@ -44,11 +44,20 @@ The four tests in [`grade-lab-util`](../../grade-lab-util) total **35 points**. 
 Commas above separate expected output lines; they are not printed punctuation. The EOF fixtures require completing a qualifying final token and discarding a nonqualifying one, while the empty-middle-file case preserves argument order.
 
 > [!IMPORTANT]
-> `assert_command_output()` removes carriage returns, locates the echoed command and its following marker, and compares every intervening line by equality. Extra, missing, reordered, or prefix-only output fails. The transcript is the QEMU console, which receives descriptors 1 and 2 alike, so a diagnostic written to descriptor 2 inside a checked command is still an extra line. These are stronger output checks than the transcript regexes used by the other util tests.
+> **Every intervening output line must match exactly.** Extra, missing, reordered, or prefix-only output fails; these checks are stronger than the transcript regexes used by other util tests.
 
-### What the grader does not prove
+`assert_command_output()` removes carriage returns, locates the echoed command and its following marker, and compares every intervening line by equality. The QEMU console receives descriptors 1 and 2 alike, so a diagnostic written to descriptor 2 inside a checked command is still an extra line.
 
-The fixtures use small values; they establish no integer range or overflow policy. No test forces an actual post-open `read()` failure, mixes file operands with stdin, checks exit status or the diagnostic descriptor, or determines whether processing should continue after one file **cannot** open. Keep those distinctions separate from the [contract](#contract).
+### `sixfive` grader evidence limits
+
+**Unchecked policies and failure paths:**
+
+- **Numeric range:** small fixture values establish no integer range or overflow policy.
+- **Input failures:** no test forces a post-open `read()` failure or decides whether to continue after one file **cannot** open.
+- **Input combination:** no test mixes file operands with stdin.
+- **Process and diagnostic metadata:** no test checks exit status or the diagnostic descriptor.
+
+Keep those distinctions separate from the [contract](#sixfive-contract).
 
 The checked fixture [`user/sixfive.txt`](../../user/sixfive.txt) makes several boundaries observable:
 
@@ -68,7 +77,7 @@ The checked fixture [`user/sixfive.txt`](../../user/sixfive.txt) makes several b
 
 The five intended README results are `6`, `6`, `1810`, `6`, and `1810`: the standalone 6 in “Version 6,” the `/6.1810/` URL components, and the final “MIT's 6.1810.” Text such as `xv6`, `v6`, `6th`, and `x653` remains part of nondecimal tokens because the adjacent letters are not separators.
 
-## Prerequisites
+## `sixfive` prerequisites and references
 
 | When                               | Read                                                                                                             | Why it matters here                                                                                                    |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -78,13 +87,13 @@ The five intended README results are `6`, `6`, `1810`, `6`, and `1810`: the stan
 | **Use when checking divisibility** | [`C_Operators.md`](../../../c-programming/C_Operators.md#arithmetic-operators)                                   | Reviews remainder and inclusive logical OR without prescribing the scanner around them.                                |
 | **Worked comparison**              | [`count_words.c`](../../../c-programming/notes/src/main/library/io_streams/file_streams/text_mode/count_words.c) | Shows persistent token state and an explicit EOF commit in hosted C; its streams and library helpers are not xv6 APIs. |
 
-## Setup in this tree
+## `sixfive` build registration and fixtures
 
 The Makefile already lists `$U/_sixfive` in `UPROGS`, so the linked program is installed in `fs.img` as the guest command `sixfive`. Under `LAB=util`, `UEXTRA` copies [`user/sixfive.txt`](../../user/sixfive.txt) plus the `sf-empty`, `sf-seps`, `sf-edge`, `sf-good-eof`, and `sf-bad-eof` grader fixtures into the image. [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) owns those build and program-layout mechanics.
 
 This note treats the target file as the exercise and neither quotes nor explains it. All code below comes from existing non-target sources.
 
-## The code to read first
+## Code to read first for `sixfive`
 
 | Source                                                                        | Contributes                                                                                                                               | Deliberately does not contribute                                            |
 | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -102,7 +111,7 @@ Everything else this exercise touches is owned elsewhere and is deliberately not
 | **`open`, `read`, and `close` contracts** | [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors)                    |
 | **The kernel-backed descriptor model**    | [`book/ch01`](../book/ch01-operating-system-interfaces.md#descriptors-two-levels-of-indirection) |
 | **Byte streams and EOF**                  | [`07-exercises.md`](../07-exercises.md#ex1copy--the-lecture-1-input-filter)                      |
-| **Grader operation and transcripts**      | [`03-lab-workflow.md`](../03-lab-workflow.md#grading)                                            |
+| **Grader operation and transcripts**      | [`03-lab-workflow.md`](../03-lab-workflow.md#run-graders-and-interpret-failure-transcripts)      |
 
 Two further sibling-repository examples are useful comparisons when working in this personal workspace:
 
@@ -182,7 +191,7 @@ _Blue marks decisions, and yellow marks processing. This diagram shows only word
 
 `wc()` counts a word when its first nonseparator arrives, so EOF needs no extra word-count increment. Its `inword` state survives both individual bytes and buffer refills. Decimal-token recognition has a different contract: letters inside a token invalidate it, and EOF can complete a qualifying value.
 
-## The concept underneath
+## The concept underneath `sixfive`: decimal tokens and file boundaries
 
 > [!IMPORTANT]
 > Keep three independent facts: **only the listed separators end tokens**, **invalid-token state survives later digits**, and **EOF can complete one pending decimal candidate**. Losing any one of them produces plausible output for simple inputs while failing the exercise's boundary cases.
@@ -199,7 +208,7 @@ There are three character classes, not two:
 
 Treating every nondigit as a boundary collapses the last two rows and incorrectly extracts 6 from `xv6`, `6th`, or `:6`. The handout's separator string is therefore a grammar rule, not merely a list of convenient punctuation.
 
-### The minimum token model
+### Token validity, implicit boundaries, and file isolation
 
 | Distinction to preserve               | Contract example                                                                       |
 | ------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -208,7 +217,7 @@ Treating every nondigit as a boundary collapses the last two rows and incorrectl
 | **Explicit versus implicit boundary** | `30` at EOF qualifies even when no separator byte follows it.                          |
 | **One file versus the next**          | Each file has its own implicit start and end boundaries.                               |
 
-These distinctions describe the input language rather than a scanner implementation. A later digit **cannot** repair an earlier nondigit in the same token: `6th 12` contains the nondecimal token `6th` and a new decimal token `12`. File start permits the first token, and EOF completes a pending token before that file ends. Decide how to retain the necessary information using the existing `wc()` comparison above and the [derivation questions](#decisions-and-evidence).
+These distinctions describe the input language rather than a scanner implementation. A later digit **cannot** repair an earlier nondigit in the same token: `6th 12` contains the nondecimal token `6th` and a new decimal token `12`. File start permits the first token, and EOF completes a pending token before that file ends. Decide how to retain the necessary information using the existing `wc()` comparison above and the [derivation questions](#sixfive-decisions-and-source-evidence).
 
 ### Text representation versus numeric value
 
@@ -243,7 +252,12 @@ The hardest type errors in this exercise come from treating bytes, strings, and 
 
 The return from `strchr()` is either a pointer into its first string or null. For membership testing, the pointer's exact address is irrelevant; only null versus non-null matters. The return from `read()` is instead a count, so it **must** remain an integer whose positive, zero, and negative values retain their distinct meanings.
 
-`read()`'s buffer argument is a destination address: for one character object `c`, `&c` names writable storage, while `c` is only its current byte value. Passing `c` supplies a byte value where the kernel needs an address to copy into. `strchr()` needs no second comparison because finding the byte already establishes membership. This tree's implementation checks only characters before the terminating NUL, so searching for NUL returns null, unlike the hosted-C version.
+| Expression for one character object `c` | Meaning as a `read()` argument                                                    |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| `&c`                                    | Destination address naming writable storage.                                      |
+| `c`                                     | Current byte value; it does not supply the address the kernel needs to copy into. |
+
+**`strchr()` membership needs no second comparison:** finding the byte already establishes membership. This tree's implementation checks only characters before the terminating NUL, so searching for NUL returns null, unlike the hosted-C version.
 
 ### Divisible by 5 or 6
 
@@ -258,9 +272,9 @@ Divisibility means the remainder is zero, and the word “or” is inclusive. Ze
 
 ## Deriving `user/sixfive.c`
 
-**Contract:** use the [requirements above](#contract); the decisions below remain yours to derive.
+**Contract:** use the [requirements above](#sixfive-contract); the decisions below remain yours to derive.
 
-### Decisions and evidence
+### `sixfive` decisions and source evidence
 
 1. **Which argument indices are input paths?** Read `main()` in `user/wc.c` and compare the `argc`/`argv` construction in [`02-build-boot-and-usage.md`](../02-build-boot-and-usage.md#how-command-words-reach-main-via-argcargv). What does `argv[0]` contain, which grader test requires a second path, and which descriptor stands in for a path when `argc` is 1?
 2. **What are the three possible `read()` outcomes?** Use the files-and-descriptors table in [`05-syscall-reference.md`](../05-syscall-reference.md#files-and-descriptors). Which result contains a byte, which represents EOF, and which represents failure?
@@ -271,31 +285,33 @@ Divisibility means the remainder is zero, and the word “or” is inclusive. Ze
 7. **How is a completed candidate selected exactly once?** Translate inclusive “multiple of 5 or 6” into remainder questions without printing a common multiple twice.
 8. **Where do failures and cleanup live?** Compare `cat()` and `wc()` plus the multi-file loop in `user/wc.c`. Decide whether one bad path stops all processing or merely reports and advances; the grader does not choose for you. Answer the same question for a `read()` failure after a successful `open()`, so the two failure paths **do not** contradict each other, and decide what the exit status reports.
 
-### Traps
+### `sixfive` token, type, and I/O traps
 
-| Trap                                                                  | Why it fails                                                                                                                                                                                                                                                                                                                    | Source that exposes it                                                                     |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| **Requiring exactly one path**                                        | Passes the two one-file tests but **cannot** satisfy the handout's “for each input file” contract; `sixfive_all` is intended to expose this.                                                                                                                                                                                    | `grade-lab-util`, `user/wc.c`                                                              |
-| **Omitting `kernel/types.h`**                                         | `user/user.h` declares `strlen()`, `memset()`, `malloc()`, and others with `uint`, which `kernel/types.h` defines. Without it, every one of those declarations is a compile error.                                                                                                                                              | `user/user.h`, [docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) |
-| **Rejecting a missing path as a usage error**                         | No argument means standard input, not a mistake. Exiting with a usage message leaves `echo 12 30 7 \| sixfive` printing nothing, and printing one before reading standard input adds a line; the 2026 corner test rejects both because the console includes descriptor 2.                                                       | Handout, `user/cat.c`, `user/wc.c`                                                         |
-| **Treating every nondigit as a separator**                            | Extracts false numbers from `xv6`, `6th`, or `:6`; only the eight allowed bytes are boundaries.                                                                                                                                                                                                                                 | Handout, `README`                                                                          |
-| **Declaring separators as separate strings**                          | `strchr()` expects one NUL-terminated search string and one character, not an array of string pointers.                                                                                                                                                                                                                         | `user/ulib.c`, `user/user.h`                                                               |
-| **Calling `strchr()` on raw read data**                               | A read buffer is not NUL-terminated, so string search can continue into stale or unrelated bytes. Use `strchr()` on the fixed separator string, with the input byte as the search character.                                                                                                                                    | `user/cat.c`, `user/ulib.c`                                                                |
-| **Writing `n = read(...) > 0`**                                       | Relational `>` binds before assignment, so `n` receives 0 or 1 instead of the byte count.                                                                                                                                                                                                                                       | Parenthesized loop in `user/wc.c`                                                          |
-| **Writing `'0' <= c <= '9'`**                                         | C has no chained comparison. The left comparison yields 0 or 1, which is **always** at most `'9'`, so every byte is classified as a digit.                                                                                                                                                                                      | [`C_Operators.md`](../../../c-programming/C_Operators.md)                                  |
-| **Writing a state's name where a comparison was meant**               | An enumeration constant or macro is just a nonzero value, so `n == 0 && SOME_STATE` is true at every EOF regardless of the current state. A file ending in a separator then gains a spurious `0` line, which fails almost every exact-output test.                                                                              | `sf-seps`, `sf-empty`, grader table                                                        |
-| **Iterating to buffer capacity**                                      | Only the first `n` bytes were written by the current call; the rest may contain stale data.                                                                                                                                                                                                                                     | Inner loop in `user/wc.c`                                                                  |
-| **Passing one `char` to `atoi()`**                                    | `atoi()` expects a pointer to a NUL-terminated sequence, not a character value.                                                                                                                                                                                                                                                 | `user/ulib.c`, `user/user.h`                                                               |
-| **Buffering without a terminator or bound**                           | `atoi()` reads until a nondigit, while string functions require NUL-terminated storage; an overlong token can also overwrite adjacent state. Moving the buffer to `malloc()` adds two more: `sizeof` on a pointer gives the pointer's size, not the allocation's, and `user/user.h` declares no `realloc()`.                    | `atoi()` in `user/ulib.c`                                                                  |
-| **Forgetting invalid-token state**                                    | Once a letter shares a token with digits, later digits stay invalid until a real separator; resetting early prints the 6 from `xv6`.                                                                                                                                                                                            | Handout example, contract examples above                                                   |
-| **Resetting token state only after printing**                         | A nonqualifying token **must** be discarded too. Otherwise `7 30` carries the 7 into the next token and evaluates 730.                                                                                                                                                                                                          | `user/sixfive.txt` (`3`, `127`)                                                            |
-| **Treating EOF only as loop termination**                             | Drops the qualifying value in `sf-good-eof` because no separator byte arrives to complete it.                                                                                                                                                                                                                                   | `sf-good-eof`, handout hint                                                                |
-| **Printing the original digit spelling**                              | Produces `06`, while the handout's fixture output requires numeric `6`.                                                                                                                                                                                                                                                         | `user/sixfive.txt`, handout example                                                        |
-| **Accumulating without a range check**                                | Signed `int` overflow is undefined behaviour, and a long digit run produces a wrong or negative value rather than an error. Grouping matters too: in the `atoi()` shape `n * 10 + c - '0'`, the character code is added before `'0'` is subtracted, so the intermediate sum can leave the range even when the final value fits. | `atoi()` in `user/ulib.c`, [range note](#text-representation-versus-numeric-value)         |
-| **Requiring both divisibility tests or using two independent prints** | The first drops values divisible by only one divisor; the second prints common multiples twice.                                                                                                                                                                                                                                 | Handout's inclusive “5 or 6” requirement                                                   |
-| **Ignoring negative `read()` or failed `open()`**                     | Turns an I/O failure into apparent EOF or sends an invalid descriptor into the scanner.                                                                                                                                                                                                                                         | `user/cat.c`, `user/wc.c`, `docs/05`                                                       |
+| Trap                                                                  | Why it fails                                                                                                                                                                                                                                                                                                 | Source that exposes it                                                                     |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| **Requiring exactly one path**                                        | Passes the two one-file tests but **cannot** satisfy the handout's “for each input file” contract; `sixfive_all` is intended to expose this.                                                                                                                                                                 | `grade-lab-util`, `user/wc.c`                                                              |
+| **Omitting `kernel/types.h`**                                         | `user/user.h` declares `strlen()`, `memset()`, `malloc()`, and others with `uint`, which `kernel/types.h` defines. Without it, every one of those declarations is a compile error.                                                                                                                           | `user/user.h`, [docs 02](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise) |
+| **Rejecting a missing path as a usage error**                         | No argument means standard input, not a mistake. Exiting with a usage message leaves `echo 12 30 7 \| sixfive` printing nothing, and printing one before reading standard input adds a line; the 2026 corner test rejects both because the console includes descriptor 2.                                    | Handout, `user/cat.c`, `user/wc.c`                                                         |
+| **Treating every nondigit as a separator**                            | Extracts false numbers from `xv6`, `6th`, or `:6`; only the eight allowed bytes are boundaries.                                                                                                                                                                                                              | Handout, `README`                                                                          |
+| **Declaring separators as separate strings**                          | `strchr()` expects one NUL-terminated search string and one character, not an array of string pointers.                                                                                                                                                                                                      | `user/ulib.c`, `user/user.h`                                                               |
+| **Calling `strchr()` on raw read data**                               | A read buffer is not NUL-terminated, so string search can continue into stale or unrelated bytes. Use `strchr()` on the fixed separator string, with the input byte as the search character.                                                                                                                 | `user/cat.c`, `user/ulib.c`                                                                |
+| **Writing `n = read(...) > 0`**                                       | Relational `>` binds before assignment, so `n` receives 0 or 1 instead of the byte count.                                                                                                                                                                                                                    | Parenthesized loop in `user/wc.c`                                                          |
+| **Writing `'0' <= c <= '9'`**                                         | C has no chained comparison. The left comparison yields 0 or 1, which is **always** at most `'9'`, so every byte is classified as a digit.                                                                                                                                                                   | [`C_Operators.md`](../../../c-programming/C_Operators.md)                                  |
+| **Writing a state's name where a comparison was meant**               | An enumeration constant or macro is just a nonzero value, so `n == 0 && SOME_STATE` is true at every EOF regardless of the current state. A file ending in a separator then gains a spurious `0` line, which fails almost every exact-output test.                                                           | `sf-seps`, `sf-empty`, grader table                                                        |
+| **Iterating to buffer capacity**                                      | Only the first `n` bytes were written by the current call; the rest may contain stale data.                                                                                                                                                                                                                  | Inner loop in `user/wc.c`                                                                  |
+| **Passing one `char` to `atoi()`**                                    | `atoi()` expects a pointer to a NUL-terminated sequence, not a character value.                                                                                                                                                                                                                              | `user/ulib.c`, `user/user.h`                                                               |
+| **Buffering without a terminator or bound**                           | `atoi()` reads until a nondigit, while string functions require NUL-terminated storage; an overlong token can also overwrite adjacent state. Moving the buffer to `malloc()` adds two more: `sizeof` on a pointer gives the pointer's size, not the allocation's, and `user/user.h` declares no `realloc()`. | `atoi()` in `user/ulib.c`                                                                  |
+| **Forgetting invalid-token state**                                    | Once a letter shares a token with digits, later digits stay invalid until a real separator; resetting early prints the 6 from `xv6`.                                                                                                                                                                         | Handout example, contract examples above                                                   |
+| **Resetting token state only after printing**                         | A nonqualifying token **must** be discarded too. Otherwise `7 30` carries the 7 into the next token and evaluates 730.                                                                                                                                                                                       | `user/sixfive.txt` (`3`, `127`)                                                            |
+| **Treating EOF only as loop termination**                             | Drops the qualifying value in `sf-good-eof` because no separator byte arrives to complete it.                                                                                                                                                                                                                | `sf-good-eof`, handout hint                                                                |
+| **Printing the original digit spelling**                              | Produces `06`, while the handout's fixture output requires numeric `6`.                                                                                                                                                                                                                                      | `user/sixfive.txt`, handout example                                                        |
+| **Accumulating without a range check**                                | Signed `int` overflow is undefined behaviour; an unchecked long digit run produces a wrong or negative value rather than an error.                                                                                                                                                                           | `atoi()` in `user/ulib.c`, [range note](#text-representation-versus-numeric-value)         |
+| **Requiring both divisibility tests or using two independent prints** | The first drops values divisible by only one divisor; the second prints common multiples twice.                                                                                                                                                                                                              | Handout's inclusive “5 or 6” requirement                                                   |
+| **Ignoring negative `read()` or failed `open()`**                     | Turns an I/O failure into apparent EOF or sends an invalid descriptor into the scanner.                                                                                                                                                                                                                      | `user/cat.c`, `user/wc.c`, `docs/05`                                                       |
 
-## Verifying it
+**Intermediate arithmetic also needs range headroom.** In the `atoi()` shape `n * 10 + c - '0'`, the character code is added before `'0'` is subtracted. That intermediate sum can leave the range even when the final value fits; grouping therefore matters too.
+
+## Verifying `sixfive`: build, guest checks, and grading
 
 Build the program and a fresh filesystem image from the host:
 
@@ -319,7 +335,15 @@ $ echo 2147483646 2147483648 99999999999990 > sf-range
 $ sixfive sf-range
 ```
 
-This tree extends the handout fixture: compare `sixfive.txt` against the seven-line list in [the grader table](#what-the-grader-checks), not just the handout's original four values. The boundary file should produce the numeric values from `/6,`, `06`, and `30`, while the invalid-token file should produce no values. The standard-input command should print `12` and `30`. The range file straddles the 32-bit `int` limit; its output should follow the overflow policy you chose, and it **must never** be a wrapped or negative number. These are contract checks, not a predicted shell transcript; run them against the implementation and inspect its actual output.
+| Guest check             | Expected contract observation                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `sixfive.txt`           | The seven-line list in [the grader table](#sixfive-grader-checks); this tree extends the handout's original four values. |
+| **Boundary file**       | Numeric values from `/6,`, `06`, and `30`.                                                                               |
+| **Invalid-token file**  | No values.                                                                                                               |
+| **Standard-input pipe** | `12` and `30`.                                                                                                           |
+| **Range file**          | The chosen overflow policy across the 32-bit `int` limit; **never** wrapped or negative output.                          |
+
+These are contract checks, not a predicted shell transcript. Run them against the implementation and inspect its actual output.
 
 Exit QEMU with `Ctrl-a` then `x`, then run the focused grader. A still-running QEMU keeps `fs.img` locked, and the grader then fails with `Failed to get "write" lock` before any test runs:
 
@@ -327,13 +351,13 @@ Exit QEMU with `Ctrl-a` then `x`, then run the focused grader. A still-running Q
 ./grade-lab-util sixfive
 ```
 
-Use `SIXFIVE_PROGRAM=sixfive2 ./grade-lab-util sixfive` once that alternate binary is registered in the image; the expected missing-file diagnostic then uses its program name. Read any failed `xv6.out.*` transcript; interpret a pass using [the evidence limits](#what-the-grader-does-not-prove). No kernel debugger recipe is needed because the meaningful state is entirely inside the user program.
+Use `SIXFIVE_PROGRAM=sixfive2 ./grade-lab-util sixfive` once that alternate binary is registered in the image; the expected missing-file diagnostic then uses its program name. Read any failed `xv6.out.*` transcript; interpret a pass using [the evidence limits](#sixfive-grader-evidence-limits). No kernel debugger recipe is needed because the meaningful state is entirely inside the user program.
 
-### Grader details and transcripts
+### `sixfive` test registration and failure transcripts
 
 The duplicate function name for `sixfive_readme` and `sixfive_all` does not remove either registered test. Both can save to `xv6.out.sixfive_readme`; a later failure can overwrite the earlier failure, and a later pass can remove the shared failure log. [The sleep note](01-util-sleep.md#why-two-tests-can-have-the-same-python-function-name) explains decorator registration. The other paths are `xv6.out.sixfive_test` and `xv6.out.sixfive_corner`.
 
-## Questions
+## Questions about `sixfive`: decimal tokens and file boundaries
 
 1. **Why does `strchr(" -\r\t\n./,", c)` answer a membership question even though its name means “string character”?** Trace the loop and return values in `user/ulib.c`.
 2. **Why is `xv6` one invalid token rather than the token `xv` followed by the number 6?** Identify which character classes the letters belong to and whether any allowed separator occurs.

@@ -1,4 +1,4 @@
-# Repository Workflow
+# xv6 Repository and Git Workflow
 
 ---
 
@@ -8,7 +8,7 @@
 
 How this repository is wired, and the exact git commands for everyday work: syncing with upstream, pushing, tagging labs, and recovering when something goes wrong.
 
-## The shape of it
+## Remotes, branches, and the shared working copy
 
 There are two GitHub repositories and three remotes, but only **one working copy** — this one.
 
@@ -51,7 +51,7 @@ flowchart LR
     class O done
 ```
 
-## One-time setup
+## Configure remotes and conflict-resolution reuse
 
 Already done in this checkout, but recorded here in case you clone it fresh on another machine:
 
@@ -66,9 +66,9 @@ git config rerere.enabled true
 ```
 
 > [!TIP]
-> `rerere` ("reuse recorded resolution") is not optional here — it is what makes the lab workflow bearable. The nine 2025 lab branches were all cut from the same 2025-08-25 base, so each one you merge re-presents the _same_ conflicts against your ever-growing `study` branch. With `rerere` on, git records how you resolved each hunk the first time and replays it automatically on every later merge.
+> **Enable `rerere` ("reuse recorded resolution") before merging labs.** The nine 2025 lab branches were all cut from the same 2025-08-25 base, so each merge re-presents the _same_ conflicts against the growing `study` branch. Git records your first resolution of each hunk and automatically replays it on later merges.
 
-## Everyday commands
+## Git commands for syncing, labs, and snapshots
 
 ### Sync with upstream xv6
 
@@ -82,7 +82,7 @@ git checkout study
 git merge riscv                         # resolve conflicts here, if any
 ```
 
-`--ff-only` is deliberate. If it ever refuses, it means something was committed to `riscv` by mistake — see [Recovery](#recovery) below.
+`--ff-only` is deliberate. If it ever refuses, it means something was committed to `riscv` by mistake — see [Recovery](#recover-stray-commits-and-failed-merges) below.
 
 ### Push your work
 
@@ -143,7 +143,10 @@ This is the single most useful command for revision — it shows your work with 
 
 ## Why merge instead of rebase
 
-You are **never** sending a pull request upstream, so there is no clean-history requirement to pay for. Rebasing would rewrite your growing `study` history every time upstream moves and force a `--force` push each time. Merging resolves each conflict once, keeps your commit dates, and **never** needs a force push.
+**Merge upstream changes into `study`.** This repository never sends pull requests upstream, so it has no clean-history requirement.
+
+- **Rebase:** rewrites the growing `study` history every time upstream moves and requires a `--force` push each time.
+- **Merge:** resolves each conflict once, preserves commit dates, and never needs a force push.
 
 The one place this differs from typical open-source advice is exactly the place it matters: advice to rebase assumes you are preparing commits for someone else to review. Here, nobody reviews them but you.
 
@@ -156,7 +159,7 @@ Cumulative work on one branch matches how the labs actually build on each other,
 > [!NOTE]
 > One consequence worth expecting: after a later lab changes kernel internals (the lock lab restructures `kalloc` and the buffer cache, cow rewrites page-fault handling), re-running an earlier lab's grader may fail. That is usually a genuine regression signal and worth investigating — but not always, since some labs deliberately change behaviour an earlier grader asserted.
 
-## Recovery
+## Recover stray commits and failed merges
 
 **You committed to `riscv` by accident.** Move the commits to `study` and reset the mirror:
 
@@ -167,7 +170,12 @@ git checkout riscv
 git reset --hard upstream/riscv         # discards the stray commit
 ```
 
-**A merge went badly and you want out.** Before committing, `git merge --abort` restores the pre-merge state exactly. After committing, `git reset --hard HEAD~1` drops the merge commit — safe as long as you have not pushed.
+**A merge went badly and you want out.** Choose the recovery command according to whether the merge was committed:
+
+| Merge state                          | Recovery                                                  |
+| ------------------------------------ | --------------------------------------------------------- |
+| **Before committing**                | `git merge --abort` restores the pre-merge state exactly. |
+| **After committing, before pushing** | `git reset --hard HEAD~1` drops the merge commit.         |
 
 **You want to see a conflict resolution `rerere` applied.** `git rerere diff` shows what it replayed; `git checkout --conflict=merge <file>` restores the conflict markers if you disagree with it.
 
@@ -184,13 +192,13 @@ Practical consequences:
 - MIT publishes the labs **only** over `git://` — there is no official HTTPS endpoint, GitHub mirror, or tarball. This is why the labs live on a GitHub fork instead.
 - If you ever need to re-fetch from MIT directly, do it from a network without the proxy (home connection or phone hotspot), then push to your GitHub fork.
 
-## The labs clone
+## Refresh the labs fork from MIT
 
 `~/personal/xv6-labs-2026` is the single local clone of the labs fork. It exists only to reach MIT's `git://` server from an unproxied network and to push what it finds to GitHub; no work happens in it. It carries two remotes:
 
-| Remote     | URL                                      | Role                                                                                              |
-| ---------- | ---------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **origin** | `git@github.com:cv47522/xv6-labs-2026.git` | The GitHub fork, reachable from any network. This is what `labs` in this repository points at.     |
+| Remote     | URL                                        | Role                                                                                                             |
+| ---------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| **origin** | `git@github.com:cv47522/xv6-labs-2026.git` | The GitHub fork, reachable from any network. This is what `labs` in this repository points at.                   |
 | **mit**    | `git://g.csail.mit.edu/xv6-labs-2026`      | MIT's publication point. Works only off the corporate network — see [Network constraints](#network-constraints). |
 
 The earlier `~/personal/xv6-labs-2025` clone was removed once the GitHub fork was renamed to `xv6-labs-2026`; it held nothing that the fork did not already have. The fork itself **must** be kept, since it is the only reachable source of lab starter code.
@@ -204,4 +212,8 @@ git push --force origin mit/<labname>:refs/heads/<labname>
 ```
 
 > [!WARNING]
-> That push rewrites the branch. It is safe here only because nothing depends on the fork's branch tips: `study` carries its own merge of whatever it took, so the commits it merged stay reachable from `cv47522/xv6-riscv` even after the lab branch moves off them. The 2025 `util` tip `db9a9d8` is the worked example — it was replaced by the 2026 branch and is still reachable from `origin/study`. After any such push, run `git fetch --prune labs` here; the replaced branch arrives as a **forced update**, which is expected rather than a sign of damage.
+> **That push rewrites the branch.** It is safe here only because nothing depends on the fork's branch tips: `study` carries its own merge, keeping the merged commits reachable from `cv47522/xv6-riscv` after the lab branch moves.
+
+The 2025 `util` tip `db9a9d8` is the worked example: the 2026 branch replaced it, but it remains reachable from `origin/study`.
+
+After any such push, run `git fetch --prune labs` here. The replaced branch arrives as a **forced update**; this is expected, rather than a sign of damage.

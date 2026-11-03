@@ -2,21 +2,28 @@
 
 ## Documentation Visual Readability
 
+- Apply these rules to all new or substantively edited Markdown, including lecture notes, book notes, lab notes, READMEs, and instruction files. Improve the section being edited; restructure an entire document when a readability pass is requested. Preserve generated output and verbatim quotations.
+- Give each document one descriptive H1. Make headings clear TOC entries by naming the concept, command, function, subsystem, task, or question readers will seek; distinguish related headings by their scope. Replace vague labels with the actual topic, keep a logical heading hierarchy, and update explicit TOCs and incoming anchor links when headings change. Keep required lab and book section labels recognizable by adding subject context where useful.
+- Lead each substantive learning section with its main takeaway or a compact structure exposing its mechanism. Aim for one idea per paragraph, usually two or three sentences. Inspect paragraphs exceeding roughly 80 words or containing four or more sentences; restructure shorter ones when they bury several steps, alternatives, conditions, or exceptions. Word and sentence counts are review triggers, not hard limits; do not count rendered lines or introduce hard wraps.
 - Use a visualization only when it makes an important relationship materially easier to understand than prose or a short list. **Do not** add one merely because a section is long.
 - Preserve every technical detail when restructuring documentation. A visual may reorganize or front-load information, but it **must not** silently simplify away invariants, failure behavior, exceptions, values, or source references.
 - Layer complex explanations when necessary: lead with a compact visual overview, then retain the detailed explanation immediately below it.
 - Keep nuanced causal reasoning in prose. **Do not** cram paragraph-sized explanations into Mermaid nodes or oversized table cells.
 - Prefer the smallest visual that matches the information shape:
 
-| Information shape                                                      | Preferred presentation                |
-| ---------------------------------------------------------------------- | ------------------------------------- |
-| **Control flow, lifecycle, or state transition**                       | Mermaid flowchart or sequence diagram |
-| **Pointers, ownership, sharing, or reference counts**                  | Object graph                          |
-| **Conditions, branches, and outcomes**                                 | Decision or state table               |
-| **Ordered operations without meaningful branching**                    | Numbered list                         |
-| **Repeated fields, alternatives, naming, or architecture differences** | Comparison table                      |
-| **Hierarchy, nesting, or parent/child relationships**                  | Tree or flowchart                     |
-| **Critical invariant or deliberate exception**                         | GitHub-style callout                  |
+| Information shape                                                      | Preferred presentation                                      |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Control flow, lifecycle, or state transition**                       | Mermaid flowchart or sequence diagram                       |
+| **Pointers, ownership, sharing, or reference counts**                  | Object graph                                                |
+| **Conditions, branches, and outcomes**                                 | Decision or state table                                     |
+| **Ordered operations without meaningful branching**                    | Numbered list                                               |
+| **Repeated fields, alternatives, naming, or architecture differences** | Comparison table                                            |
+| **Hierarchy, nesting, or parent/child relationships**                  | Tree or flowchart                                           |
+| **Critical invariant or deliberate exception**                         | GitHub-style callout                                        |
+| **Independent points or responsibilities**                             | Bullets with short, descriptive lead-ins                    |
+| **Syntax, commands, or concrete input/output**                         | Fenced code block                                           |
+| **Memory layout or meaningful spatial placement**                      | Table; Excalidraw when geometry teaches something important |
+| **Why something happens**                                              | Short causal prose beside the relevant structure            |
 
 - Use callouts deliberately: `NOTE` for context or invariants, `TIP` for practical workflow advice, `IMPORTANT` for decisions readers **must** preserve, `WARNING` for likely mistakes, and `CAUTION` for destructive or difficult-to-recover consequences. **Do not** use callouts as decoration or as a substitute for ordinary exposition.
 - In tables that compare or summarize named items, bold the first-column value unless it is a raw identifier, command, path, URL, or value readers need to copy exactly.
@@ -24,6 +31,8 @@
 - Use the repository's light-theme Mermaid palette consistently: request `#fff0f0`, decision or routing `#f0f0ff`, data movement `#f0fff0`, processing `#fffff0`, commit `#f0ffff`, and stall or failure `#ffd9d9`.
 - Keep diagrams focused. If a diagram needs dense prose, many cross-links, or more than a quick glance to decode, split it or return the detail to prose.
 - Preserve existing effective comprehension aids. Tables, examples, summaries, and callouts are not redundant when they help readers orient, compare, or retain information.
+- Bold short retrieval cues and decisive conclusions selectively. Keep list items and callouts concise too; moving a paragraph into a bullet or callout does not resolve its density. Reorganize detailed explanations without duplicating the original paragraph in full.
+- Before finishing any substantive learning note, perform a scan check using only headings, bold cues, lists, tables, callouts, diagrams, and examples. Readers must be able to identify the main idea, follow the mechanism, and locate the relevant invariants, failure modes, source evidence, and verification commands where applicable. Then read the prose to confirm that the causal reasoning and every technical qualification survived. The more specific lab-note scan check still applies to lab notes.
 
 ## C Source Style
 
@@ -111,9 +120,9 @@ The documentation visual-readability rules above apply inside `.c` and `.h` comm
 
 Choose the information shape first using [Documentation Visual Readability](#documentation-visual-readability). A table or numbered list may explain it better than either diagram format.
 
-| Format | Use when | Why |
-| --- | --- | --- |
-| **Inline Mermaid** | Relationships, file dependencies, control flow, state transitions, or message order carry the meaning. | Labels and branches live beside the explanation and remain reviewable in a text diff; no separate export is needed. |
+| Format                                | Use when                                                                                                          | Why                                                                                                                  |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| **Inline Mermaid**                    | Relationships, file dependencies, control flow, state transitions, or message order carry the meaning.            | Labels and branches live beside the explanation and remain reviewable in a text diff; no separate export is needed.  |
 | **Excalidraw source plus SVG export** | Spatial placement, alignment, custom annotation, or a sketch carries meaning that automatic layout would obscure. | Manual composition can show memory regions, byte layouts, or a book figure more clearly when their geometry matters. |
 
 - Prefer Mermaid for new logical diagrams. Use Excalidraw when its layout teaches something the automatic graph would lose; a simple memory map may still be clearer as a table.

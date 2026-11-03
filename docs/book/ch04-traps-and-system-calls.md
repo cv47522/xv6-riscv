@@ -37,6 +37,8 @@ _“Outline of how a trap from user code is handled.” — redrawn from `trap.t
 
 ## What xv6 actually does
 
+The current canonical walkthroughs of [system-call arguments and user-memory copies](../11-os-design-in-xv6.md#system-call-arguments-and-user-memory) (book §4.4) and [traps from kernel space](../11-os-design-in-xv6.md#kernel-space-traps-dispatch-preemption-and-return) (book §4.5) are held on loan in the OS-design note. Move them here when writing this chapter; preserve the lazy-page branches, permission checks, stack ownership, and interrupt-window invariants.
+
 ## Divergences
 
 ## Code walked through

@@ -24,7 +24,7 @@ _“Layout of a process's virtual address space” — [book figure](fig/README.
 
 ### One program in supervisor mode
 
-Xv6 is monolithic in the most literal sense: every `.c` and `.S` file in `kernel/` links into the single `kernel/kernel` binary, and `kernel/kernel.ld` places its first instruction at `0x80000000` (`KERNBASE` in `kernel/memlayout.h`). The book's source-file table lists 27 files, and this tree has exactly those 27; [11-os-design-in-xv6.md](../11-os-design-in-xv6.md#the-machine-xv6-runs-on) records their measured size. Because there is no second privileged program, the kernel interface _is_ the system-call interface, which [05-syscall-reference.md](../05-syscall-reference.md#what-a-system-call-actually-is-here) catalogues.
+Xv6 is monolithic in the most literal sense: every `.c` and `.S` file in `kernel/` links into the single `kernel/kernel` binary, and `kernel/kernel.ld` places its first instruction at `0x80000000` (`KERNBASE` in `kernel/memlayout.h`). The book's source-file table lists 27 files, and this tree has exactly those 27; [11-os-design-in-xv6.md](../11-os-design-in-xv6.md#qemu-machine-configuration-and-physical-memory-map) records their measured size. Because there is no second privileged program, the kernel interface _is_ the system-call interface, which [05-syscall-reference.md](../05-syscall-reference.md#system-call-path-declaration-stub-dispatch-implementation) catalogues.
 
 ### A process is an address space plus a thread
 
@@ -55,7 +55,7 @@ The book describes five run states informally; `enum procstate` in `kernel/proc.
 
 **Assembly prerequisite:** [CSR fields and privilege returns](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md). Use it for the machine-level foundation before reading this tree’s implementation below.
 
-Each step runs once, in order, so a numbered list carries it. [11-os-design-in-xv6.md](../11-os-design-in-xv6.md#from-boot-to-the-first-process) draws the same path as a flowchart with the symbols' addresses.
+Each step runs once, in order, so a numbered list carries it. [11-os-design-in-xv6.md](../11-os-design-in-xv6.md#kernel-boot-from-entry-to-the-first-user-process) draws the same path as a flowchart with the symbols' addresses.
 
 1. QEMU (`-bios none`) loads `kernel/kernel` at `0x80000000` and starts **every** hart at `_entry` in `kernel/entry.S`, in machine mode with paging off.
 2. `_entry` gives each hart its own 4096-byte slice of `stack0[4096 * NCPU]` (declared in `kernel/start.c`) and calls `start()`.
@@ -124,6 +124,6 @@ Quoted from `kernel/entry.S`, comments removed. The `+ 1` is there because RISC-
 ## Lab connection
 
 - [The util `memdump` note](../labs/03-util-memdump.md) relies on this chapter's address-space picture for what a user virtual address is.
-- The chapter's one exercise, a system call that reports free memory, crosses both halves of this chapter's organization: the system-call path that [05-syscall-reference.md](../05-syscall-reference.md#what-a-system-call-actually-is-here) and [ch04](ch04-traps-and-system-calls.md) describe, and the physical page allocator in `kernel/kalloc.c`.
+- The chapter's one exercise, a system call that reports free memory, crosses both halves of this chapter's organization: the system-call path that [05-syscall-reference.md](../05-syscall-reference.md#system-call-path-declaration-stub-dispatch-implementation) and [ch04](ch04-traps-and-system-calls.md) describe, and the physical page allocator in `kernel/kalloc.c`.
 
 [ostep]: ../../../operating-system/Introduction_to_Operating_Systems.md

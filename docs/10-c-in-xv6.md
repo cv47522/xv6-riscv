@@ -1,4 +1,4 @@
-# C in xv6
+# C in xv6: user memory, binary tools, and kernel examples
 
 ---
 
@@ -6,45 +6,58 @@
 
 ---
 
-The companion to Lecture 2, [_programming xv6 in C_](../lectures/l-c.txt), and Homework 2, [_kernel C_](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-c.html). The lecture is "not a general intro to C", and neither is this note: generic C lives in `../c-programming/`, and this file owns only what is specific to xv6 — where things land in memory, what the toolchain shows, and which kernel files use each idea.
+This note connects Lecture 2, [_programming xv6 in C_](../lectures/l-c.txt), and Homework 2, [_kernel C_](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-c.html), to this tree:
+
+- **Memory:** where code, data, arguments, stack, and heap land.
+- **Tools:** what the built binaries show through `objdump` and `nm`.
+- **Kernel examples:** which source files use the lecture's C concepts.
+
+The lecture is "not a general intro to C"; generic language material lives in `../c-programming/`.
 
 > [!NOTE]
 > Ownership follows the [book notes rule](book/README.md): `../c-programming/` owns the language, [Memory Management and Organization](../../operating-system/Memory_Management.md) owns the shared memory-layout and storage-class reference, this note owns xv6's use of those concepts, and [`07-exercises.md`](07-exercises.md#lecture-2--c-and-memory) owns the practice programs. Read the linked C note when a row below is unfamiliar; do not expect it restated here.
 
-## Lecture topic map
+## Lecture 2 topic map: C references and xv6 practice
 
-| Lecture topic              | Generic C (read when needed)                                                                                                   | xv6-specific, in this note                                                                                                       | Practice                                |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| **Why C?**                 | —                                                                                                                              | [Why C, as this tree shows it](#why-c-as-this-tree-shows-it)                                                                     | —                                       |
-| **Memory layout**          | [Memory Management and Organization](../../operating-system/Memory_Management.md#memory-segments-overview)                     | [The user address space](#the-user-address-space)                                                                                | [`user/ptr.c`](../user/ptr.c)           |
-| **From `cat.c` to `_cat`** | [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md)                                                         | [Looking inside a user binary](#looking-inside-a-user-binary); ELF in [06-build-artifacts.md](06-build-artifacts.md#what-elf-is) | —                                       |
-| **Pointers**               | [C_Pointers.md](../../c-programming/C_Pointers.md), [C_Pointer_Declarations.md](../../c-programming/C_Pointer_Declarations.md) | [`argv` and the calling convention](#argv-and-the-calling-convention)                                                            | [`user/ptr.c`](../user/ptr.c)           |
-| **Arrays**                 | [C_Array.md](../../c-programming/C_Array.md), [C_Pointer_Arithmetic.md](../../c-programming/C_Pointer_Arithmetic.md)           | [Strings in `ulib.c`](#strings-in-ulibc)                                                                                         | [`user/array.c`](../user/array.c)       |
-| **Strings**                | [C_String.md](../../c-programming/C_String.md)                                                                                 | [Strings in `ulib.c`](#strings-in-ulibc), `struct dirent`                                                                        | [`user/str.c`](../user/str.c)           |
-| **Structs**                | [C_Custom_Data_Types.md](../../c-programming/C_Custom_Data_Types.md#same-structs-ilp32-and-lp64)                               | [Homework 2](#homework-2-struct-addresses)                                                                                       | [`user/hwstruct.c`](../user/hwstruct.c) |
-| **Lists**                  | [C_Linked_List.md](../../c-programming/C_Linked_List.md)                                                                       | [Two kernel lists](#two-kernel-lists)                                                                                            | —                                       |
-| **Bitwise operators**      | [C_Bitwise_Module.md](../../c-programming/C_Bitwise_Module.md)                                                                 | [Flags in `fcntl.h`](#flags-in-fcntlh)                                                                                           | —                                       |
-| **`static`, `void`**       | [Storage Class Specifiers](../../operating-system/Memory_Management.md#storage-class-specifiers)                               | [Keywords and common bugs](#keywords-and-common-bugs)                                                                            | —                                       |
-| **Common C bugs**          | [C_Valgrind.md](../../c-programming/C_Valgrind.md), [C_Dynamic_Memory.md](../../c-programming/C_Dynamic_Memory.md)             | [Keywords and common bugs](#keywords-and-common-bugs)                                                                            | [`user/str.c`](../user/str.c)           |
+| Lecture topic              | Generic C (read when needed)                                                                                                   | xv6-specific, in this note                                                                                                                                          | Practice                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| **Why C?**                 | —                                                                                                                              | [Why C, as this tree shows it](#why-c-suits-this-kernel-instructions-hardware-runtime-and-memory)                                                                   | —                                       |
+| **Memory layout**          | [Memory Management and Organization](../../operating-system/Memory_Management.md#memory-segments-overview)                     | [The user address space](#user-address-space-text-data-guard-stack-and-heap)                                                                                        | [`user/ptr.c`](../user/ptr.c)           |
+| **From `cat.c` to `_cat`** | [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md)                                                         | [Looking inside a user binary](#inspect-usercat-with-objdump-and-nm); ELF in [06-build-artifacts.md](06-build-artifacts.md#elf-headers-segments-and-load-addresses) | —                                       |
+| **Pointers**               | [C_Pointers.md](../../c-programming/C_Pointers.md), [C_Pointer_Declarations.md](../../c-programming/C_Pointer_Declarations.md) | [`argv` and the calling convention](#argv-and-the-calling-convention)                                                                                               | [`user/ptr.c`](../user/ptr.c)           |
+| **Arrays**                 | [C_Array.md](../../c-programming/C_Array.md), [C_Pointer_Arithmetic.md](../../c-programming/C_Pointer_Arithmetic.md)           | [Strings in `ulib.c`](#strings-in-ulibc)                                                                                                                            | [`user/array.c`](../user/array.c)       |
+| **Strings**                | [C_String.md](../../c-programming/C_String.md)                                                                                 | [Strings in `ulib.c`](#strings-in-ulibc), `struct dirent`                                                                                                           | [`user/str.c`](../user/str.c)           |
+| **Structs**                | [C_Custom_Data_Types.md](../../c-programming/C_Custom_Data_Types.md#same-structs-ilp32-and-lp64)                               | [Homework 2](#homework-2-struct-addresses)                                                                                                                          | [`user/hwstruct.c`](../user/hwstruct.c) |
+| **Lists**                  | [C_Linked_List.md](../../c-programming/C_Linked_List.md)                                                                       | [Two kernel lists](#kernel-lists-free-pages-and-the-buffer-cache-lru)                                                                                               | —                                       |
+| **Bitwise operators**      | [C_Bitwise_Module.md](../../c-programming/C_Bitwise_Module.md)                                                                 | [Flags in `fcntl.h`](#lp64-type-widths-and-open-flags-in-fcntlh)                                                                                                    | —                                       |
+| **`static`, `void`**       | [Storage Class Specifiers](../../operating-system/Memory_Management.md#storage-class-specifiers)                               | [Keywords and common bugs](#static-void-and-kernel-defenses-against-c-memory-bugs)                                                                                  | —                                       |
+| **Common C bugs**          | [C_Valgrind.md](../../c-programming/C_Valgrind.md), [C_Dynamic_Memory.md](../../c-programming/C_Dynamic_Memory.md)             | [Keywords and common bugs](#static-void-and-kernel-defenses-against-c-memory-bugs)                                                                                  | [`user/str.c`](../user/str.c)           |
 
-## Why C, as this tree shows it
+## Why C suits this kernel: instructions, hardware, runtime, and memory
 
-The lecture opens with reasons for writing a kernel in C. The language-level argument is general; this table shows only where each claim is visible in this tree. The lecture's "why not?" — incorrect and insecure code is easy to write — is mapped onto xv6 in [Keywords and common bugs](#keywords-and-common-bugs).
+The lecture opens with reasons for writing a kernel in C. The language-level argument is general; this table shows only where each claim is visible in this tree. The lecture's "why not?" — incorrect and insecure code is easy to write — is mapped onto xv6 in [Keywords and common bugs](#static-void-and-kernel-defenses-against-c-memory-bugs).
 
 | Lecture claim                            | Where this tree shows it                                                                                                                                                                                                                                            |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Easy mapping to RISC-V instructions**  | `user/cat.asm` (`objdump -S`) interleaves each line of `cat.c` with the few instructions compiled from it; see [Looking inside a user binary](#looking-inside-a-user-binary).                                                                                       |
+| **Easy mapping to RISC-V instructions**  | `user/cat.asm` (`objdump -S`) interleaves each line of `cat.c` with the few instructions compiled from it; see [Looking inside a user binary](#inspect-usercat-with-objdump-and-nm).                                                                                |
 | **C types map onto hardware structures** | `kernel/uart.c` names 16550 register bits as masks (`LSR_TX_IDLE` is `(1 << 5)`), reaches registers through a `volatile unsigned char *` in `Reg()`, and enables interrupts with `WriteReg(IER, IER_TX_ENABLE \| IER_RX_ENABLE)`.                                   |
 | **Minimal runtime**                      | No host C library: the Makefile compiles with `-ffreestanding` and `-nostdlib`, every user program links only `ULIB` (`ulib.o`, `usys.o`, `printf.o`, `umalloc.o`; plus `statistics.o` under `LAB=lock`), and `start()` in `user/ulib.c` is the whole startup code. |
 | **Explicit memory management**           | No garbage collector: the kernel hands out pages with `kalloc()` and `kfree()` in `kernel/kalloc.c`, and user programs get memory from `malloc()` and `free()` in `user/umalloc.c`, which grow the heap with `sbrk()`.                                              |
 
-## The user address space
+## User address space: text, data, guard, stack, and heap
 
 Every address below was printed by [`ptr`](../user/ptr.c) and [`array`](../user/array.c) in this tree with `LAB=util`; the shape is the book's figure below, also captioned in [ch03](book/ch03-page-tables.md#figures).
 
 ![A tall column for a user address space, with an exploded panel opening the stack region](book/fig/processlayout.svg)
 
-_“A process's user address space, with its initial stack.” — [book figure](book/fig/README.md), `mem.tex` `fig:processlayout`. From 0 up: **text** (R-XU), **data**, a **guard page**, the **stack**, the **heap** (R-WU), unused space, then **trapframe** (R-W-) and **trampoline** (RX--) under `MAXVA`; the exploded panel shows the stack's top as the argument strings, a zero marking the end of `argv`, and the `argv[]` pointers below them. Read it as the overview and the table below as this build's evidence: the drawing's lower regions are the table's rows with real addresses, except that it draws one stack page where `LAB_UTIL` gives two. The table stops at the heap because the two top pages lack `U`, so no user program can print from them; [Lecture 3](11-os-design-in-xv6.md#where-the-boundary-is-enforced) attacks exactly those pages. The exploded panel is exactly what [`argv` and the calling convention](#argv-and-the-calling-convention) builds step by step._
+_“A process's user address space, with its initial stack.” — [book figure](book/fig/README.md), `mem.tex` `fig:processlayout`; also captioned in [ch03](book/ch03-page-tables.md#figures)._
+
+Read the drawing as the layout overview and the table as evidence from this build:
+
+- **Low to high:** text (R-XU), data, guard page, stack, heap (R-WU), unused space, then trapframe (R-W-) and trampoline (RX--) below `MAXVA`.
+- **Stack detail:** the exploded panel places argument strings at the top, a zero ending `argv`, and `argv[]` pointers below. [`argv` and the calling convention](#argv-and-the-calling-convention) builds that panel step by step.
+- **Build difference:** the drawing has one stack page; `LAB_UTIL` gives two.
+- **Table boundary:** the real-address table stops at the heap. The top two pages lack `U`, so a user program cannot print from them; [Lecture 3](11-os-design-in-xv6.md#program-isolation-hardware-faults-and-kernel-checks) attacks those pages.
 
 | Address           | Region             | What lands there                                                          | Set by                                     |
 | ----------------- | ------------------ | ------------------------------------------------------------------------- | ------------------------------------------ |
@@ -113,7 +126,9 @@ This arrangement keeps the low user image, guard, stack, and heap under one size
 
 The Linux comparison is illustrated in [Memory Management and Organization](../../operating-system/Memory_Management.md#linux-and-xv6-same-roles-different-layouts).
 
-## Looking inside a user binary
+<a id="inspect-usercat-with-objdump-and-nm"></a>
+
+## Inspect user/\_cat with objdump and nm
 
 Practice the tools on a smaller C/assembly program in [C, ELF, linker symbols, and disassembly](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md). The details below apply to this xv6 tree.
 
@@ -134,7 +149,7 @@ riscv64-linux-gnu-nm -n user/_cat           # symbols sorted by address
 | **Where is `buf`?**                | `0000000000001010 B buf`: `B` is `.bss`. The file stores no bytes for it (`filesz 0`, `memsz 0x220` in the second `LOAD` header), so `kexec()` **must** allocate and zero it.                                                                       |
 | **Two `cat`s at once?**            | Both use virtual address `0x0` for text; per-process page tables map them to different physical pages. That is Lecture 4.                                                                                                                           |
 
-The general ELF and `.asm` material belongs to [06-build-artifacts.md](06-build-artifacts.md#what-elf-is); the build graph that produces these files is in [08-makefile-tour.md](08-makefile-tour.md).
+The general ELF and `.asm` material belongs to [06-build-artifacts.md](06-build-artifacts.md#elf-headers-segments-and-load-addresses); the build graph that produces these files is in [08-makefile-tour.md](08-makefile-tour.md).
 
 ## `argv` and the calling convention
 
@@ -165,10 +180,10 @@ The strings are 16 bytes apart, with the array below them. The book's Figure 3.4
 
 ## Strings in `ulib.c`
 
-| Function       | Style        | Code in `user/ulib.c`                                           |
-| -------------- | ------------ | --------------------------------------------------------------- |
-| **`strlen()`** | array index  | `for (n = 0; s[n]; n++)`                                        |
-| **`strcmp()`** | pointer walk | `while (*p && *p == *q) p++, q++;` then `(uchar)*p - (uchar)*q` |
+| Function   | Style        | Code in `user/ulib.c`                                           |
+| ---------- | ------------ | --------------------------------------------------------------- |
+| `strlen()` | array index  | `for (n = 0; s[n]; n++)`                                        |
+| `strcmp()` | pointer walk | `while (*p && *p == *q) p++, q++;` then `(uchar)*p - (uchar)*q` |
 
 Both stop at the terminating `0`, which is the only length a C string carries.
 
@@ -181,7 +196,7 @@ Both stop at the terminating `0`, which is the only length a C string carries.
 | `name` is marked `__attribute__((nonstring))`.                                                                                | It explicitly allows that non-string representation. |
 | The `ls.c` `T_DIR` case and [`ex9ls`](07-exercises.md#ex9ls--a-directory-is-a-file) copy the name into a `DIRSIZ + 1` buffer. | The extra byte leaves room for the terminator.       |
 
-## Two kernel lists
+## Kernel lists: free pages and the buffer-cache LRU
 
 ```mermaid
 flowchart TD
@@ -204,10 +219,10 @@ flowchart TD
 
 Green nodes hold data (a free page or a cached block); blue nodes are list roots, the sentinel, and the terminator. Solid arrows are `next`, dashed arrows are `prev`.
 
-| List                | Node type                                             | Insert                                                         | Remove                          | Why that shape                                                                                         |
-| ------------------- | ----------------------------------------------------- | -------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| **`kmem.freelist`** | `struct run`, stored _inside_ the free 4096-byte page | `kfree()` prepends                                             | `kalloc()` takes the front      | Only the front is ever touched, so one `next` pointer is enough and the list costs no memory.          |
-| **`bcache.head`**   | `struct buf`, `prev` and `next` in `kernel/buf.h`     | `brelse()` moves a buffer to the front when `refcnt` reaches 0 | `bget()` recycles from the back | Moving an arbitrary node to the front needs its predecessor, which only `prev` gives in constant time. |
+| List            | Node type                                             | Insert                                                         | Remove                          | Why that shape                                                                                         |
+| --------------- | ----------------------------------------------------- | -------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `kmem.freelist` | `struct run`, stored _inside_ the free 4096-byte page | `kfree()` prepends                                             | `kalloc()` takes the front      | Only the front is ever touched, so one `next` pointer is enough and the list costs no memory.          |
+| `bcache.head`   | `struct buf`, `prev` and `next` in `kernel/buf.h`     | `brelse()` moves a buffer to the front when `refcnt` reaches 0 | `bget()` recycles from the back | Moving an arbitrary node to the front needs its predecessor, which only `prev` gives in constant time. |
 
 When moving a buffer, `brelse()`:
 
@@ -216,15 +231,26 @@ When moving a buffer, `brelse()`:
 
 The sentinel means neither step needs an empty-list special case.
 
-## Flags in `fcntl.h`
+## LP64 type widths and open() flags in fcntl.h
 
-The lecture's bit widths are this toolchain's LP64 sizes. `riscv64-linux-gnu-gcc -dM -E` predefines `__CHAR_BIT__` 8, `__SIZEOF_INT__` 4, `__SIZEOF_LONG__` 8, `__SIZEOF_POINTER__` 8, and `_LP64`; the Makefile passes `-march=rv64gc` and no `-mabi`, so the default 64-bit ABI applies:
+**This build uses LP64:** the Makefile passes `-march=rv64gc` and no `-mabi`, so the toolchain's default 64-bit ABI applies.
+
+`riscv64-linux-gnu-gcc -dM -E` predefines `_LP64` and these size macros:
+
+| Macro                | Value |
+| -------------------- | ----- |
+| `__CHAR_BIT__`       | 8     |
+| `__SIZEOF_INT__`     | 4     |
+| `__SIZEOF_LONG__`    | 8     |
+| `__SIZEOF_POINTER__` | 8     |
+
+The corresponding type widths are:
 
 | Type        | Bits |
 | ----------- | ---- |
-| **`char`**  | 8    |
-| **`int`**   | 32   |
-| **`long`**  | 64   |
+| `char`      | 8    |
+| `int`       | 32   |
+| `long`      | 64   |
 | **pointer** | 64   |
 
 `kernel/fcntl.h` defines the flags:
@@ -239,24 +265,24 @@ The lecture's bit widths are this toolchain's LP64 sizes. `riscv64-linux-gnu-gcc
 
 Each uses one bit except `O_RDONLY`, which is the absence of the write bits. User code combines them with `|` (`O_CREATE|O_RDWR` in `user/usertests.c`), and `sys_open()` in `kernel/sysfile.c` tests them with `&`:
 
-| Test in `sys_open()`                           | Meaning                           |
-| ---------------------------------------------- | --------------------------------- |
-| **`omode & O_CREATE`**                         | create the file if it is missing  |
-| **`!(omode & O_WRONLY)`**                      | readable unless opened write-only |
-| **`(omode & O_WRONLY) \|\| (omode & O_RDWR)`** | writable in either write mode     |
-| **`(omode & O_TRUNC) && ip->type == T_FILE`**  | truncate plain files only         |
+| Test in `sys_open()`                       | Meaning                           |
+| ------------------------------------------ | --------------------------------- |
+| `omode & O_CREATE`                         | create the file if it is missing  |
+| `!(omode & O_WRONLY)`                      | readable unless opened write-only |
+| `(omode & O_WRONLY) \|\| (omode & O_RDWR)` | writable in either write mode     |
+| `(omode & O_TRUNC) && ip->type == T_FILE`  | truncate plain files only         |
 
 > [!WARNING]
 > Because `O_RDONLY` is `0`, `omode & O_RDONLY` is always false; read-only is detected as "no write bit".
 
 Page-table entry flags in `kernel/riscv.h` (`PTE_V`, `PTE_R`, `PTE_W`, `PTE_X`, `PTE_U`) are the lecture's "more interesting examples later".
 
-## Keywords and common bugs
+## static, void, and kernel defenses against C memory bugs
 
 | Item                       | xv6 example                                                            | What xv6 does about it                                                                                                                                                                       |
 | -------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`static`**               | `static Header *freep` in `user/umalloc.c`                             | file-scope global: visible to `malloc`/`free`, invisible to user programs; lives in `.bss`, so it starts at `0`                                                                              |
-| **`void`**                 | `main(void)`, `void *` from `malloc()`, `void` return of `kfree()`     | no parameters, untyped pointer, no value                                                                                                                                                     |
+| `static`                   | `static Header *freep` in `user/umalloc.c`                             | file-scope global: visible to `malloc`/`free`, invisible to user programs; lives in `.bss`, so it starts at `0`                                                                              |
+| `void`                     | `main(void)`, `void *` from `malloc()`, `void` return of `kfree()`     | no parameters, untyped pointer, no value                                                                                                                                                     |
 | **Use after free**         | a stale pointer into a freed page                                      | `kfree()` fills the page with `1`s (`memset(pa, 1, PGSIZE)`) so a dangling read sees junk, not plausible data                                                                                |
 | **Double free / bad free** | `kfree()` of an unaligned or out-of-range address                      | `panic("kfree")` on a misaligned page or one outside `end`..`PHYSTOP`; a true double free of a valid page is _not_ detected                                                                  |
 | **Uninitialized memory**   | a local, or a page from `kalloc()`                                     | `kalloc()` fills new pages with `5`s; stack locals hold whatever was there                                                                                                                   |
@@ -277,24 +303,24 @@ struct h { struct f *f; struct g g; };
 struct h *h;
 ```
 
-| Member             | 32-bit offset    | Size | 64-bit xv6 offset | Size |
-| ------------------ | ---------------- | ---- | ----------------- | ---- |
-| **`h->f`**         | `0x00`           | 4    | `0x00`            | 8    |
-| **`h->g.c`**       | `0x04`           | 4    | `0x08`            | 8    |
-| **`h->g.d[0..3]`** | `0x08`–`0x17`    | 16   | `0x10`–`0x1F`     | 16   |
-| **`sizeof`**       | f 36, g 20, h 24 |      | f 36, g 24, h 32  |      |
+| Member         | 32-bit offset    | Size | 64-bit xv6 offset | Size |
+| -------------- | ---------------- | ---- | ----------------- | ---- |
+| `h->f`         | `0x00`           | 4    | `0x00`            | 8    |
+| `h->g.c`       | `0x04`           | 4    | `0x08`            | 8    |
+| `h->g.d[0..3]` | `0x08`–`0x17`    | 16   | `0x10`–`0x1F`     | 16   |
+| `sizeof`       | f 36, g 20, h 24 |      | f 36, g 24, h 32  |      |
 
-| Expression        | 32-bit answer                     | Determinable? | Why                                                                      |
-| ----------------- | --------------------------------- | ------------- | ------------------------------------------------------------------------ |
-| **`&h->g.d[2]`**  | `0x1000 + 4 + 4 + 2*4` = `0x1010` | yes           | pure offset arithmetic                                                   |
-| **`&h->f->a`**    | `h->f + 0`                        | no            | needs the pointer _stored_ at `0x1000`, which the question does not give |
-| **`&h->g.c`**     | `0x1000 + 4` = `0x1004`           | yes           | pure offset arithmetic                                                   |
-| **`&h->g.c[10]`** | `h->g.c + 10`                     | no            | needs the pointer stored at `0x1004`; `char` scales by 1                 |
+| Expression    | 32-bit answer                     | Determinable? | Why                                                                      |
+| ------------- | --------------------------------- | ------------- | ------------------------------------------------------------------------ |
+| `&h->g.d[2]`  | `0x1000 + 4 + 4 + 2*4` = `0x1010` | yes           | pure offset arithmetic                                                   |
+| `&h->f->a`    | `h->f + 0`                        | no            | needs the pointer _stored_ at `0x1000`, which the question does not give |
+| `&h->g.c`     | `0x1000 + 4` = `0x1004`           | yes           | pure offset arithmetic                                                   |
+| `&h->g.c[10]` | `h->g.c + 10`                     | no            | needs the pointer stored at `0x1004`; `char` scales by 1                 |
 
 > [!IMPORTANT]
 > `&` cancels only the final access. `&h->f->a` is `&((*h).f)->a`: the compiler must still load `h->f` to know where `a` is.
 
-No padding appears in either ABI because every member's offset is already a multiple of its alignment; [`docs/labs/03-util-memdump.md`](labs/03-util-memdump.md#structure-layout) covers the LP64 alignment rules.
+No padding appears in either ABI because every member's offset is already a multiple of its alignment; [`docs/labs/03-util-memdump.md`](labs/03-util-memdump.md#struct-sss-member-offsets-and-tail-padding) covers the LP64 alignment rules.
 
 On xv6 the lecture asks "which printed values are guaranteed" and "why did all the prints succeed?" — [`user/hwstruct.c`](../user/hwstruct.c) answers both by running the expressions:
 
@@ -305,19 +331,21 @@ On xv6 the lecture asks "which printed values are guaranteed" and "why did all t
 | `&h->f->a`    | `0x0`      | Loads the pointer stored at `0x1000`.                     |
 | `&h->g.c[10]` | `0xA`      | Loads the pointer stored at `0x1008`, then adds 10 bytes. |
 
-The two loads read `0x1000` and `0x1008`, which in that binary is `umalloc.c`'s zeroed `freep`, so they print `0x0` and `0xA`. They succeed because `0x1000` is the program's own data page; with that page unmapped, `usertrap()` would kill the process.
+**The loaded pointer values depend on this binary's data.** The loads at `0x1000` and `0x1008` read the zeroed `freep` storage from `umalloc.c`, producing `0x0` and `0xA` after the second expression adds 10.
 
-### Where the first draft went wrong
+Both loads succeed because `0x1000` is in the program's own data page. If that page were unmapped, `usertrap()` would kill the process.
+
+### Struct-address mistakes: widths, units, and pointer loads
 
 | Draft claim                              | Problem                                                                                                   |
 | ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **`char b[32]` is 4B; `struct f` is 8B** | An array's size is element size × count: 32 bytes, so `struct f` is 36.                                   |
 | **Pointers are 8B**                      | True on xv6, but the handout says 32-bit, where they are 4.                                               |
-| **`0x1040 + 64 bits`**                   | Addresses count bytes. Adding bits to a byte address mixes units: 64 bits is 8 bytes, `0x08`, not `0x40`. |
+| `0x1040 + 64 bits`                       | Addresses count bytes. Adding bits to a byte address mixes units: 64 bits is 8 bytes, `0x08`, not `0x40`. |
 | **`&h->f->a` = `0x1000`**                | That is `&h->f`. `&h->f->a` needs the value of `h->f`.                                                    |
 | **`&h->g.c[10]` = `+ 8*10`**             | `c` is `char *`, so `[10]` moves 10 bytes; and the base is the unknown value of `c`, not `&h->g.c`.       |
 
-## Questions I had
+## Global ordering and argument-dependent stack addresses
 
 ### Why does `b` sit below `a` in `array`?
 

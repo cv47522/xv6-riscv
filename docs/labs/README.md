@@ -1,4 +1,4 @@
-# Lab Notes
+# Lab notes: exercise contracts and derivation guides
 
 ---
 
@@ -22,9 +22,14 @@ One note per lab exercise that needed more thinking than typing: what the exerci
 | **[10-util-sh-tab-completion.md](10-util-sh-tab-completion.md)** | `util` | shell: tab completion (optional, easy) — the console line discipline that hides Tab                          |
 | **[11-util-sh-history.md](11-util-sh-history.md)**               | `util` | shell: history (optional, moderate) — what one command line is, and which process owns it                    |
 
-## What belongs here, and what does not
+## Lab-note scope and shared-document ownership
 
-The mechanics shared by every lab — selecting a lab in `conf/lab.mk`, merging starter code, running `make grade`, reading a failed transcript — belong to [03-lab-workflow.md](../03-lab-workflow.md) and are not repeated in a lab note. The mechanics shared by every user program — where the source goes, the `UPROGS` entry, the house C style — belong to [02-build-boot-and-usage.md](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise). A note here covers only the one exercise it is named after.
+| Shared material                                                    | Authoritative document                                                                          |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| **Lab selection, starter merges, grading, and failed transcripts** | [03-lab-workflow.md](../03-lab-workflow.md), including `conf/lab.mk` and `make grade`.          |
+| **User-program location, `UPROGS`, and house C style**             | [02-build-boot-and-usage.md](../02-build-boot-and-usage.md#adding-and-running-a-user-exercise). |
+
+A note here covers only the exercise it is named after. Link to the shared mechanics instead of repeating them.
 
 The split against the other collections:
 
@@ -35,13 +40,20 @@ The split against the other collections:
 | **labs/** (this directory)                   | MIT lab exercises, from the handout's requirements to a checklist you can implement from. |
 
 > [!IMPORTANT]
-> **No solutions.** A lab note explains code that already exists in the tree and states the contract the new file has to satisfy; it stops at the point where writing the program begins. That boundary is deliberate — see the collaboration habit in [03-lab-workflow.md](../03-lab-workflow.md#how-to-approach-a-lab). Once an exercise passes its grader tests, the note may end with one `## Solution walkthrough` section behind a `[!CAUTION]` spoiler callout, explaining the finished source under `user/` with diagrams; every section before it stays a derivation aid. See [Lab Notes in AGENTS.md](../../AGENTS.md#lab-notes).
+> **Keep derivation sections solution-free.** Explain existing code and the target contract, then stop where writing the program begins. See the collaboration habit in [03-lab-workflow.md](../03-lab-workflow.md#read-implement-and-checkpoint-each-exercise).
 
-## Writing the next one
+| Part of a lab note                  | Solution boundary                                                                                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Derivation sections**             | No target solution; every section before the walkthrough remains a derivation aid.                                                                    |
+| **Final `## Solution walkthrough`** | Allowed only after the exercise passes its grader tests. Open with a `[!CAUTION]` spoiler callout; explain the finished `user/` source with diagrams. |
+
+[Lab Notes in AGENTS.md](../../AGENTS.md#lab-notes) owns this exception and the quotation rules.
+
+## Writing a lab derivation note
 
 Follow the shape of [01-util-sleep.md](01-util-sleep.md):
 
-- **Open with one contract**, distinguishing handout requirements from repository conventions, then document what each grader test actually asserts. A passing score may leave part of the contract unchecked; [the sleep note](01-util-sleep.md#what-the-grader-does-not-prove) shows how to record that boundary.
+- **Open with one contract**, distinguishing handout requirements from repository conventions, then document what each grader test actually asserts. A passing score may leave part of the contract unchecked; [the sleep note](01-util-sleep.md#sleep-grader-evidence-limits) shows how to record that boundary.
 - **Map prerequisites before the walkthrough.** Separate material to read first from references to consult when needed, and link an owning concept note before individual example files.
 - **Explain only the existing code the exercise forces you to read.** Link out for anything another document already owns; a second explanation of `ecall` is a second thing to keep correct. For the trap path, trapframe, register roles, or harts, link to [the foundation section of 01-util-sleep.md](01-util-sleep.md#the-foundation-a-c-call-that-becomes-a-trap), which holds that material on loan until [ch04](../book/ch04-traps-and-system-calls.md) is written.
 - **Layer dense explanations for scanning.** Lead with the smallest useful callout, table, list, or diagram, then retain nuanced causal detail below it; visual structure **must** improve retrieval rather than decorate the page.

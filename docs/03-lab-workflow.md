@@ -1,4 +1,4 @@
-# Lab Workflow
+# xv6 Lab Setup, Grading, and Submission
 
 ---
 
@@ -8,7 +8,7 @@
 
 Running MIT's [6.1810](https://pdos.csail.mit.edu/6.1810/2026/) labs from this repository: selecting a lab, merging its starter code, and grading your work.
 
-## How labs work here
+## Lab branches, starter files, and cumulative solutions
 
 MIT distributes each lab as a separate branch of `xv6-labs-2026`. The branches are **independent siblings** — `util` is not an ancestor of `syscall`. Each branch contains stock xv6 plus that lab's starter files, grading script, and `#ifdef` guards.
 
@@ -60,7 +60,7 @@ Other conflicts should be rare after the first merge, because `rerere` replays y
 git config rerere.enabled true
 ```
 
-## How to approach a lab
+## Read, implement, and checkpoint each exercise
 
 Across the course, labs exercise three overlapping kinds of work, with each exercise having a primary engineering focus.
 
@@ -95,9 +95,9 @@ MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) 
 Where an exercise needed more understanding than typing, the derivation is written up under [labs/](labs/) — one note per exercise, covering the existing code the exercise forces you to read and the decisions the implementation reduces to, and stopping short of the solution.
 
 > [!TIP]
-> Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder. Enrolled students are told to ask on Piazza or come to office hours; the self-study equivalent is to go back to the book chapter or step through the code in gdb — see [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debugging).
+> Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder. Enrolled students are told to ask on Piazza or come to office hours; the self-study equivalent is to go back to the book chapter or step through the code in gdb — see [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu).
 
-## Grading
+## Run graders and interpret failure transcripts
 
 ```bash
 make grade                      # every test for the current lab
@@ -119,7 +119,8 @@ exec via sh script: FAIL (1.2s)
 Score: 0/156
 ```
 
-Two things to note. Failures leave the full QEMU transcript in `xv6.out.<testname>` — read it, it usually shows the shell command that failed and exactly what your program printed. And the `$ make qemu-gdb` line is the harness reporting how it launched QEMU, not a command you need to run.
+- **Failure evidence:** `xv6.out.<testname>` contains the full QEMU transcript. Read it for the failed shell command and exactly what your program printed.
+- **Launch report:** `$ make qemu-gdb` records how the harness launched QEMU; it is not a command you need to run.
 
 ### The util lab's tests
 
@@ -127,14 +128,21 @@ Two things to note. Failures leave the full QEMU transcript in `xv6.out.<testnam
 
 | Points | Tests                                                                          |
 | ------ | ------------------------------------------------------------------------------ |
-| **25** | `sleep` — no arguments, returns, makes syscall, zero and non-numeric arguments |
-| **35** | `sixfive` — test, readme, all, standard input and missing file                 |
-| **25** | `memdump` — examples, format `ii, S, p`, formats `h`/`c` with bounds and usage |
-| **40** | `find` — current directory, sub-directory, recursive, missing and duplicate    |
-| **30** | `exec` — basic, multiple args, via sh script                                   |
-| **1**  | `time` — reads `time.txt`, the hours you spent                                 |
+| 25     | `sleep` — no arguments, returns, makes syscall, zero and non-numeric arguments |
+| 35     | `sixfive` — test, readme, all, standard input and missing file                 |
+| 25     | `memdump` — examples, format `ii, S, p`, formats `h`/`c` with bounds and usage |
+| 40     | `find` — current directory, sub-directory, recursive, missing and duplicate    |
+| 30     | `exec` — basic, multiple args, via sh script                                   |
+| 1      | `time` — reads `time.txt`, the hours you spent                                 |
 
-The last four of those are the 2026 corner tests. They are what a solution that passes the older, looser checks most often fails: a `sleep` that hangs on `sleep 0`, a `sixfive` that **cannot** read standard input, a `memdump` that reads past the end of short input, and a `find` that recurses into `.` and reports the same file many times.
+**The 2026 corner tests catch failures older, looser checks often miss:**
+
+| Exercise  | Failure exposed                                         |
+| --------- | ------------------------------------------------------- |
+| `sleep`   | Hangs on `sleep 0`.                                     |
+| `sixfive` | Cannot read standard input.                             |
+| `memdump` | Reads past the end of short input.                      |
+| `find`    | Recurses into `.` and reports the same file many times. |
 
 The last one is why a full-marks run still fails if you have not created `time.txt`. Write a number into it:
 
@@ -174,7 +182,7 @@ make clean
 > [!NOTE]
 > Expect this to fail occasionally as you progress. Later labs change kernel internals that earlier graders assert on — the lock lab restructures `kalloc` and the buffer cache, cow rewrites page-fault handling. Sometimes that is a genuine regression worth fixing, and sometimes the later lab deliberately changed the behaviour the old grader checked. The transcript in `xv6.out.*` tells you which.
 
-## Submission
+## Create a committed-tree submission with `make zipball`
 
 `make zipball` produces `lab.zip` from the **committed** tree via `git archive`, so uncommitted work is excluded. It runs `submit-check` first, which verifies you are on a branch named after the lab.
 
@@ -182,11 +190,21 @@ In this consolidated repository you work on `study`, not on a branch called `uti
 
 This matters **only if** you are submitting to Gradescope as an enrolled student. For self-study, `make grade` is the whole feedback loop.
 
-## Compatibility note
+## Compatibility risks when merging 2025 and 2026 labs
 
-The nine 2025 lab branches were cut from xv6 as of 2025-08-25, and `study` tracks a newer upstream. One consequence has already been handled: upstream renamed `kernel/printf.c` to `kernel/printk.c`, so the Makefile's `OBJS_KCSAN` list was retargeted during the util merge. If a future lab merge fails to link with an error about a missing object, check whether upstream renamed the file and update the list the same way.
+**The lab year determines which compatibility risks to check.** The nine 2025 branches were cut from xv6 as of 2025-08-25, while `study` tracks a newer upstream.
+
+- **Handled rename:** upstream changed `kernel/printf.c` to `kernel/printk.c`, so the util merge retargeted the Makefile's `OBJS_KCSAN` list.
+- **Future missing-object errors:** check whether upstream renamed the file, then update the list the same way.
 
 `labs/util` no longer has that problem — it now holds MIT's 2026 branch, cut from a later upstream that already uses `printk.c`. Expect the opposite risk from the 2026 branches instead: they carry upstream changes `study` may not have yet, such as `-march=rv64gc`, `-std=gnu99`, and the `conf/lab.mk` prerequisite on every object rule.
 
 > [!CAUTION]
-> `labs/util` was rewritten in place when the fork moved to 2026, so the branch tip `study` originally merged is **no longer on it**. The 2026 starter and grader were applied to this tree by hand rather than merged, so `git merge labs/util` is not a no-op: the branches meet at `7d01506`, and the merge would bring 14 commits touching 18 files — the lab's own `find`, `findtest.sh`, and `sixfive.txt` alongside upstream work such as deterministic builds, the `nlink` overflow fixes, and an `ialloc`/`iput` race fix. Diff against it to see what is still missing rather than merging blind.
+> **Diff against `labs/util` before merging it.** The fork rewrote that branch for 2026, so the tip originally merged into `study` is no longer on it. The 2026 starter and grader were applied here by hand, making `git merge labs/util` a substantive merge.
+
+The branches meet at `7d01506`; the merge would bring **14 commits touching 18 files**, including:
+
+- **Lab files:** `find`, `findtest.sh`, and `sixfive.txt`.
+- **Upstream changes:** deterministic builds, `nlink` overflow fixes, and an `ialloc`/`iput` race fix.
+
+Use the diff to determine which changes are still missing.
