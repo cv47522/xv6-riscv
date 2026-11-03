@@ -697,7 +697,7 @@ flowchart TD
     F --> G --> H
     H -->|No: returns -1| X
     H -->|Yes: returns argc| I --> J --> K
-    K -.->|Each fork() and exec() here is a system call.| L
+    K -.->|"Each fork() and exec() here is a system call."| L
     classDef processing fill:#fffff0,stroke:#999944,color:#111
     classDef routing fill:#f0f0ff,stroke:#6666aa,color:#111
     classDef commit fill:#f0ffff,stroke:#449999,color:#111
@@ -824,7 +824,7 @@ _Measured with GDB at `CPUS=3`. [View the SVG](images/boot-physical-memory.svg) 
 
 **Why the kernel keeps working when paging turns on:** `kvmmake()` maps `KERNBASE` through `PHYSTOP` at identical virtual addresses, so every pointer created with `satp = 0` stays valid. Only the trampoline and the kernel stacks gain extra high virtual addresses; those do not add RAM above `PHYSTOP`.
 
-**The first user page table is built but not used:** `satp` still holds `kernel_pagetable` at the end of `main()`. It switches to `0x87f55000` only when `forkret()` jumps to `userret`, after `kexec()` has added `/init`'s pages.
+**The first user page table is built but not used:** `satp` still holds `kernel_pagetable` at the end of `main()`. It switches to the replacement page table built by `kexec()` only when `forkret()` jumps to `userret`; `kexec()` frees the original `0x87f55000` table.
 
 > [!NOTE]
 > The page counts depend on `NPROC`, `CPUS`, and the build. Reproduce them with `make qemu-gdb` and these GDB commands, deleting each breakpoint after it hits so another hart does not stop there first:

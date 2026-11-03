@@ -16,7 +16,7 @@ This folder holds the repository's rules for AI agents and the contract for revi
 | **Codex**       | `AGENTS.md`                            | None in the repository; name `review.md` in the prompt     |
 | **Cursor**      | `AGENTS.md`                            | None in the repository; attach files with `@`              |
 
-`AGENTS.md` only indexes the rule files, so agents read a specific rule file when the task touches it. Name the rule file in a prompt whenever you want to be sure it is loaded.
+Read the matching files under `.agents/rules/` explicitly; `AGENTS.md` does not reference them. Name the rule file in a prompt whenever you want to be sure it is loaded.
 
 ## Workflow
 
@@ -24,7 +24,7 @@ This folder holds the repository's rules for AI agents and the contract for revi
 flowchart LR
     A[Agent A drafts] --> S[git add: snapshot A]
     S --> L[make lint]
-    L --> R[Agent B reviews the unstaged diff: findings table only]
+    L --> R[Agent B reviews the staged diff against HEAD: findings table only]
     R --> U{You pick IDs}
     U --> P[Apply accepted findings]
     U --> D[Record rejected ones under Decisions]
@@ -33,7 +33,7 @@ flowchart LR
 
 1. Let agent A write or edit, then stage the result with `git add`. The staged version is now A's snapshot.
 2. Run `make lint` and fix what it reports.
-3. Ask agent B for a review. B **must not** edit files; it returns a numbered findings table of the unstaged diff against the staged snapshot.
+3. Ask agent B for a review. B **must not** edit files; it returns a numbered findings table of the staged diff against `HEAD` (`git diff --cached --word-diff`).
 4. Answer with a selection. The applying agent changes only those spans and proposes `## Decisions` entries for the findings you rejected.
 
 If an agent edited files anyway, `git diff --word-diff` shows the changes word by word, and `git restore -p <file>` discards the hunks you do not want.

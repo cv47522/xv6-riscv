@@ -13,7 +13,8 @@
  *   Kind  Read first
  *   ----  ------------------------------------------------------------------
  *   code  user/ex8pipefork.c (EOF needs every write end closed)
- *   note  docs/11-os-design-in-xv6.md#fork-kfork-and-a-full-table
+ *   note  docs/11-os-design-in-xv6.md
+ *         #fork-and-kfork-process-creation-and-table-exhaustion
  *   code  kernel/proc.c allocproc(), kfork()
  *
  * ---------------------------------------------------------------------------

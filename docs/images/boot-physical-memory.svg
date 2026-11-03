@@ -114,7 +114,7 @@
     <tspan x="924" dy="0">3. kvminit(), kvminithart()</tspan>
   </text>
   <text x="924" y="141" font-size="13" fill="#495057" text-anchor="start" xml:space="preserve">
-    <tspan x="924" dy="0">satp = kernel_pagetable (VA == PA)</tspan>
+    <tspan x="924" dy="0">satp = MAKE_SATP(root) (VA == PA)</tspan>
   </text>
   <text x="910.0" y="119" font-size="15" fill="#1e1e1e" text-anchor="middle" xml:space="preserve">
     <tspan x="910.0" dy="0">-&gt;</tspan>

@@ -100,7 +100,7 @@ Read the chapter's `.tex` in full, then the source it cites in **this** tree. Th
 6. **Do not copy book prose.** Summarize in your own words and quote only a caption or a short definition where the exact wording matters.
 7. **Do not explain portable concepts here.** A concept whose OSTEP note is written gets a link; one still a placeholder gets a `## Concept on loan` block per the book README. Generic C goes to `../c-programming/`. When you notice a sibling note missing something the chapter makes clear, list it in the report instead of editing the sibling repository; [`write-lecture-note.md`](write-lecture-note.md) is where sibling edits happen.
 
-Then update the chapter row in [`docs/book/README.md`](../book/README.md#chapters) if its case changed, and set its `Synced against` line (add it under the opening paragraph if absent):
+Then update the chapter row in [`docs/book/README.md`](../book/README.md#chapters) if its case changed, and update the repository-wide `Synced against` line only after every chapter has been checked at that commit (otherwise preserve the existing baseline):
 
 ```markdown
 Synced against upstream book commit `<short hash>` on <YYYY-MM-DD>.

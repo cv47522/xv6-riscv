@@ -111,7 +111,7 @@ sequenceDiagram
     end
     Note over U,K: Phase 4: return to the caller
     rect rgb(240, 255, 255)
-        K->>T: prepare_return() sets stvec, sstatus.SPP, and sepc; usertrap() returns the user satp
+        K->>T: prepare_return() sets stvec, sstatus.SPP, and sepc#59; usertrap() returns the user satp
         T->>U: userret switches page tables, restores registers from TRAPFRAME, and executes sret
     end
 ```

@@ -144,7 +144,7 @@ Score: 0/156
 | `memdump` | Reads past the end of short input.                      |
 | `find`    | Recurses into `.` and reports the same file many times. |
 
-The last one is why a full-marks run still fails if you have not created `time.txt`. Write a number into it:
+The `time` test is why a full-marks run still fails if you have not created `time.txt`. Write a number into it:
 
 ```bash
 echo 5 > time.txt
