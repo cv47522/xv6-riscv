@@ -9,6 +9,12 @@ _*
 /mkfs/mkfs
 /kernel/kernel
 /user/usys.S
+vectors.S
+bootblock
+entryother
+initcode
+initcode.out
+kernelmemfs
 .gdbinit
 *.zip
 xv6.out*
