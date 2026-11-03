@@ -32,7 +32,7 @@ Use the [self-study progress tracker](../STUDY-PROGRESS.md) for the full course 
 | [08-makefile-tour.md](08-makefile-tour.md)           | The [Makefile](../Makefile): default goal, dependency graph, cold build, link steps, constructs, and comparison with a simpler project.       |
 | [09-debugging-xv6.md](09-debugging-xv6.md)           | Native versus xv6 breakpoints, ELF symbol loading, manual user-program debugging, and tracing with one hart before verification with three.   |
 | [10-c-in-xv6.md](10-c-in-xv6.md)                     | Lecture 2 and Homework 2: user memory, binary tools, arguments, kernel lists, flags, and struct-address calculations.                         |
-| [11-os-design-in-xv6.md](11-os-design-in-xv6.md)     | Lecture 3 draft, not yet studied: isolation, syscall dispatch, boot, process exhaustion, and hostile ELF validation. Homework 3 remains open. |
+| [11-os-design-in-xv6.md](11-os-design-in-xv6.md)     | Lecture 3 draft, not yet studied: isolation, syscall dispatch, boot, process exhaustion, and hostile ELF validation. Homework 3 now answered. |
 | [12-os-overview-in-xv6.md](12-os-overview-in-xv6.md) | Lecture 1 topic map, four OS goals, syscall steps, alternative designs, and lecture differences. Homework 1 has no recorded answer.           |
 
 For a specific mechanism, use these guide details:
@@ -40,7 +40,7 @@ For a specific mechanism, use these guide details:
 - **Build artifacts (06):** `.o`, `.d`, `.asm`, `.sym`, `.S`, `.pl`, and `.ld` contents and generation; why a kernel needs these file types; every instruction and register used in `.S`; ELF and `0x80000000`; `ULIB` versus glibc; and how `fs.img`, `mkfs`, `kernel/`, and `user/` map onto Linux.
 - **Makefile comparison (08):** the final comparison uses `operating-system/codes/Makefile`; [C_Project_Build_Tool.md](../../c-programming/C_Project_Build_Tool.md) explains its syntax.
 - **C in xv6 (10):** real user-space addresses, `objdump` and `nm` output, `argv` on the stack, two kernel linked lists, `fcntl.h` bit flags, and the worked struct-address answer. Generic C stays in `../c-programming/`.
-- **OS design (11):** user/kernel enforcement, a syscall as a number, argument extraction and safe user-memory copies, kernel traps and timer preemption, `_entry` through `/init` to the shell, `fork` with a full process table, and `exec` checks on a hostile ELF.
+- **OS design (11):** user/kernel enforcement, a syscall as a number, argument extraction and safe user-memory copies, kernel traps and timer preemption, `_entry` through `/init` to the shell, `fork` with a full process table, `exec` checks on a hostile ELF, and the Homework 3 answer on `exec`, `fork`, and `kill` when the table is full.
 - **OS overview (12):** a map into ch01 and the exercises, each lecture goal's kernel location, syscall steps pinned to symbols, the cost of the lecture's "other designs", and qualifications where lecture text differs from this tree.
 
 ### Find book notes, lab derivations, and reusable prompts

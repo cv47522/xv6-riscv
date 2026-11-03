@@ -419,7 +419,7 @@ def subprocess_out(argv):
 
 
 ##############################################################################
-#  Lecture 3 -- isolate, forkfill: the user/kernel boundary and a full table
+#  Lecture 3 -- isolate, forkfill, hwdesign: the boundary and a full table
 ##############################################################################
 
 @test(1, "isolate: hardware kills csr and kload, the kernel refuses badsys and kcopy")
@@ -456,6 +456,27 @@ def test_forkfill():
             no=["fork still fails", "panic"])
     assert_equal(r.qemu.output.count("after 61 children"), 2,
                  "second run sees the same number of free slots")
+
+
+@test(1, "hwdesign: full table: exec works, fork fails, kill alone frees nothing")
+def test_hwdesign():
+    r.run_qemu(shell_script(["hwdesign", "echo DONE"]))
+    r.match("^hwdesign: table full: fork returned -1 after 60 children$",
+            "^hwdesign: probe exec'd echo while the table was full$",
+            "^hwdesign: exec used the probe's own slot; probe exited 0$",
+            "^hwdesign: refilled 1 freed slot$",
+            "^hwdesign: kill\\((\\d+)\\) returned 0; "
+            "fork right after returned -1$",
+            "^hwdesign: wait reaped killed pid \\d+, status -1$",
+            "^hwdesign: fork after that wait succeeded$",
+            "^hwdesign: reaped 60 children$",
+            "^DONE$",
+            no=["not the victim", "fork still fails", "exec failed",
+                "expected the probe", "panic"])
+    m = re.search(r"kill\((\d+)\).*\n.*reaped killed pid (\d+)",
+                  r.qemu.output)
+    assert m and m.group(1) == m.group(2), \
+        "wait reaped a pid other than the one killed"
 
 
 run_tests()

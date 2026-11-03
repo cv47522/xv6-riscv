@@ -49,9 +49,9 @@ When you finish an item:
 
 | Area                      | Work on record                                                                                                                                                                                      | Next step                                                                                               |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                                                                              | Suite fully passing: [18/18 checks](#verification-evidence), including Lectures 2 and 3, on 2026-10-28. |
-| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [18/18 checks](#verification-evidence). | Lecture 3 (OS design) and Homework 3.                                                                   |
-| **Lecture 3 draft**       | [isolate](user/isolate.c), [forkfill](user/forkfill.c); [draft OS design note](docs/11-os-design-in-xv6.md); [18/18 checks](#verification-evidence). Not yet studied.                               | Study Lecture 3, confirm it, and answer Homework 3.                                                     |
+| **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                                                                              | Suite fully passing: [19/19 checks](#verification-evidence), including Lectures 2 and 3, on 2026-11-03. |
+| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [19/19 checks](#verification-evidence). | Lecture 3 (OS design) and Homework 3.                                                                   |
+| **Lecture 3 draft**       | [isolate](user/isolate.c), [forkfill](user/forkfill.c), [hwdesign](user/hwdesign.c); [draft OS design note](docs/11-os-design-in-xv6.md); [19/19 checks](#verification-evidence). Not yet studied.  | Study Lecture 3 and confirm it; Homework 3 is answered.                                                 |
 | **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence).                                                            | Optional shell challenges; then the syscall lab.                                                        |
 | **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                                                                                  | Read the remaining chapters; their files are scaffolding or references, not proof of reading.           |
 
@@ -126,10 +126,12 @@ Additional code includes links found inside the lecture texts. The [archive inve
     - **Task:** Work the handout’s pointer/structure expressions under its explicit 32-bit assumption.
     - **Answer:** [32-bit worked answer and 64-bit comparison](docs/10-c-in-xv6.md#homework-2-struct-addresses); checked on xv6 by [user/hwstruct.c](user/hwstruct.c).
 
-- [ ] **Homework 03 · 2026-09-16** — [kernel design](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-design.html)
+- [x] **Homework 03 · 2026-09-16** — [kernel design](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-design.html) · answered 2026-11-03
     - **Read:** [`kernel/proc.h`](kernel/proc.h), [`kernel/defs.h`](kernel/defs.h), [`kernel/entry.S`](kernel/entry.S), [`kernel/main.c`](kernel/main.c), and [`user/init.c`](user/init.c).
     - **Skim:** [`kernel/proc.c`](kernel/proc.c) and [`kernel/exec.c`](kernel/exec.c).
     - **Book:** Chapter 2.
+    - **Task:** With every `proc[NPROC]` entry in use, say what `exec()`, `fork()`, and `kill()` followed by `fork()` each do.
+    - **Answer:** [`exec` works, `fork` returns `-1`, and `kill` alone frees no slot](docs/11-os-design-in-xv6.md#homework-3-a-full-process-table-versus-exec-fork-and-kill); checked on xv6 by [user/hwdesign.c](user/hwdesign.c).
 
 - [ ] **Homework 04 · 2026-09-21** — [page tables](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-pgtbl.html)
     - **Read:** [`kernel/memlayout.h`](kernel/memlayout.h), [`kernel/vm.c`](kernel/vm.c), [`kernel/kalloc.c`](kernel/kalloc.c), [`kernel/riscv.h`](kernel/riscv.h), and [`kernel/exec.c`](kernel/exec.c).
@@ -286,13 +288,14 @@ Additional code includes links found inside the lecture texts. The [archive inve
 
 ### Lecture 3 example practice
 
-- **Originals:** None. MIT published no example code for [Lecture 3](lectures/l-os.txt); both programs reproduce the lecture's claims rather than an upstream file.
+- **Originals:** None. MIT published no example code for [Lecture 3](lectures/l-os.txt); all three programs reproduce the lecture's or homework's claims rather than an upstream file.
 - **Practice versions:** Descriptive names; see the [exercise guide](docs/07-exercises.md#lecture-3--the-userkernel-boundary) and the [draft OS design note](docs/11-os-design-in-xv6.md).
-- **Completion basis:** Two passing tests in the [18/18 exercise suite](#verification-evidence), each confirmed to fail against a deliberately broken program. These programs **do not** by themselves check off Lecture 3.
+- **Completion basis:** Three passing tests in the [19/19 exercise suite](#verification-evidence), each confirmed to fail against a deliberately broken program. These programs **do not** by themselves check off Lecture 3.
 - **Deliberately not done:** The lecture's `syscall()` trace demo, because it is the syscall lab's `trace` exercise.
 
 - [x] **isolate** — "hardware-level isolation" and "How do system calls work?": four attempts across the boundary; [practice implementation](user/isolate.c)
 - [x] **forkfill** — "HW: allocproc; what happens if out of proc's?"; [practice implementation](user/forkfill.c)
+- [x] **hwdesign** — Homework 3's `exec`, `fork`, and `kill` questions on a full process table; [practice implementation](user/hwdesign.c)
 
 ## Books, code handouts, and course references
 
@@ -328,17 +331,18 @@ Additional code includes links found inside the lecture texts. The [archive inve
 
 ## Verification evidence
 
-| Snapshot          | Value                                                                               |
-| ----------------- | ----------------------------------------------------------------------------------- |
-| **Date**          | 2026-10-28                                                                          |
-| **Commit**        | `a7c7f92` plus uncommitted Lecture 3 work and the staged Lecture 2 note restructure |
-| **Code assessed** | That commit, plus `isolate`, `forkfill`, and their tests                            |
-| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                  |
+| Snapshot          | Value                                                                                                                         |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Date**          | 2026-10-28                                                                                                                    |
+| **Commit**        | `a7c7f92` plus uncommitted Lecture 3 work and the staged Lecture 2 note restructure                                           |
+| **Code assessed** | That commit, plus `isolate`, `forkfill`, and their tests                                                                      |
+| **Where it ran**  | The repository itself; no other QEMU held `fs.img`                                                                            |
+| **Re-run**        | 2026-11-03: `./grade-exercises` only, at `f5d6dd5` plus `hwdesign`, in a scratch worktree because the main tree was mid-merge |
 
-| Command             | Result           | What the run covers                                                                                                               |
-| ------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `make grade`        | Exit 0 · 206/206 | All 26 util tests: every MIT test, including `time`, plus the 7 local uptime and find-regex tests.                                |
-| `./grade-exercises` | Exit 0 · 18/18   | All nine Lecture 1 exercises, `array`, `ptr`, `str`, and `hwstruct` from Lecture 2, plus `isolate` and `forkfill` from Lecture 3. |
+| Command             | Result           | What the run covers                                                                                                                                               |
+| ------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make grade`        | Exit 0 · 206/206 | All 26 util tests: every MIT test, including `time`, plus the 7 local uptime and find-regex tests.                                                                |
+| `./grade-exercises` | Exit 0 · 19/19   | All nine Lecture 1 exercises, `array`, `ptr`, `str`, and `hwstruct` from Lecture 2, plus `isolate`, `forkfill`, and `hwdesign` from Lecture 3; 2026-11-03 re-run. |
 
 The `ex3fork` check had expected `parent, x is 11` and `child, x is 22`, but [`user/ex3fork.c`](user/ex3fork.c) prints colons. The assertion in [`grade-exercises`](grade-exercises) now matches the program's actual output, so the suite passes without changing the exercise.
 

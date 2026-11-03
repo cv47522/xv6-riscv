@@ -697,12 +697,13 @@ The fault report identifies both the destination and the store:
 
 ## Lecture 3 — the user/kernel boundary
 
-Lecture 3 ([`l-os.txt`](../lectures/l-os.txt)) publishes no example code, so both programs are written here to make the lecture's claims observable: `isolate` attacks the boundary four ways, and `forkfill` answers the lecture's "what happens if out of proc's?". The concepts, the boot path, and the `fork`/`exec` walkthroughs live in [11-os-design-in-xv6.md](11-os-design-in-xv6.md); these sections cover only the programs.
+Lecture 3 ([`l-os.txt`](../lectures/l-os.txt)) publishes no example code, so all three programs are written here to make the lecture's claims observable: `isolate` attacks the boundary four ways, `forkfill` answers the lecture's "what happens if out of proc's?", and `hwdesign` runs Homework 3's three questions on a full table. The concepts, the boot path, and the `fork`/`exec` walkthroughs live in [11-os-design-in-xv6.md](11-os-design-in-xv6.md); these sections cover only the programs.
 
-| Program                                                   | Source            | Lecture                                                 | What it introduces                                                     |
-| --------------------------------------------------------- | ----------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **[`isolate`](#isolate--four-attempts-four-refusals)**    | `user/isolate.c`  | "hardware-level isolation", "How do system calls work?" | privileged instructions, `PTE_U`, `a7` checks, and user-pointer checks |
-| **[`forkfill`](#forkfill--running-out-of-process-slots)** | `user/forkfill.c` | "HW: allocproc; what happens if out of proc's?"         | `NPROC`, `allocproc()` failure, and slots freed only by `wait()`       |
+| Program                                                         | Source            | Lecture                                                 | What it introduces                                                     |
+| --------------------------------------------------------------- | ----------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **[`isolate`](#isolate--four-attempts-four-refusals)**          | `user/isolate.c`  | "hardware-level isolation", "How do system calls work?" | privileged instructions, `PTE_U`, `a7` checks, and user-pointer checks |
+| **[`forkfill`](#forkfill--running-out-of-process-slots)**       | `user/forkfill.c` | "HW: allocproc; what happens if out of proc's?"         | `NPROC`, `allocproc()` failure, and slots freed only by `wait()`       |
+| **[`hwdesign`](#hwdesign--homework-3-on-a-full-process-table)** | `user/hwdesign.c` | Homework 3, _kernel design_                             | `exec()` in an existing slot, and `kill()` freeing nothing by itself   |
 
 ### `isolate` — four attempts, four refusals
 
@@ -750,9 +751,32 @@ forkfill: fork works again
 
 A child that kept `p[1]` would hold the pipe open forever, the same protocol as [`ex8pipefork`](#closing-unused-ends-is-protocol-not-hygiene).
 
+### `hwdesign` — Homework 3 on a full process table
+
+```text
+$ hwdesign
+hwdesign: table full: fork returned -1 after 60 children
+hwdesign: probe exec'd echo while the table was full
+hwdesign: exec used the probe's own slot; probe exited 0
+hwdesign: refilled 1 freed slot
+hwdesign: kill(65) returned 0; fork right after returned -1
+hwdesign: wait reaped killed pid 65, status -1
+hwdesign: fork after that wait succeeded
+hwdesign: reaped 60 children
+```
+
+**60 children, not 61:** a probe child is forked before the table fills, so it already owns a slot when the parent later tells it to `exec("echo", ...)`. The pids vary from run to run.
+
+1. The parent fills the table with children blocked on a pipe, exactly as `forkfill` does.
+2. It releases the probe, whose `exec()` succeeds, then refills the probe's freed slot.
+3. It kills its last child and forks at once: `-1`, because the victim is the parent's own unreaped child.
+4. One `wait()` returns the victim with status `-1`, after which `fork()` succeeds.
+
+The answer and its reasoning live in [11-os-design-in-xv6.md](11-os-design-in-xv6.md#homework-3-a-full-process-table-versus-exec-fork-and-kill).
+
 ## grade-exercises: coverage and mutation checks
 
-[`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises, the four Lecture 2 programs, and the two Lecture 3 programs: eighteen tests in about twenty seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose **cannot** drift away from the programs without something going red.
+[`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises, the four Lecture 2 programs, and the three Lecture 3 programs: nineteen tests in about twenty seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose **cannot** drift away from the programs without something going red.
 
 | Test             | The claim it pins                                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -771,6 +795,7 @@ A child that kept `p[1]` would hold the pipe open forever, the same protocol as 
 | `hwstruct`       | RV64 sizes 36/24/32, the two guaranteed addresses, and all four lines printing without a fault.                                                                                |
 | `isolate`        | `csr` and `kload` die with `scause` 2 and `0xd`, `stval` naming the `csrr` encoding and `TRAMPOLINE`; `badsys` and `kcopy` return `-1`; `"hi"` is kept.                        |
 | `forkfill`       | `fork()` fails after exactly 61 children, all 61 are reaped, and a second run finds the same 61 free slots.                                                                    |
+| `hwdesign`       | With the table full, `exec()` succeeds, `fork()` returns `-1` even right after `kill()`, and the pid `wait()` reaps with status `-1` is the one killed.                        |
 
 Several of these pin _kernel_ invariants rather than program output — `fdalloc()`'s lowest-free rule, `exec()` preserving the descriptor table, `wait()` ordering. **A lab that touches `kernel/proc.c`, `kernel/exec.c`, or `kernel/sysfile.c` should run this suite**; it will tell you within seconds whether you changed a user-visible contract.
 

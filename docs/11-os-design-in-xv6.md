@@ -31,7 +31,7 @@ Use this ownership map to find the explanation you need, following the [book not
 | **Lecture 3's additions in this tree**                        | This note: where the boundary is enforced, how the first process crosses it, and how `fork` and `exec` handle hostile input.                                  |
 
 > [!IMPORTANT]
-> **Status: draft study notes.** Lecture 3 is not yet marked studied in [STUDY-PROGRESS.md](../STUDY-PROGRESS.md#lectures), and Homework 3 is unanswered. Measurements below are from this tree's `LAB=util` build on 2026-10-28.
+> **Status: draft study notes.** Lecture 3 is not yet marked studied in [STUDY-PROGRESS.md](../STUDY-PROGRESS.md#lectures), and [Homework 3](#homework-3-a-full-process-table-versus-exec-fork-and-kill) was answered on 2026-11-03. Measurements below are from this tree's `LAB=util` build on 2026-10-28, except the Homework 3 run, measured on 2026-11-03.
 
 ## Lecture 3 topics and practice programs
 
@@ -924,9 +924,99 @@ The resulting stack and `argv` layout is drawn in [10-c-in-xv6.md](10-c-in-xv6.m
 | **`ecall <n>`**                      | `ecall` takes no operand; the number travels in `a7`, set by the preceding `li` in `user/usys.S`.                     |
 | **`k<syscallname>()` in the kernel** | Only for process calls; see [A system call is a number](#system-call-dispatch-numbers-handlers-and-invalid-requests). |
 
-## Homework 3: kernel-design questions and answer status
+## Homework 3: a full process table versus `exec`, `fork`, and `kill`
 
-Homework 3, [_kernel design_](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-design.html), is **not answered yet**. Its reading list is in [STUDY-PROGRESS.md](../STUDY-PROGRESS.md#homework-and-assigned-reading). When an answer is drafted, record it here as a worked table, keeping a _where the first draft went wrong_ table as [10-c-in-xv6.md](10-c-in-xv6.md#struct-address-mistakes-widths-units-and-pointer-loads) does.
+**Only `fork()` needs a free `struct proc`.** With every `proc[NPROC]` entry in use, `exec()` works, `fork()` returns `-1`, and `kill()` frees nothing by itself, so a `fork()` right after it still returns `-1`. The question is from Homework 3, [_kernel design_](https://pdos.csail.mit.edu/6.1810/2026/homework/xv6-design.html); its reading list is in [STUDY-PROGRESS.md](../STUDY-PROGRESS.md#homework-and-assigned-reading).
+
+| Call made while no slot is `UNUSED` | Result                                                 | Why, in this tree                                                                                                                                           |
+| ----------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`exec()`**                        | Works normally; the pid is unchanged.                  | `kexec()` in `kernel/exec.c` works on `myproc()`. It builds a new page table with `proc_pagetable(p)` and frees the old one, so it needs pages, not a slot. |
+| **`fork()`**                        | Returns `-1`; the caller and the kernel keep running.  | `allocproc()` in `kernel/proc.c` scans all `NPROC` entries, finds no `UNUSED` one, and returns `0`, so `kfork()` returns `-1`.                              |
+| **`kill(pid)`, then `fork()`**      | `kill()` returns `0`; the `fork()` still returns `-1`. | `kkill()` only sets `p->killed = 1` and makes a `SLEEPING` victim `RUNNABLE`. The victim's slot stays occupied until it exits **and** its parent waits.     |
+
+`exec()` can still return `-1` when `kalloc()` runs out of pages, or for any [hostile-ELF check](#exec-hostile-elf-checks-and-failure-cleanup), but never because the process table is full.
+
+### Why `kill()` alone never frees a process slot
+
+```mermaid
+flowchart TD
+    K["kill(pid): kkill() sets p->killed = 1 and wakes a SLEEPING victim."]
+    R["The victim runs again and reaches usertrap() in kernel/trap.c."]
+    X["killed(p) is true, so usertrap() calls kexit(-1)."]
+    Z["kexit() marks the victim ZOMBIE: it still holds its slot, trapframe, page table, and user memory."]
+    W{"Has the victim's parent called wait()?"}
+    S["The slot stays occupied: fork() keeps returning -1."]
+    F["kwait() calls freeproc(), which frees the memory and sets state = UNUSED."]
+    N["The next allocproc() scan can take the slot, so fork() succeeds."]
+
+    K --> R --> X --> Z --> W
+    W -->|No| S
+    S -.->|The parent waits later.| W
+    W -->|Yes| F --> N
+
+    classDef request fill:#fff0f0,stroke:#c66
+    classDef processing fill:#fffff0,stroke:#cc6
+    classDef decision fill:#f0f0ff,stroke:#66c
+    classDef stall fill:#ffd9d9,stroke:#c33
+    classDef commit fill:#f0ffff,stroke:#6cc
+    class K request
+    class R,X processing
+    class W decision
+    class Z,S stall
+    class F,N commit
+```
+
+_Legend: request red-white, processing yellow, decision blue, stall or held resource red, commit cyan; every node also states its meaning in text._
+
+**`kill()` is deliberately asynchronous.** The victim may be running on another hart or sleeping inside the kernel while holding locks, so destroying it on the spot could leave shared state inconsistent. xv6 instead lets the victim exit itself at a safe point: `usertrap()` checks `killed(p)` on system-call entry and again before returning to user space, and sleep loops such as `piperead()` in `kernel/pipe.c` and `sys_pause()` in `kernel/sysproc.c` check it after every wakeup.
+
+**Exiting is not enough either.** `kexit()` is still running on the slot's kernel stack until `sched()` switches away, so the slot cannot be handed out yet, and the parent is owed the exit status. The `ZOMBIE` therefore keeps the slot until the parent's `wait()` reaches `freeproc()`.
+
+### When `fork()` after `kill()` can succeed
+
+| Situation                                                | `fork()` right after `kill()`                                                                                                                               |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The caller is the victim's parent and has not waited** | Always `-1`: nobody else can reap the victim. This is the measured case below.                                                                              |
+| **Another parent is already blocked in `wait()`**        | A race: `-1` unless the victim exits and its parent reaps it on another hart before `allocproc()` scans the table. The homework's answer cannot rely on it. |
+| **The victim's parent never waits**                      | `-1` indefinitely. If that parent later exits, `reparent()` hands the zombie to `init`, whose `wait()` loop in `user/init.c` reaps it.                      |
+| **The pid already belongs to a `ZOMBIE`**                | `kkill()` still matches the pid and returns `0`, but changes nothing: the slot is waiting for `wait()`, not for an exit.                                    |
+| **The caller kills itself**                              | The `fork()` never runs: `usertrap()` sees `killed(p)` right after `syscall()` returns and calls `kexit(-1)`.                                               |
+
+### Homework 3 evidence: `hwdesign` on a full table
+
+[`user/hwdesign.c`](../user/hwdesign.c) runs all three questions in one process. A probe child is forked **before** the table fills, so it already owns a slot when it is told to `exec("echo", ...)`; the program then refills the probe's freed slot, kills one of its own blocked children, and forks before waiting:
+
+```text
+$ hwdesign
+hwdesign: table full: fork returned -1 after 60 children
+hwdesign: probe exec'd echo while the table was full
+hwdesign: exec used the probe's own slot; probe exited 0
+hwdesign: refilled 1 freed slot
+hwdesign: kill(65) returned 0; fork right after returned -1
+hwdesign: wait reaped killed pid 65, status -1
+hwdesign: fork after that wait succeeded
+hwdesign: reaped 60 children
+```
+
+| Line                                    | What it proves                                                                                                                                     |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **60 children**                         | `NPROC` 64 minus `init`, `sh`, `hwdesign`, and the probe; one fewer than [`forkfill`](#fork-and-kfork-process-creation-and-table-exhaustion)'s 61. |
+| **`echo`'s line, then exit status `0`** | `exec()` succeeded while `fork()` was failing for everyone.                                                                                        |
+| **`kill(...)` `0`, then `-1`**          | Marking the victim did not return its slot.                                                                                                        |
+| **Status `-1` from the killed pid**     | The victim left through `kexit(-1)` in `usertrap()`, and only this `wait()` freed its slot.                                                        |
+
+`./grade-exercises` pins every line; inserting a `wait(0)` between the `kill()` and the `fork()` turns the test red, because the fork then succeeds.
+
+### Homework 3 traps: tempting wrong answers
+
+| Tempting answer                                         | Why it is wrong                                                                                   |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **`exec()` fails too, because it starts a new program** | `exec()` replaces the caller's image in place; there is no `allocproc()` call in `kernel/exec.c`. |
+| **`kill()` destroys the process immediately**           | It sets a flag. The victim exits later, from its own kernel thread, at the next `killed()` check. |
+| **An exited process frees its slot**                    | `kexit()` leaves a `ZOMBIE`; only the parent's `wait()` calls `freeproc()`.                       |
+| **A full table panics the kernel**                      | `allocproc()` returns `0` and `fork()` returns `-1`. The failure is per call, not per system.     |
+
+> [!NOTE] **At the shell, a full table ends the shell, not the system.** By reading the code (not run): `fork1()` in `user/sh.c` calls `panic("fork")`, which prints `fork` and calls `exit(1)`. `init`'s `wait()` then reaps the shell, and its next `fork()` reuses the shell's own freed slot to start a new one.
 
 ## Questions about page-table permissions and trap diagnostics
 
