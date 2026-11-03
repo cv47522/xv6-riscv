@@ -59,6 +59,8 @@ anchors_of() {
   ' "$1" |
     tr '[:upper:]' '[:lower:]' |
     sed -E 's/[^a-z0-9 -]//g; s/ /-/g'
+  # Explicit anchors keep old fragments working after a heading is renamed.
+  sed -nE 's/^<a id="([^"]+)"><\/a>$/\1/p' < <(awk '/^[[:space:]]*```/ { fence = !fence; next } !fence' "$1")
 }
 
 # 1. Every relative markdown link resolves from the file that contains it,
@@ -89,7 +91,9 @@ check_links() {
       abs="$(cd "$(dirname "$resolved")" && pwd)/$(basename "$resolved")"
       case "$abs" in "$REPO"/*) ;; *) continue ;; esac
 
-      anchors_of "$abs" | grep -qxF "$frag" ||
+      # Not grep -q: exiting at the first match would SIGPIPE anchors_of on
+      # a large note, and pipefail would report that as a missing anchor.
+      anchors_of "$abs" | grep -xF "$frag" >/dev/null ||
         bad "${f#"$REPO"/} -> $target (no heading generates #$frag)"
     done
   done

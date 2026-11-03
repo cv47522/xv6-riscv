@@ -6,11 +6,11 @@
 
 ---
 
-**This is the canonical GDB guide for this tree.** Lab notes and other documents keep only their exercise-specific breakpoints and observations, and link here for setup, controls, crash lookup, backtraces, and pitfalls.
+**This is the canonical GDB guide for this tree.** Lab notes and other documents keep only their exercise-specific breakpoints and observations and link here for setup, controls, crash lookup, backtraces, and pitfalls.
 
 | Task                                                              | Section                                                                                                                                                                     |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Attach GDB to the emulated machine**                            | [Start a kernel GDB session](#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit)                                                                                              |
+| **Attach GDB to the emulated machine**                            | [Run a GDB session](#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit)                                                                                                       |
 | **See a whole session end to end, with screenshots**              | [Follow a system call into `sys_pause`](#follow-a-system-call-into-syspause)                                                                                                |
 | **Look up a command: `next`, `finish`, `p/x`, `bt`, `layout`, …** | [GDB command reference](#gdb-command-reference-run-control-breakpoints-inspection-and-harts)                                                                                |
 | **Use VS Code instead of a terminal**                             | [Debug with VS Code](#debug-with-vs-code-launch-configuration-and-evidence)                                                                                                 |
@@ -26,7 +26,18 @@ Console output comes first: [02-build-boot-and-usage.md](02-build-boot-and-usage
 
 Kernel bugs rarely announce themselves clearly. MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) says learning these tools is well worth the time, and the sections below turn most "it just hangs" sessions into a short investigation.
 
-## Start a kernel GDB session: `qemu-gdb` and `.gdbinit`
+<a id="start-a-kernel-gdb-session-qemu-gdb-and-gdbinit"></a>
+
+## Run a GDB session: `qemu-gdb`, kernel stops, and user stops
+
+**Every session starts the same way; only the stop differs.** The setup and [the two-terminal handoff](#the-two-terminal-handoff-which-terminal-acts-next) below are shared by both walkthroughs:
+
+| Walkthrough                                                                                  | Where it stops                | Symbols it needs                        |
+| -------------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------- |
+| **[Kernel stop in `sys_pause`](#follow-a-system-call-into-syspause)**                        | `kernel/sysproc.c`, in S-mode | `kernel/kernel`, loaded by `.gdbinit`   |
+| **[User stop in `sleep.c:main`](#debug-usersleep-manually-with-add-symbol-file-and-hbreak)** | `user/sleep.c`, in U-mode     | `user/_sleep`, added by hand after boot |
+
+### Start QEMU halted and attach GDB
 
 Use two terminals. In the first, start one emulated hart to remove cross-hart interleavings while you trace one path; timer interrupts and xv6 process scheduling still occur:
 
@@ -53,35 +64,76 @@ The explicit `-x` works even when GDB declines to auto-load a repository-local `
 > add-auto-load-safe-path /absolute/path/to/xv6-riscv/.gdbinit
 > ```
 
-<a id="follow-a-system-call-into-syspause"></a>
+### The two-terminal handoff: which terminal acts next
 
-## Follow a system call into `sys_pause`
+**After `continue`, GDB's prompt disappears until the kernel stops, and the next action is usually in QEMU's terminal.** QEMU starts halted, GDB releases it, xv6 boots in terminal 1, and only the code path you trigger there brings the `(gdb)` prompt back in terminal 2:
 
-**One session, end to end:** stop the kernel in the handler for `sleep 10`, read the decoded argument, then read the user's saved registers one frame up. Set the breakpoint before continuing from the reset vector, then type the command in QEMU's terminal once xv6 reaches its `$ ` prompt:
-
-```gdb
-(gdb) break sys_pause
-(gdb) continue
-(gdb) next
-(gdb) print n
-(gdb) backtrace
-(gdb) frame 1
-(gdb) print p->trapframe->a0
-(gdb) print p->trapframe->a7
-(gdb) detach
-(gdb) quit
+```mermaid
+sequenceDiagram
+    participant T1 as Terminal 1, QEMU console
+    participant Q as Emulated hart
+    participant T2 as Terminal 2, GDB
+    rect rgb(255, 240, 240)
+    Note over T1,T2: Start and attach
+    T1->>Q: make CPUS=1 qemu-gdb starts QEMU with -S
+    Note over Q: Halted at the reset vector 0x1000, the console stays blank
+    T2->>Q: gdb-multiarch attaches through the per-user port
+    end
+    rect rgb(240, 240, 255)
+    Note over T1,T2: Set breakpoints while the hart is halted
+    T2->>Q: break sys_pause
+    end
+    rect rgb(255, 255, 240)
+    Note over T1,T2: Run and trigger the code path
+    T2->>Q: continue, GDB prints Continuing. and shows no prompt
+    Q-->>T1: xv6 boots and prints the shell prompt
+    T1->>Q: The user types sleep 10
+    end
+    rect rgb(240, 255, 240)
+    Note over T1,T2: Stop
+    Q-->>T2: Breakpoint 1, sys_pause, and the (gdb) prompt returns
+    Note over T1,Q: The whole machine is paused, so the console stops responding
+    end
 ```
 
-1. Enter `sleep 10` in QEMU's terminal. The breakpoint stops at the handler's opening brace, before local `n` has a value.
-2. Run `next` until the highlighted line is past `argint(0, &n)`, then `print n`. Check the current source position rather than relying on a fixed number of `next` commands.
-3. Run `backtrace` to see `sys_pause()`, `syscall()`, and `usertrap()`. Frame pointers in the kernel build make that trace available.
-4. Select the `syscall` frame with `frame 1`, where `p` is in scope, and print the **saved** user registers from the trapframe.
+_Legend: request red-white for starting and attaching, routing blue for setting breakpoints, processing yellow for running, and data green for the stop report returning to GDB. Every band also carries a text title._
+
+Use this table to decide what a silent terminal means:
+
+| Where you are waiting                                 | What it means                                                                 | Next action                                                                                                |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Terminal 1 is blank after `make qemu-gdb`**         | `-S` halted the hart before its first instruction; QEMU waits for a debugger. | Attach GDB in terminal 2.                                                                                  |
+| **Terminal 2 shows `Continuing.` and no prompt**      | The kernel is running; GDB prompts again only when the target stops.          | Look at terminal 1: wait for the boot output, then trigger the code path, or press `Ctrl-C` in terminal 2. |
+| **Terminal 1 shows `$ ` and terminal 2 stays silent** | The breakpoint's code has not run yet.                                        | Type the command that reaches it, such as `sleep 10`.                                                      |
+| **Terminal 1 stops responding mid-command**           | A breakpoint hit, and every hart is paused.                                   | Switch to terminal 2, where the `(gdb)` prompt is back.                                                    |
+
+**A breakpoint on a path the kernel takes during boot fires without any typing.** `b syscall`, for example, stops on the first system call before the shell prints `$ `, so terminal 1 shows only the boot banner.
+
+<a id="follow-a-system-call-into-syspause"></a>
+
+### Kernel stop: follow a system call into `sys_pause`
+
+**One session, end to end:** stop the kernel in the handler for `sleep 10`, read the decoded argument, then read the user's saved registers one frame up. Each step names the terminal it happens in; [the handoff](#the-two-terminal-handoff-which-terminal-acts-next) explains the waits between them.
+
+1. **Terminal 1:** run `make CPUS=1 qemu-gdb`. It prints `*** Now run 'gdb' in another window.` and the QEMU command line, then stays blank: the hart is halted.
+2. **Terminal 2:** run `gdb-multiarch -x .gdbinit kernel/kernel`. GDB reports `0x0000000000001000 in ?? ()`, the reset vector, and shows `(gdb)`.
+3. **Terminal 2:** run `break sys_pause`. GDB prints `Breakpoint 1 at 0x80001e98: file kernel/sysproc.c, line 94.`
+4. **Terminal 2:** run `continue`. GDB prints `Continuing.` and **no prompt**. This is not a hang: the kernel is running, and the next step happens in terminal 1.
+5. **Terminal 1:** wait for `xv6 kernel is booting`, `init: starting sh`, and the `$ ` prompt, then type `sleep 10` and press Enter. The shell does not return, because the breakpoint pauses the whole machine.
+6. **Terminal 2:** the prompt is back after `Breakpoint 1, sys_pause () at kernel/sysproc.c:94`, the handler's opening brace, before local `n` has a value.
+7. **Terminal 2:** run `next 3`, then `print n`. GDB stops on line 101, `acquire(&tickslock)`, and prints `$1 = 10`: `argint(0, &n)` has copied the user's argument into `n`.
+8. **Terminal 2:** run `backtrace` to see `sys_pause()`, `syscall()`, and `usertrap()`. Frame pointers in the kernel build make that trace available; [reading the backtrace](#reading-the-syspause-backtrace-stack-frames-and-callers) explains the order.
+9. **Terminal 2:** run `frame 1` to select `syscall`, where `p` is in scope, then `print p->trapframe->a0` and `print p->trapframe->a7` to read the **saved** user registers.
+10. **Terminal 2:** run `detach`, then `quit`. In terminal 1, the kernel resumes, `sleep` finishes, and `$ ` returns; exit QEMU with `Ctrl-a x`.
 
 This tree's session printed the following; addresses change after a rebuild, and line 94 is the handler's opening brace:
 
 ```text
 Breakpoint 1 at 0x80001e98: file kernel/sysproc.c, line 94.
 Breakpoint 1, sys_pause () at kernel/sysproc.c:94
+94      {
+(gdb) next 3
+101       acquire(&tickslock);
 (gdb) print n
 $1 = 10
 (gdb) backtrace
@@ -97,26 +149,139 @@ $3 = 10
 $4 = 13
 ```
 
-**Frame `#3` is not a kernel caller.** `0x3ffffff09c` is in the trampoline page that `uservec` runs from, and the unwinder **cannot** continue past it into user code. `13` is `SYS_pause` in `kernel/syscall.h`.
+**Frame `#3` is not a kernel caller.** `0x3ffffff09c` is in the trampoline page that `uservec` runs from, and the unwinder **cannot** continue past it into user code; [reading the backtrace](#reading-the-syspause-backtrace-stack-frames-and-callers) explains why. `13` is `SYS_pause` in `kernel/syscall.h`.
 
 > [!WARNING]
 > `info registers a0 a7` prints the hart's **live** registers, not the trapframe. In this session they happened to read 10 and 13 as well, but nothing preserves them once the kernel runs; see [Live CSRs versus saved user registers](#live-csrs-versus-saved-user-registers).
 
-### The same stop in GDB's TUI: `layout src` and `layout split`
+#### Why `next 3` stops on line 101 and `print n` shows 10
 
-`layout src` keeps the source beside the prompt, so each `next` moves a visible marker instead of printing one line at a time:
+**The two `n`s are different things.** In `n 3`, `n` is GDB's abbreviation for `next` and `3` is a repeat count; in `print n`, `n` is the C local `int n` declared in `sys_pause`.
 
-![GDB's layout src stopped on line 101 of sys_pause, with the status bar and print n showing 10](images/gdb-tui-layout-src-sys-pause.png)
+| Command       | What GDB parses             | Result in this session                          |
+| ------------- | --------------------------- | ----------------------------------------------- |
+| **`n 3`**     | Run `next` three times      | Stops on line 101, not on line 94 + 3           |
+| **`print n`** | Evaluate the C variable `n` | `10`, the argument `sleep 10` passed to `pause` |
+
+**`next` counts executed source lines, not line numbers.** Lines that generate no code, such as declarations and blank lines, are never a stop, and a skipped branch body is never reached:
+
+| `next` | Stops on line | Why that line                                                    |
+| ------ | ------------- | ---------------------------------------------------------------- |
+| start  | 94 `{`        | The breakpoint sits on the prologue, before `n` is assigned.     |
+| 1      | 98            | `int n;` and `uint ticks0;` on lines 95–96 emit no instructions. |
+| 2      | 99            | `argint(0, &n)` has run, so `n` is now 10.                       |
+| 3      | 101           | `n < 0` is false, so line 100, `n = 0`, is skipped.              |
+
+Another build or another argument can change that path, so read the highlighted line rather than trusting the count. `print` takes a C expression, so its `n` can only be a variable in the selected frame.
+
+<a id="reading-the-syspause-backtrace-stack-frames-and-callers"></a>
+
+#### Reading the `sys_pause` backtrace: stack frames and callers
+
+**A stack frame is one active function call's record on the kernel stack:** its saved return address, saved frame pointer, and locals. `backtrace` lists one line per active call, the innermost first, so `#0` is the function that is running and each higher number is the function that called the one below it. It is a snapshot of who is waiting for whom, not a history of every function that ran.
+
+**`sys_pause` does not call `syscall`; `syscall` calls `sys_pause`.** `kernel/sysproc.c` has no call to `syscall()`, because the call goes the other way, through the function-pointer table in `kernel/syscall.c`:
+
+```c
+    p->trapframe->a0 = syscalls[num]();
+```
+
+_From `syscall()` in `kernel/syscall.c`._ With `num` equal to 13, `syscalls[13]` is `sys_pause`, so that indirect call creates frame `#0`. Read the backtrace from the bottom up to follow time forward:
+
+```mermaid
+flowchart TB
+    A["user/sleep.c main calls pause(); the user/usys.S stub sets a7 = 13 and executes ecall (U-mode)"]
+    B["uservec in kernel/trampoline.S saves user registers to p->trapframe, then jalr calls usertrap() — frame #3, shown as ?? at 0x3ffffff09c"]
+    C["usertrap() in kernel/trap.c:76 calls syscall() — frame #2"]
+    D["syscall() in kernel/syscall.c:156 reads a7 and calls syscalls[13]() — frame #1"]
+    E["sys_pause() in kernel/sysproc.c:101 is running — frame #0"]
+    A -->|ecall traps into S-mode| B --> C --> D --> E
+    classDef request fill:#fff0f0,stroke:#8a4b4b,color:#111
+    classDef routing fill:#f0f0ff,stroke:#57578a,color:#111
+    classDef processing fill:#fffff0,stroke:#85854d,color:#111
+    class A request
+    class B,C,D routing
+    class E processing
+```
+
+_Legend: request red-white for the user-mode request, routing blue for trap entry and dispatch, processing yellow for the handler doing the work. U-mode is user mode and S-mode is supervisor mode; see [04-terminology.md](04-terminology.md)._
+
+**Frame `#3` has no name because of where it runs.** `jalr t0` in `uservec` left `ra` pointing at `userret`, which runs from the trampoline page's high virtual address rather than the address `kernel/kernel` links it at, so GDB has no symbol for it. The `ecall` before it is a trap, not a call, so no frame links back into `sleep.c`.
+
+**Selecting a frame changes scope, not execution.** `frame 1` (or `up`) makes `print` evaluate in `syscall`, where `p` and `num` exist; the hart is still stopped in `sys_pause`. `frame 0` (or `down`) returns. In VS Code the **Call Stack** pane shows the same list; clicking the `syscall` row is `frame 1`, and the Variables pane and Debug Console then use that frame. In the [TUI](#the-same-stop-in-gdbs-tui-layout-src-and-layout-split), both panes jump to the selected frame's line.
+
+#### The same stop in GDB's TUI: `layout src` and `layout split`
+
+`layout src` keeps the source beside the prompt, so each `next` moves a visible marker instead of printing one line at a time. **Leave the TUI with `tui disable` or `Ctrl-x a`**; the session keeps running, and `Ctrl-x a` again or any `layout` command brings it back. If the screen is garbled afterwards, press `Ctrl-l`:
+
+![GDB's layout src stopped on line 101 of sys_pause, with the status bar and print n showing 10](images/riscv-01-gdb-tui-layout-src-sys-pause.png)
 
 _`layout src` after three `next` commands. **1** The `>` row is the next line to execute, not the last one executed. **2** The status bar names the selected hart (`Thread 1.1`), the function, the line, and the PC. **3** `print n` reads the local after `argint(0, &n)` has filled it._
 
 `layout split` adds the disassembly. Selecting `frame 1` moves both panes to the caller, which is how to see where `sys_pause` will return:
 
-![GDB's layout split in the syscall frame, with the source on line 156, the assembly on the instruction after jalr, and the trapframe a0 and a7 values](images/gdb-tui-layout-split-syscall-frame.png)
+![GDB's layout split in the syscall frame, with the source on line 156, the assembly on the instruction after jalr, and the trapframe a0 and a7 values](images/riscv-02-gdb-tui-layout-split-syscall-frame.png)
 
 _`layout split` after `frame 1`. **1** Line 156 calls through `syscalls[num]` and stores the result. **2** The selected frame's PC is the instruction after `jalr a5`: the `sd` that writes the return value into `p->trapframe->a0`. **3** That store has not run, so the saved `a0` still holds the argument 10. **4** The saved `a7` is 13, `SYS_pause`._
 
 The [sleep note](labs/01-util-sleep.md#inspecting-the-argument-the-grader-does-not-check) records what this stop does and does not prove about the exercise.
+
+<a id="debug-usersleep-manually-with-add-symbol-file-and-hbreak"></a>
+
+### User stop: break in `user/_sleep` with `add-symbol-file` and `hbreak`
+
+**Same start, different stop:** attach exactly as for the kernel stop, but load `user/_sleep`'s symbols after the shell is ready and stop on `sleep.c:main` with a hardware breakpoint. [Why the kernel symbols do not cover `sleep.c`](#kernelkernel-symbols-do-not-cover-usersleep) explains why the extra symbol file is needed; this recipe leaves `.vscode` unchanged.
+
+1. **Terminals 1 and 2:** start QEMU and attach GDB as in [steps 1–2 of the kernel stop](#follow-a-system-call-into-syspause). The `-q` flag in `gdb-multiarch -q -x .gdbinit kernel/kernel` only hides GDB's banner.
+2. **Terminal 2:** run `continue` **without** setting a breakpoint. GDB prints `Continuing.` and no prompt; see [the handoff](#the-two-terminal-handoff-which-terminal-acts-next).
+3. **Terminal 1:** wait for the `$ ` prompt. **Terminal 2:** press `Ctrl-C` to get `(gdb)` back.
+4. **Terminal 2:** load the user ELF's symbols at its link address, set a source-qualified hardware breakpoint, and continue:
+
+    ```gdb
+    (gdb) add-symbol-file user/_sleep 0
+    add symbol table from file "user/_sleep" at
+        .text_addr = 0x0
+    (gdb) hbreak -source sleep.c -function main
+    Hardware assisted breakpoint 1 at 0x0: file user/sleep.c, line 7.
+    (gdb) info breakpoints
+    (gdb) continue
+    ```
+
+5. **Terminal 1:** type `sleep 10` and press Enter.
+6. **Terminal 2:** confirm that GDB stopped in the user program and inspect its arguments:
+
+    ```gdb
+    Breakpoint 1, main (argc=2, argv=0x4fc0) at user/sleep.c:7
+    (gdb) info source
+    Current source file is user/sleep.c
+    (gdb) print argc
+    $1 = 2
+    (gdb) x/s argv[1]
+    0x4fe0: "10"
+    ```
+
+7. **Terminal 2:** remove the breakpoint and the user symbols, then leave as before:
+
+    ```gdb
+    (gdb) delete 1
+    (gdb) remove-symbol-file -a 0
+    (gdb) detach
+    (gdb) quit
+    ```
+
+Stack and string addresses vary after a rebuild, but the source file, argument count, and argument text should agree.
+
+| Step that differs from the kernel stop    | Why it differs                                                                                                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Breakpoint set after boot, not before** | Every xv6 user ELF is linked at virtual address 0, so a breakpoint there during boot stops in `init` or `sh` instead of `sleep`.                        |
+| **`add-symbol-file`, then removal**       | `.gdbinit` loads only `kernel/kernel`; the user labels are correct only while `sleep` owns the user page table.                                         |
+| **`hbreak` instead of `break`**           | A software breakpoint is written into memory through whichever page table is active when GDB inserts it; a hardware breakpoint compares the PC instead. |
+| **A short user backtrace**                | `bt` is reliable through `main` and `start`; nothing above them is a kernel caller, because user code enters the kernel only through an `ecall` stub.   |
+
+**Why the hardware breakpoint is needed:** after `Ctrl-C` the hart is usually running the kernel or the shell, so a software breakpoint at address 0 either has nowhere to go or lands in the wrong process's page, and `exec` gives `sleep` fresh pages without it. QEMU's hardware breakpoint matches the address whichever page backs it. The repository's VS Code configuration likewise requires hardware breakpoints.
+
+> [!WARNING]
+> `add-symbol-file` teaches GDB how to label addresses; it does not teach GDB which xv6 process owns the current page table. xv6 links user programs at the same virtual addresses, so `user/_sleep` labels become wrong when another user program runs. Load them for a focused stop, then remove them.
 
 ## GDB command reference: run control, breakpoints, inspection, and harts
 
@@ -126,7 +291,7 @@ The [sleep note](labs/01-util-sleep.md#inspecting-the-argument-the-grader-does-n
 
 | Command               | Short form  | What it does in an xv6 session                                                                                   |
 | --------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- |
-| **`continue`**        | `c`         | Runs every hart until a breakpoint, a fault, or `Ctrl-C`.                                                        |
+| **`continue`**        | `c`         | Runs every hart until a breakpoint, a watchpoint, or `Ctrl-C`.                                                   |
 | **`next`**            | `n`         | Runs to the next source line of the current function, stepping **over** calls such as `argint()`.                |
 | **`step`**            | `s`         | Runs to the next source line, stepping **into** calls: from `sys_pause` it stops inside `argint()`.              |
 | **`finish`**          | `fin`       | Runs until the current function returns and prints `Value returned`; from `sys_pause` that waits the full ticks. |
@@ -148,17 +313,17 @@ The [sleep note](labs/01-util-sleep.md#inspecting-the-argument-the-grader-does-n
 
 ### Inspect values, memory, and registers: `print`, `x`, and `info`
 
-| Command                        | Short form | What it does in an xv6 session                                                                                              |
-| ------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
-| **`print EXPR`**               | `p`        | Evaluates a C expression in the selected frame: `p n`, `p p->trapframe->a7`, `p p->name`, `p *p`.                           |
-| **`print/x EXPR`**             | `p/x`      | Prints in hex; use it for addresses and CSRs, such as `p/x $sstatus` or `p/x $satp`.                                        |
-| **`x/Ni ADDR`**                | —          | Disassembles `N` instructions: `x/4i $pc` shows the instruction about to run.                                               |
-| **`x/s ADDR`, `x/Ngx ADDR`**   | —          | Reads memory as a string or as `N` 8-byte hex words.                                                                        |
-| **`info registers [REG…]`**    | `i r`      | Prints the hart's **live** registers, never the trapframe; see [live versus saved](#live-csrs-versus-saved-user-registers). |
-| **`info locals`, `info args`** | `i lo`     | Lists the selected frame's variables; `<optimized out>` means the compiler kept no copy at this PC.                         |
-| **`info symbol ADDR`**         | —          | Names the function containing an address: `info symbol $pc` printed `sys_pause + 20 in section .text`.                      |
-| **`display EXPR`**             | —          | Reprints the expression after every stop inside the function where it was set.                                              |
-| **`list`**                     | `l`        | Prints source around the current line, for sessions without the TUI.                                                        |
+| Command                        | Short form | What it does in an xv6 session                                                                                                                       |
+| ------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`print EXPR`**               | `p`        | Evaluates a C expression in the selected frame: `p n`, `p p->trapframe->a7`, `p p->name`, `p *p`.                                                    |
+| **`print/x EXPR`**             | `p/x`      | Prints in hex; use it for addresses and CSRs, such as `p/x $sstatus` or `p/x $satp`.                                                                 |
+| **`x/Ni ADDR`**                | —          | Disassembles `N` instructions: `x/4i $pc` shows the instruction about to run.                                                                        |
+| **`x/s ADDR`, `x/Ngx ADDR`**   | —          | Reads memory as a string or as `N` 8-byte hex words.                                                                                                 |
+| **`info registers [REG…]`**    | `i r`      | Prints registers for the selected stack frame; select `frame 0` for live registers; see [live versus saved](#live-csrs-versus-saved-user-registers). |
+| **`info locals`, `info args`** | `i lo`     | Lists the selected frame's variables; `<optimized out>` means the compiler kept no copy at this PC.                                                  |
+| **`info symbol ADDR`**         | —          | Names the function containing an address: `info symbol $pc` printed `sys_pause + 20 in section .text`.                                               |
+| **`display EXPR`**             | —          | Reprints the expression after every stop inside the function where it was set.                                                                       |
+| **`list`**                     | `l`        | Prints source around the current line, for sessions without the TUI.                                                                                 |
 
 ### Stack frames and harts: `backtrace`, `frame`, and `thread`
 
@@ -251,7 +416,7 @@ For a panic, break on `panic` and let the kernel run into it:
 (gdb) p /x $stval
 ```
 
-![GDB stopped in panic after a kernel-mode load fault: bt ends at kernelvec, and info symbol on $sepc names syscall](images/gdb-bt-at-panic-kerneltrap.png)
+![GDB stopped in panic after a kernel-mode load fault: bt ends at kernelvec, and info symbol on $sepc names syscall](images/riscv-04-gdb-bt-at-panic-kerneltrap.png)
 
 _`b panic` with the syscall lab's null-load edit in `syscall()`, `CPUS=1`. **1** The trace ends at `kernelvec`, the S-mode trap entry. **2** `$sepc` still holds the faulting PC, so `info symbol` names the function the unwinder **cannot** reach. **3** That function's locals are out of scope here._
 
@@ -270,18 +435,18 @@ For a **hang** — a **deadlock**, or a loop that **never** exits — there is n
 
 ## Live CSRs versus saved user registers
 
-**GDB prints the hart's live state unless you ask for the trapframe.** At any stop inside a system call or trap handler, the user's registers and the hart's registers are different things:
+**Select `frame 0` to read live registers; outer frames may show reconstructed values.** At any stop inside a system call or trap handler, the user's registers and the hart's registers are different things:
 
-| What you print in GDB               | Where the value lives                   | What it describes at a stop inside the kernel                              |
-| ----------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
-| **`p->trapframe->a0` … `->a7`**     | The process's trapframe page, in memory | The user's registers at the moment of the trap, saved by `uservec`         |
-| **`$a0` … `$a7`, `info registers`** | The hart's live registers               | Whatever the **kernel** last put there; equal to the user's only by chance |
-| **`$sstatus`**                      | The hart's live CSR                     | Current interrupt enables, plus `SPP`: the mode the last trap came from    |
-| **`$scause`, `$sepc`, `$stval`**    | The hart's live CSRs                    | The **most recent** trap on this hart, until the next trap overwrites them |
+| What you print in GDB               | Where the value lives                   | What it describes at a stop inside the kernel                                    |
+| ----------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------- |
+| **`p->trapframe->a0` … `->a7`**     | The process's trapframe page, in memory | The user's registers at the moment of the trap, saved by `uservec`               |
+| **`$a0` … `$a7`, `info registers`** | The selected frame's register values    | Live in `frame 0`; outer frames may reconstruct values, not the user's trapframe |
+| **`$sstatus`**                      | The hart's live CSR                     | Current interrupt enables, plus `SPP`: the mode the last trap came from          |
+| **`$scause`, `$sepc`, `$stval`**    | The hart's live CSRs                    | The **most recent** trap on this hart, until the next trap overwrites them       |
 
 **Saved and live values diverge as soon as the kernel runs.** `uservec` copies the 31 user registers into the trapframe, and the kernel then uses the real registers for its own work. The [trapframe walkthrough](labs/01-util-sleep.md#the-per-process-trapframe-layout-and-access) owns the layout; `kernel/trampoline.S` and `struct trapframe` in `kernel/proc.h` are the sources.
 
-**Trap CSRs describe the last trap, not the one you are thinking of.** A breakpoint on a faulting instruction stops before it executes, so `$scause` still holds the cause of the trap that brought the hart into the kernel — for a system call, `8`, an environment call from U-mode. Read a fault's cause from the console line, or stop at `panic`, where the fault has been recorded.
+**Trap CSRs describe the last trap, not the one you are thinking of.** A breakpoint on a faulting instruction stops before it executes, so `$scause` describes the most recent trap, which may be the system call or an intervening interrupt. Read a fault's cause from the console line, or stop at `panic`, where the fault has been recorded.
 
 To decode `$sstatus`, test the `SSTATUS_*` masks in `kernel/riscv.h`: `SPP` is bit 8 (1 = Supervisor, 0 = User), `SPIE` bit 5, and `SIE` bit 1. On RV64 the printed value is large because bits 33:32 hold the `UXL` field, U-mode's register width, which says nothing about the previous mode.
 
@@ -303,7 +468,7 @@ make CPUS=1 qemu
 
 ## Debug user programs: load symbols from the right ELF
 
-**Kernel symbols are loaded by default; a user program's are not.** The four subsections below explain why a `user/sleep.c` breakpoint stays unresolved, how that differs from debugging a native host program, and the manual recipe that stops inside `user/_sleep` without breaking kernel debugging.
+**Kernel symbols are loaded by default; a user program's are not.** The three subsections below explain why a `user/sleep.c` breakpoint stays unresolved and how that differs from debugging a native host program. [The user-stop walkthrough](#debug-usersleep-manually-with-add-symbol-file-and-hbreak) is the recipe that stops inside `user/_sleep` without breaking kernel debugging.
 
 ### Source breakpoints require symbols from the correct ELF
 
@@ -373,6 +538,8 @@ The colors label request, processing, routing, data, successful resolution, and 
 | **Source covered initially**     | Sources linked into the selected ELF.   | Sources linked into the kernel ELF.                                                    |
 | **Other executable code**        | Usually outside the exercise's process. | Separate user ELFs such as `user/_sleep`, loaded later from `fs.img`.                  |
 
+<a id="kernelkernel-symbols-do-not-cover-usersleep"></a>
+
 ### kernel/kernel symbols do not cover user/\_sleep
 
 **Both ELFs contain debug information; only the kernel ELF is loaded initially.** The Makefile's `-ggdb` supplies DWARF source mappings in the independent RISC-V files `kernel/kernel` and `user/_sleep`.
@@ -380,78 +547,6 @@ The colors label request, processing, routing, data, successful resolution, and 
 The generated `.gdbinit` contains `symbol-file kernel/kernel` and no `add-symbol-file user/_sleep`. GDB therefore maps `sysproc.c` lines to kernel virtual addresses but has no source-to-address translation for `sleep.c`.
 
 `fs.img` does not solve that symbol problem. It stores the linked `sleep` executable for xv6 to load with `exec`; it is not a GDB symbol container, and QEMU's remote stub does not understand the xv6 filesystem or process table. The stub reports machine state—registers, memory, and emulated CPUs—while GDB relies on the ELF files supplied by the human or debugger configuration to label that state.
-
-<a id="debug-usersleep-manually-with-add-symbol-file-and-hbreak"></a>
-
-### Debug user/\_sleep manually with add-symbol-file and hbreak
-
-The following recipe adds `user/_sleep` to the existing kernel-debugging session without changing `.vscode`. It is deliberately manual because the symbol file is meaningful only while the intended xv6 process occupies that user address space.
-
-1. Start the normal one-hart QEMU debug target in terminal 1:
-
-    ```bash
-    make CPUS=1 qemu-gdb
-    ```
-
-2. Attach from terminal 2 and continue through boot:
-
-    ```bash
-    gdb-multiarch -q -x .gdbinit kernel/kernel
-    ```
-
-    ```gdb
-    (gdb) continue
-    ```
-
-    GDB prints `Continuing.` and then shows no further `(gdb)` prompt; that is expected, because the target is running and GDB only prompts again once it stops.
-
-3. Wait for the `$ ` prompt in terminal 1, then press `Ctrl-C` in terminal 2. Stopping after the shell is ready matters because every xv6 user ELF is linked at virtual address zero; installing an address-zero breakpoint during boot could stop in `init` or `sh` before `sleep` runs.
-
-4. Load the user ELF's symbols, set a source-qualified hardware breakpoint, and continue:
-
-    ```gdb
-    (gdb) add-symbol-file user/_sleep 0
-    add symbol table from file "user/_sleep" at
-        .text_addr = 0x0
-    (gdb) hbreak -source sleep.c -function main
-    Hardware assisted breakpoint 1 at 0x0: file user/sleep.c, line 7.
-    (gdb) info breakpoints
-    (gdb) continue
-    ```
-
-5. Enter the command in terminal 1:
-
-    ```text
-    $ sleep 10
-    ```
-
-6. Confirm that GDB stopped in the user program and inspect its arguments:
-
-    ```gdb
-    Breakpoint 1, main (argc=2, argv=0x4fc0) at user/sleep.c:7
-    (gdb) info source
-    Current source file is user/sleep.c
-    (gdb) print argc
-    $1 = 2
-    (gdb) x/s argv[1]
-    0x4fe0: "10"
-    ```
-
-    Stack and string addresses vary after a rebuild, but the source file, argument count, and argument text should agree. A user backtrace is reliable through `main` and `start`; **do not** interpret frames beyond the saved entry context as kernel callers because the user-to-kernel transition happens only when the program executes a system-call stub.
-
-7. Remove the temporary breakpoint and user symbols before returning to kernel-only debugging:
-
-    ```gdb
-    (gdb) delete 1
-    (gdb) remove-symbol-file -a 0
-    (gdb) detach
-    (gdb) quit
-    ```
-
-> [!WARNING]
-> `add-symbol-file` teaches GDB how to label addresses; it does not teach GDB which xv6 process owns the current page table. xv6 links user programs at the same virtual addresses, so `user/_sleep` labels become wrong when another user program runs. Load them for a focused stop, then remove them.
-
-The hardware breakpoint is purposeful. It asks QEMU to stop when a hart executes the address instead of having GDB patch a breakpoint instruction into a guest text page. The repository's VS Code configuration likewise requires hardware breakpoints.
 
 ## Why use `CPUS=1`
 
@@ -471,18 +566,18 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 
 ## GDB troubleshooting: symbols, reused addresses, and harts
 
-| Observation                                                               | Likely cause                                                                                                                 | Check or correction                                                                                                                                  |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **gdb prints `Undefined item: "riscv:rv64"`**                             | The `gdb` binary was built without RISC-V support.                                                                           | Run `gdb-multiarch`, `riscv64-linux-gnu-gdb`, or `riscv64-unknown-elf-gdb` instead.                                                                  |
-| **gdb never mentions `riscv:rv64`**                                       | gdb was started outside the repository root, so it did not read the generated `.gdbinit`.                                    | `cd` to the root and pass `-x .gdbinit`; [the session setup](#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit) explains auto-load safe paths.        |
-| **A breakpoint is gray or hollow**                                        | No loaded symbol file maps that source line to an address.                                                                   | Run `info sources` and `info files`; load the correct ELF rather than moving the breakpoint randomly.                                                |
-| **`continue` prints `Continuing.` and no further `(gdb)` prompt appears** | The target is running; GDB does not prompt again until it stops.                                                             | Watch terminal 1 for the `$ ` prompt, then press `Ctrl-C` in terminal 2 to regain the `(gdb)` prompt, as in step 3 of the recipe above.              |
-| **`sleep.c` resolves but execution stops in another user program**        | Several xv6 user ELFs reuse virtual address zero, and the breakpoint was installed before `sleep` owned the user page table. | Continue to the shell first, interrupt GDB, then add the symbols and hardware breakpoint immediately before running `sleep`.                         |
-| **GDB cannot insert the breakpoint**                                      | The requested breakpoint type or address is unavailable in the current target state.                                         | Confirm the QEMU remote connection, use `hbreak`, and check `info breakpoints`; do not replace it with a software breakpoint in read-only user text. |
-| **A local is `<optimized out>` or nonsensical**                           | The compiler optimized it or the stop is before its initialization.                                                          | Check the highlighted source line and step past the assignment before printing the value.                                                            |
-| **The GDB port is already in use**                                        | A previous QEMU instance still owns the per-user port.                                                                       | Run `pgrep -af qemu-system-riscv64`, identify the stale instance, and terminate only that process.                                                   |
-| **`exec sleep failed` appears**                                           | The running guest's `fs.img` does not contain the linked user program.                                                       | Quit QEMU, rebuild the image, boot again, and confirm the xv6 shell's `ls` output includes `sleep` before debugging source behavior.                 |
-| **The bug disappears with `CPUS=1`**                                      | The failure depends on cross-hart concurrency.                                                                               | Treat the single-hart trace as partial evidence and reproduce with the default three harts.                                                          |
+| Observation                                                               | Likely cause                                                                                                                 | Check or correction                                                                                                                                                                               |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **gdb prints `Undefined item: "riscv:rv64"`**                             | The `gdb` binary was built without RISC-V support.                                                                           | Run `gdb-multiarch`, `riscv64-linux-gnu-gdb`, or `riscv64-unknown-elf-gdb` instead.                                                                                                               |
+| **gdb never mentions `riscv:rv64`**                                       | gdb was started outside the repository root, so it did not read the generated `.gdbinit`.                                    | `cd` to the root and pass `-x .gdbinit`; [the session setup](#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit) explains auto-load safe paths.                                                     |
+| **A breakpoint is gray or hollow**                                        | No loaded symbol file maps that source line to an address.                                                                   | Run `info sources` and `info files`; load the correct ELF rather than moving the breakpoint randomly.                                                                                             |
+| **`continue` prints `Continuing.` and no further `(gdb)` prompt appears** | The target is running; GDB does not prompt again until it stops.                                                             | Watch terminal 1 for the `$ ` prompt, then press `Ctrl-C` in terminal 2 to regain the `(gdb)` prompt, as in step 3 of [the user stop](#debug-usersleep-manually-with-add-symbol-file-and-hbreak). |
+| **`sleep.c` resolves but execution stops in another user program**        | Several xv6 user ELFs reuse virtual address zero, and the breakpoint was installed before `sleep` owned the user page table. | Continue to the shell first, interrupt GDB, then add the symbols and hardware breakpoint immediately before running `sleep`.                                                                      |
+| **GDB cannot insert the breakpoint**                                      | The requested breakpoint type or address is unavailable in the current target state.                                         | Confirm the QEMU remote connection, use `hbreak`, and check `info breakpoints`; do not replace it with a software breakpoint in read-only user text.                                              |
+| **A local is `<optimized out>` or nonsensical**                           | The compiler optimized it or the stop is before its initialization.                                                          | Check the highlighted source line and step past the assignment before printing the value.                                                                                                         |
+| **The GDB port is already in use**                                        | A previous QEMU instance still owns the per-user port.                                                                       | Run `pgrep -af qemu-system-riscv64`, identify the stale instance, and terminate only that process.                                                                                                |
+| **`exec sleep failed` appears**                                           | The running guest's `fs.img` does not contain the linked user program.                                                       | Quit QEMU, rebuild the image, boot again, and confirm the xv6 shell's `ls` output includes `sleep` before debugging source behavior.                                                              |
+| **The bug disappears with `CPUS=1`**                                      | The failure depends on cross-hart concurrency.                                                                               | Treat the single-hart trace as partial evidence and reproduce with the default three harts.                                                                                                       |
 
 ## Assembly, GDB, ELF, and lab references
 

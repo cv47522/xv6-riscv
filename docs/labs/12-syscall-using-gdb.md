@@ -18,7 +18,7 @@ Derive the answers to the first exercise of MIT's [syscall lab](https://pdos.csa
 | **Stuck on a reading that is odd** | [Traps](#using-gdb-traps-misleading-readings-and-stale-addresses)                                                               |
 
 > [!IMPORTANT]
-> No answers here. The C quotation below is existing kernel code, and the gdb transcripts show only setup lines. Each question gets the evidence to collect and the readings that mislead, not the reading itself.
+> No answers here. The gdb transcripts show only setup lines. Each question gets the evidence to collect and the readings that mislead, not the reading itself.
 
 ## What the exercise asks for: Using gdb
 
@@ -87,40 +87,19 @@ The test body's own comment says it is "just a simple sanity check, will be grad
 
 ## The code to read first
 
-| File                               | Contributes                                                                                                          | Deliberately does not                                               |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **`kernel/syscall.c`**             | `syscall()`: the breakpoint, the `a7` load you replace, and the dispatch through `syscalls[]`                        | Validate the user's registers; `argint()` and friends do that later |
-| **`kernel/trap.c`**                | `usertrap()` for traps from user mode; `kerneltrap()`, which prints `scause sepc stval` before `panic("kerneltrap")` | Recover from a kernel-mode fault: there is no handler for one       |
-| **`kernel/proc.h`**                | `struct proc`, including `trapframe`, `name`, and `pid`, which `p /x *p` prints                                      | Hold user registers directly; they live in the trapframe page       |
-| **`user/init.c`, `user/init.asm`** | The first user program, and the stub call its first system call compiles into                                        | Run before the kernel finishes booting                              |
-| **`kernel/syscall.h`**             | The `SYS_*` numbers                                                                                                  | Say anything about arguments                                        |
-| **`kernel/riscv.h`**               | `SSTATUS_SPP`, `SSTATUS_SPIE`, and `SSTATUS_SIE` bit masks                                                           | Describe the fields above bit 8                                     |
-| **`kernel/vm.c`**                  | `kvmmake()`: every range the kernel page table maps                                                                  | Map anything lazily: what it does not map stays unmapped            |
+| File                               | Contributes                                                                                                          | Deliberately does not                                          |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **`kernel/syscall.c`**             | `syscall()`: the breakpoint, the `a7` load you replace, and the dispatch through `syscalls[]`                        | Validate argument values; handlers check them after extraction |
+| **`kernel/trap.c`**                | `usertrap()` for traps from user mode; `kerneltrap()`, which prints `scause sepc stval` before `panic("kerneltrap")` | Recover from a kernel-mode fault: there is no handler for one  |
+| **`kernel/proc.h`**                | `struct proc`, including `trapframe`, `name`, and `pid`, which `p /x *p` prints                                      | Hold user registers directly; they live in the trapframe page  |
+| **`user/init.c`, `user/init.asm`** | The first user program, and the stub call its first system call compiles into                                        | Run before the kernel finishes booting                         |
+| **`kernel/syscall.h`**             | The `SYS_*` numbers                                                                                                  | Say anything about arguments                                   |
+| **`kernel/riscv.h`**               | `SSTATUS_SPP`, `SSTATUS_SPIE`, and `SSTATUS_SIE` bit masks                                                           | Describe the fields above bit 8                                |
+| **`kernel/vm.c`**                  | `kvmmake()`: every range the kernel page table maps                                                                  | Map anything lazily: what it does not map stays unmapped       |
 
 ## `syscall()`: the stop point and the line you replace
 
 From [`kernel/syscall.c`](../../kernel/syscall.c):
-
-```c
-void
-syscall(void)
-{
-  int num;
-  struct proc *p = myproc();
-
-  num = p->trapframe->a7;
-  if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    /*
-     * Use num to lookup the system call function for num, call it,
-     * and store its return value in p->trapframe->a0
-     */
-    p->trapframe->a0 = syscalls[num]();
-  } else {
-    printk("%d %s: unknown sys call %d\n", p->pid, p->name, num);
-    p->trapframe->a0 = -1;
-  }
-}
-```
 
 | Line                             | Consequence for the exercise                                                                                                                    |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -171,10 +150,10 @@ Session 1 stops on the left path's way in; session 2 shows the right path's way 
 
 [09-debugging-xv6.md](../09-debugging-xv6.md#live-csrs-versus-saved-user-registers) owns the distinction between the hart's live registers and the trapframe's saved copies. In this exercise it decides two readings:
 
-| Reading                                  | Saved or live                         | Consequence                                                                              |
-| ---------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Question 2's `p->trapframe->a7`**      | Saved by `uservec` at the `ecall`     | It is the user's value; `$a7` at the same stop is live and matches it only by chance.    |
-| **`$scause` at session 2's `b *<sepc>`** | Live, describing the most recent trap | The faulting load has not run yet, so it still describes the system call, not the fault. |
+| Reading                                  | Saved or live                         | Consequence                                                                                                    |
+| ---------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Question 2's `p->trapframe->a7`**      | Saved by `uservec` at the `ecall`     | It is the user's value; `$a7` at the same stop is live and matches it only by chance.                          |
+| **`$scause` at session 2's `b *<sepc>`** | Live, describing the most recent trap | The faulting load has not run yet, so it describes the system call or an intervening interrupt, not the fault. |
 
 ### Decoding `sstatus`: the previous-mode bit
 
@@ -221,7 +200,7 @@ Link each answer back to [its evidence row](#using-gdb-questions-and-their-evide
 | **gdb itself will not start or attach**             | `Undefined item: "riscv:rv64"`, no `riscv:rv64` line, or a busy port | Wrong binary, wrong directory, or a stale QEMU: see [GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts). |
 | **Printing `*p` at the breakpoint**                 | Garbage, or an error                                                 | `next` past `myproc()` first; the stop is at the opening brace.                                                                                           |
 | **Reading `$a7` for question 2**                    | A kernel value                                                       | Read `p->trapframe->a7`, the saved user register.                                                                                                         |
-| **Reading `$scause` at the `b *<sepc>` stop**       | The system-call cause, not a page fault                              | Use the console line; see [the saved-versus-live table](#live-csrs-versus-saved-user-registers).                                                          |
+| **Reading `$scause` at the `b *<sepc>` stop**       | The system-call cause or an intervening interrupt, not the fault     | Use the console line; see [the saved-versus-live table](#live-csrs-versus-saved-user-registers).                                                          |
 | **`bt` after `b panic`**                            | It stops at `kernelvec`, never reaching `syscall()`                  | Read `$sepc` at that stop instead; see [Backtraces](../09-debugging-xv6.md#backtraces-panics-kernel-mode-faults-and-hangs).                               |
 | **`p p->name` at the `panic` stop**                 | `p` is not in scope                                                  | Ask question 6 at the `b *<sepc>` stop, inside `syscall()`.                                                                                               |
 | **Using the handout's or an old build's addresses** | A breakpoint on an unrelated instruction                             | Take `sepc` from the current run; addresses move with every rebuild.                                                                                      |
@@ -231,48 +210,55 @@ Link each answer back to [its evidence row](#using-gdb-questions-and-their-evide
 
 ### Session 1: stop in `syscall()` and step to the `a7` load
 
-Start the two-terminal session from [09](../09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit); `CPUS=1` makes the stop predictable but is optional:
+Each step names its terminal; [the two-terminal handoff in 09](../09-debugging-xv6.md#the-two-terminal-handoff-which-terminal-acts-next) explains why a terminal goes silent. `CPUS=1` makes the stop predictable but is optional.
 
-```bash
-make qemu-gdb                        # terminal 1
-gdb-multiarch -x .gdbinit kernel/kernel   # terminal 2
-```
+1. **Terminal 1:** run `make qemu-gdb`. The console stays blank because QEMU waits, halted, for a debugger.
+2. **Terminal 2:** run `gdb-multiarch -x .gdbinit kernel/kernel` from the repository root, then `b syscall` and `c`. GDB prints `Continuing.` and no prompt while the kernel boots.
+3. **Terminal 1: type nothing.** The breakpoint fires on the first system call after boot, before any `$ ` prompt appears, so terminal 1 shows only the boot banner.
+4. **Terminal 2:** the prompt returns at `syscall()`'s opening brace. Run the inspection commands below, stepping with `n` before printing anything that uses `p`:
 
-```gdb
-(gdb) b syscall
-(gdb) c
-(gdb) layout src
-(gdb) backtrace
-(gdb) n
-(gdb) n
-(gdb) p /x *p
-(gdb) p /x p->trapframe->a7
-(gdb) p /x $sstatus
-```
+    ```gdb
+    (gdb) layout src
+    (gdb) backtrace
+    (gdb) n
+    (gdb) n
+    (gdb) p /x *p
+    (gdb) p /x p->trapframe->a7
+    (gdb) p /x $sstatus
+    ```
+
+5. **Both terminals:** `detach` and `quit` in terminal 2, then `Ctrl-a x` in terminal 1, so the next session can use the port and `fs.img`.
 
 This build prints `Breakpoint 1 at 0x80001d48: file kernel/syscall.c, line 146.` when the breakpoint is installed, and two `next` commands reach line 150, `num = p->trapframe->a7;`. [Session controls](../09-debugging-xv6.md#gdb-and-qemu-session-controls) cover `layout` and leaving the TUI.
 
-![GDB's layout src in syscall(): the B+ breakpoint marker on the opening brace at line 146 and the current-line marker on line 150](../images/gdb-syscall-lab-session1-line150.png)
+![GDB's layout src in syscall(): the B+ breakpoint marker on the opening brace at line 146 and the current-line marker on line 150](../images/riscv-03-gdb-syscall-lab-session1-line150.png)
 
 _Where to be before printing anything, `CPUS=1`. **1** `B+` marks the breakpoint on the opening brace, where `p` is not yet assigned. **2** After two `next` commands, `>` sits on line 150: `myproc()` has run and the `a7` load has not. **3** The status bar confirms the function and line. The screenshot deliberately stops before the commands that answer the questions._
 
 ### Session 2: break the load, then stop at `sepc` and at `panic`
 
-Edit line 150 as the handout says, rebuild through `make qemu`, and copy the `sepc` from the line above `panic: kerneltrap`. Then:
+1. **Edit:** replace line 150 as the handout says.
+2. **Terminal 1:** run `make qemu`, without GDB. The kernel prints a `scause=... sepc=... stval=...` line and `panic: kerneltrap` before any `$ ` prompt. Copy the `sepc`, then exit with `Ctrl-a x`, since a panicked kernel never returns to a prompt.
+3. **Any terminal:** look the address up; it is valid only for this build:
 
-```bash
-grep -n '<sepc without 0x>:' kernel/kernel.asm
-riscv64-linux-gnu-addr2line -f -e kernel/kernel 0x<sepc>
-```
+    ```bash
+    grep -n '<sepc without 0x>:' kernel/kernel.asm
+    riscv64-linux-gnu-addr2line -f -e kernel/kernel 0x<sepc>
+    ```
 
-```gdb
-(gdb) b *0x<sepc>
-(gdb) layout asm
-(gdb) c
-(gdb) x/i $pc
-(gdb) p p->name
-(gdb) p p->pid
-```
+4. **Terminal 1:** run `make qemu-gdb`. It stays blank, waiting for the debugger.
+5. **Terminal 2:** attach a fresh `gdb-multiarch -x .gdbinit kernel/kernel`, then set the breakpoint and continue. As in session 1, nothing is typed in terminal 1: the faulting load runs on the first system call after boot.
+
+    ```gdb
+    (gdb) b *0x<sepc>
+    (gdb) layout asm
+    (gdb) c
+    (gdb) x/i $pc
+    (gdb) p p->name
+    (gdb) p p->pid
+    ```
+
+6. **Both terminals:** `quit` GDB and exit QEMU with `Ctrl-a x` before reverting the edit below.
 
 To recover the fault's CSRs instead, stop at `panic`; [Backtraces](../09-debugging-xv6.md#backtraces-panics-kernel-mode-faults-and-hangs) shows the commands and why the values survive there.
 
@@ -290,7 +276,7 @@ The grader's name filter is a case-insensitive substring match on test titles, s
 
 1. The session-2 load reads address 0. Would `num = * (int *) 0x80000000;` also panic? Use the `KERNBASE` row of [the mapping table](#what-the-kernel-page-table-maps) and its permissions.
 2. **Failure scenario:** if the edit were a store, `* (int *) 0 = 1;`, which `scause` would the console print, and why does the kernel still panic rather than kill the process?
-3. **Failure scenario:** if the same null load were in a user program instead, which function in `kernel/trap.c` would handle it, and why does the machine survive? See the note under [the CSR table](../06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown).
+3. **Failure scenario:** if a user program instead loaded from an unmapped address, which function in `kernel/trap.c` would handle it, and why does the machine survive? See the note under [the CSR table](../06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown).
 4. Why can gdb print `p->trapframe->a7` at all, given that the trapframe is mapped at `TRAPFRAME` in the **user** page table? Check which kernel mapping covers the physical page `p->trapframe` points to.
 5. Why does the session-1 backtrace end with an unnamed frame at an address just above `0x3ffffff000`? Compare `TRAMPOLINE` with the address `kernel/kernel.sym` gives the `trampoline` symbol.
 6. With three harts, why does exactly one `scause=... sepc=...` line appear before `panic: kerneltrap`, even if other harts are also running? `panic()` and `uartputc_sync()` in `kernel/printk.c` and `kernel/uart.c` hold the answer.
