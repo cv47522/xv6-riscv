@@ -323,9 +323,17 @@ These are conversion mechanics. The helper's [input and error-reporting limits](
 
 ## Debug xv6 with console output, GDB, and QEMU
 
-For register stepping and memory inspection on a tiny bare-metal program, start with [the assembly course’s QEMU/GDB exercise](../../assembly-language/docs/riscv/00-tools-and-first-run.md#qemu-and-gdb-run-and-step-the-first-example). The details below apply to this xv6 tree.
+**Start with console output; reach for the debugger when output cannot explain the failure.** [09-debugging-xv6.md](09-debugging-xv6.md) is the canonical guide to GDB, VS Code, crash addresses, backtraces, and the QEMU monitor; this section keeps only console tracing and the C pitfall the lab guidance singles out.
 
-Kernel bugs rarely announce themselves clearly, so it is worth building the habit of reaching for the right tool instead of staring at the code. MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) says learning these is well worth the time, and that matches experience — the tools below turn most "it just hangs" sessions into a five-minute answer.
+| Task                                       | Where                                                                                                           |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| **Trace with `printf` and keep a log**     | [Below](#trace-execution-with-printf-and-save-the-console-log)                                                  |
+| **Attach GDB with `make qemu-gdb`**        | [Start a kernel GDB session](09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit)               |
+| **Debug from VS Code**                     | [Debug with VS Code](09-debugging-xv6.md#debug-with-vs-code-launch-configuration-and-evidence)                  |
+| **Map a panic's `sepc` to a line**         | [Find where the kernel crashed](09-debugging-xv6.md#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line) |
+| **Backtrace a panic or a hang**            | [Backtraces](09-debugging-xv6.md#backtraces-panics-kernel-mode-faults-and-hangs)                                |
+| **Inspect the page table with `info mem`** | [QEMU monitor](09-debugging-xv6.md#inspect-the-machine-through-the-qemu-monitor)                                |
+| **Check pointer versus integer addition**  | [Below](#pointer-arithmetic)                                                                                    |
 
 ### Trace execution with `printf` and save the console log
 
@@ -337,133 +345,6 @@ grep -n 'panic' xv6.log
 ```
 
 Remember to leave `script` (`exit`, or `Ctrl-d`) — until you do, the log is still being written and may be incomplete.
-
-### Debugging with gdb
-
-Use two terminals. In the first, start one emulated hart to remove cross-hart interleavings while you trace one path; timer interrupts and xv6 process scheduling still occur:
-
-```bash
-make CPUS=1 qemu-gdb
-```
-
-The `qemu-gdb` recipe adds `-S`, which stops the hart at the reset vector before its first instruction, and `-gdb tcp::<port>`, which exposes QEMU's remote GDB stub. The Makefile derives the port from the host uid and generates `.gdbinit` with that value, the RISC-V architecture, `kernel/kernel` as the symbol file, and compressed-breakpoint support.
-
-In the second terminal, from the repository root, explicitly source that generated file:
-
-```bash
-gdb-multiarch -x .gdbinit kernel/kernel
-```
-
-If that binary is not installed, `riscv64-linux-gnu-gdb` or `riscv64-unknown-elf-gdb` works identically — any of the three can debug a RISC-V target.
-
-The explicit `-x` works even when GDB declines to auto-load a repository-local `.gdbinit`. To use the shorter `gdb-multiarch kernel/kernel` command, trust this one repository by adding the exact absolute path GDB prints to the user-init file named in its diagnostic, which may be `~/.config/gdb/gdbinit` or `~/.gdbinit`:
-
-> [!NOTE]
-> Add only repositories you trust. A local `.gdbinit` executes debugger commands, so globally disabling `auto-load safe-path` would also trust files in unrelated repositories.
->
-> ```gdb
-> add-auto-load-safe-path /absolute/path/to/xv6-riscv/.gdbinit
-> ```
-
-Set breakpoints before continuing from the reset vector. This example stops when the util lab's `sleep` command crosses into its kernel handler:
-
-```gdb
-(gdb) break sys_pause
-(gdb) continue
-(gdb) info breakpoints
-(gdb) next
-(gdb) print n
-(gdb) info registers a0 a7
-(gdb) backtrace
-(gdb) detach
-(gdb) quit
-```
-
-After xv6 reaches its `$ ` prompt, follow the call from the guest command into the handler:
-
-1. Enter `sleep 10` in QEMU's terminal. The breakpoint stops at the handler's opening brace, before local `n` has a value.
-2. Run `next` until past `argint(0, &n)`, then `print n`. In this build, two `next` commands reach that point and print 10.
-3. Run `info registers a0 a7` to see the saved first argument and syscall number at this boundary.
-4. Run `backtrace` to see `sys_pause()`, `syscall()`, and `usertrap()`. Frame pointers in the kernel build make that trace available.
-
-| Focus or intended outcome              | Control                             |
-| -------------------------------------- | ----------------------------------- |
-| **Interrupt the target from GDB**      | `Ctrl-C` returns to the GDB prompt. |
-| **Exit QEMU from its terminal**        | `Ctrl-a x` exits the emulator.      |
-| **Leave GDB while QEMU keeps running** | Use `detach` before `quit`.         |
-
-Otherwise, exit QEMU after leaving GDB so its per-user GDB port and `fs.img` are not left occupied.
-
-### Debugging with VS Code
-
-The checked-in `.vscode/launch.json` and `.vscode/tasks.json` automate the same two-terminal setup. They require `gdb-multiarch` and Microsoft's C/C++ extension, whose extension identifier is `ms-vscode.cpptools`:
-
-```bash
-code --install-extension ms-vscode.cpptools
-```
-
-1. Open the repository root in VS Code and select **xv6: debug sys_pause** in Run and Debug.
-2. Press F5. The pre-launch task runs `make CPUS=1 qemu-gdb` in a dedicated terminal, and `cppdbg` invokes `gdb-multiarch` with the generated `.gdbinit` explicitly sourced. This obtains the per-user port without hard-coding it in `launch.json`.
-3. The debugger connects at QEMU's reset vector with a breakpoint already set on `sys_pause`. Press Continue once and wait for xv6's `$ ` prompt in the QEMU terminal.
-4. Enter `sleep 10` in that terminal. VS Code stops in `kernel/sysproc.c`; step past `argint(0, &n)`, then inspect `n` in Variables or the Debug Console, the `a0` and `a7` registers in the Registers view, and the kernel path in Call Stack.
-5. Press Stop when finished. The post-debug task terminates the QEMU process using this user's generated GDB port, freeing both the port and disk image for the next run.
-
-The launch configuration leaves the initial target stopped instead of issuing `run`, because `kernel/kernel` is not a host executable: GDB controls an already-created remote machine. If startup fails, run the console workflow above first; it exposes GDB safe-path diagnostics, an occupied port, a missing `gdb-multiarch`, or a QEMU build failure directly.
-
-For why this session resolves `kernel/sysproc.c` but not `user/sleep.c`, how to load one user ELF manually, and why `CPUS=1` is a tracing aid rather than a correctness setting, see [Debugging xv6: symbols, address spaces, and harts](09-debugging-xv6.md).
-
-### Finding where the kernel crashed
-
-When the kernel takes an unexpected fault — an invalid memory address, most often — it prints an error containing `sepc`, the program counter at the point of the crash. Two ways to turn that number into a location:
-
-```bash
-grep -n '80001f2a' kernel/kernel.asm     # the disassembly the Makefile already built
-addr2line -e kernel/kernel 0x80001f2a    # file and line directly
-```
-
-`kernel/kernel.asm` is produced on every kernel build, and the Makefile emits a `.asm` next to every user program too. It is also the answer to "what assembly did the compiler actually generate for this", which matters more than usual in the traps and pgtbl labs.
-
-### Backtraces: panics and hangs
-
-For a panic, break on `panic` and let the kernel run into it:
-
-```bash
-make qemu-gdb                # terminal 1
-gdb-multiarch kernel/kernel  # terminal 2
-```
-
-```gdb
-(gdb) b panic
-(gdb) c
-(gdb) bt
-```
-
-For a **hang** — a **deadlock**, or a loop that **never** exits — there is nothing to break on. Continue, wait for it to wedge, then interrupt it and look at where it stopped:
-
-```gdb
-(gdb) c
-^C
-(gdb) bt
-```
-
-> [!TIP]
-> A backtrace that stops at a lock acquisition is usually a deadlock; one that sits in the same function across several `Ctrl-C` interrupts is usually a live loop. `bt` on every hart (`info threads`, then `thread N`) tells you which core holds what.
-
-### Inspect the machine through the QEMU monitor
-
-`Ctrl-a` then `c` switches from the xv6 console to QEMU's monitor, which queries the state of the emulated machine directly. `Ctrl-a c` again switches back.
-
-| Command          | What it shows                                            |
-| ---------------- | -------------------------------------------------------- |
-| `info mem`       | The active page table — the pgtbl lab's single best tool |
-| `info registers` | Every RISC-V register, including the CSRs                |
-| `cpu N`          | Select which core the other commands report on           |
-
-`info mem` reports on one core, so on a multi-core boot you either pick the core with `cpu` first or sidestep the question entirely:
-
-```bash
-make CPUS=1 qemu
-```
 
 ### Pointer arithmetic
 
@@ -511,5 +392,5 @@ For grading a lab specifically, see [03-lab-workflow.md](03-lab-workflow.md).
 | **Terminal is wrecked after a crash**               | QEMU left the terminal in raw mode. Run `reset` — it will work even though you **cannot** see what you are typing.                                                                                                                                                                                                                              |
 | **`make clean` fails**                              | Another xv6 instance is still running and holding files. Find it with `ps` and kill it.                                                                                                                                                                                                                                                         |
 | **Hangs forever with no output**                    | Usually a kernel panic before the console is up, or an infinite loop in early boot. Attach with `make qemu-gdb` and break on `main`.                                                                                                                                                                                                            |
-| **Hangs after booting normally**                    | Likely a **deadlock**. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](#backtraces-panics-and-hangs).                                                                                                                                                                                                               |
-| **A fault message with an `sepc` value**            | Turn the address into a line with `addr2line -e kernel/kernel <sepc>`, or search for it in `kernel/kernel.asm`.                                                                                                                                                                                                                                 |
+| **Hangs after booting normally**                    | Likely a **deadlock**. Attach with gdb, `c`, `Ctrl-C` once it wedges, then `bt` — see [Backtraces](09-debugging-xv6.md#backtraces-panics-kernel-mode-faults-and-hangs).                                                                                                                                                                         |
+| **A fault message with an `sepc` value**            | Turn the address into a line — see [Find where the kernel crashed](09-debugging-xv6.md#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line).                                                                                                                                                                                             |

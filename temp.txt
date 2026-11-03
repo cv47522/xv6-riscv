@@ -1,0 +1,9 @@
+Update relevant skills/prompts symlinked to .claude/.codex/.cursor/.agents/etc. in this repo (e.g., docs/prompts) so that agents can based on STUDY-PROGRESS.md:
+- Pull & Fetch materials from ~/personal/xv6-riscv-book & update/create .md in docs/book (save all figs)
+    Note. ~/personal/xv6-riscv-book: Pull upstream (git@github.com:mit-pdos/xv6-riscv-book.git) changes only & don't modify
+- Create/update lectures in docs/*.md by extracting (useful) contents from docs/book, lectures/ (& your knowledge).
+    Note that when encountering similar/same contents/concepts, prefer avoiding duplications & keep xv6 specific contents in this repo & add/update generic ones including e.g., docs/book/fig in ../operating-system or ../c*-programming & cross ref each other
+
+---
+
+Add ans or perform actions asked in `Q:` or `TODO` of staged files (also add to relevant .md if useful)

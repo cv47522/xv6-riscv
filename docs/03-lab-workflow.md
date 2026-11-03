@@ -95,7 +95,7 @@ MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) 
 Where an exercise needed more understanding than typing, the derivation is written up under [labs/](labs/) — one note per exercise, covering the existing code the exercise forces you to read and the decisions the implementation reduces to, and stopping short of the solution.
 
 > [!TIP]
-> Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder. Enrolled students are told to ask on Piazza or come to office hours; the self-study equivalent is to go back to the book chapter or step through the code in gdb — see [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu).
+> Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder. Enrolled students are told to ask on Piazza or come to office hours; the self-study equivalent is to go back to the book chapter or step through the code in gdb — see [09-debugging-xv6.md](09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit).
 
 ## Run graders and interpret failure transcripts
 

@@ -537,7 +537,7 @@ Use the [grader evidence table](#sleep-grader-evidence-limits) when interpreting
 
 QEMU startup and host scheduling add unrelated wall-clock delay. None of these argument observations alone proves that the program did no extra CPU-consuming work.
 
-[Docs 02](../02-build-boot-and-usage.md#debugging-with-vs-code) owns console/debugger setup, controls, and cleanup. [Docs 09](../09-debugging-xv6.md#debug-usersleep-manually-with-add-symbol-file-and-hbreak) explains why a `sleep.c` breakpoint initially remains unresolved and how to stop in user code without changing `.vscode`.
+[Docs 09](../09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit) owns debugger setup, controls, VS Code, and cleanup, and [its `add-symbol-file` recipe](../09-debugging-xv6.md#debug-usersleep-manually-with-add-symbol-file-and-hbreak) explains why a `sleep.c` breakpoint initially remains unresolved and how to stop in user code without changing `.vscode`.
 
 ### `sleep` grader internals: builds, registration, and breakpoints
 

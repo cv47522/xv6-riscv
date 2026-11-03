@@ -18,7 +18,7 @@ Use the [self-study progress tracker](../STUDY-PROGRESS.md) for the full course 
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | [00-repo-workflow.md](00-repo-workflow.md)               | Understand remotes, branches, tags, and where work lives; find exact sync, push, and recovery commands.                |
 | [01-environment-setup.md](01-environment-setup.md)       | Install the toolchain and understand each `apt` package.                                                               |
-| [02-build-boot-and-usage.md](02-build-boot-and-usage.md) | Run `make qemu`, read boot output, use the shell, and debug with GDB, `kernel.asm`, `addr2line`, and the QEMU monitor. |
+| [02-build-boot-and-usage.md](02-build-boot-and-usage.md) | Run `make qemu`, read boot output, use the shell, trace with `printf` and `script`, and route into the GDB guide. |
 | [03-lab-workflow.md](03-lab-workflow.md)                 | Select `conf/lab.mk`, run `make grade`, merge lab branches, and approach an exercise.                                  |
 
 ### Find a terminology, build, debugging, or lecture guide
@@ -30,7 +30,7 @@ Use the [self-study progress tracker](../STUDY-PROGRESS.md) for the full course 
 | [06-build-artifacts.md](06-build-artifacts.md)       | File extensions, generated artifacts, ELF, assembly, libraries, and the guest/host filesystem boundary.                                       |
 | [07-exercises.md](07-exercises.md)                   | Each lecture program's behavior, teaching point, and regression tests; grows as exercises are added.                                          |
 | [08-makefile-tour.md](08-makefile-tour.md)           | The [Makefile](../Makefile): default goal, dependency graph, cold build, link steps, constructs, and comparison with a simpler project.       |
-| [09-debugging-xv6.md](09-debugging-xv6.md)           | Native versus xv6 breakpoints, ELF symbol loading, manual user-program debugging, and tracing with one hart before verification with three.   |
+| [09-debugging-xv6.md](09-debugging-xv6.md)           | Canonical GDB guide: sessions, VS Code, crash addresses, backtraces, live versus saved registers, QEMU monitor, symbols, and harts.           |
 | [10-c-in-xv6.md](10-c-in-xv6.md)                     | Lecture 2 and Homework 2: user memory, binary tools, arguments, kernel lists, flags, and struct-address calculations.                         |
 | [11-os-design-in-xv6.md](11-os-design-in-xv6.md)     | Lecture 3 draft, not yet studied: isolation, syscall dispatch, boot, process exhaustion, and hostile ELF validation. Homework 3 now answered. |
 | [12-os-overview-in-xv6.md](12-os-overview-in-xv6.md) | Lecture 1 topic map, four OS goals, syscall steps, alternative designs, and lecture differences. Homework 1 has no recorded answer.           |
