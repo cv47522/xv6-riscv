@@ -23,7 +23,7 @@ One note per lab exercise that needed more thinking than typing: what the exerci
 | **[11-util-sh-history.md](11-util-sh-history.md)**               | `util`    | shell: history (optional, moderate) — what one command line is, and which process owns it                    |
 | **[12-syscall-using-gdb.md](12-syscall-using-gdb.md)**           | `syscall` | Using gdb (easy) — stopping in `syscall()`, decoding saved and live registers, and tracing a kernel panic    |
 
-**Graded answer files live here too, and they are spoilers.** [answers-syscall.md](answers-syscall.md) answers the Using gdb questions; `answers-syscall.txt` at the repository root is a symlink to it, because `grade-lab-syscall` opens that exact path.
+**Graded answers are spoilers.** Each lab note keeps them in its final `## Solution walkthrough`. `answers-syscall.txt` at the repository root is a symlink to [12-syscall-using-gdb.md](12-syscall-using-gdb.md#solution-walkthrough), because `grade-lab-syscall` opens that exact path.
 
 ## Lab-note scope and shared-document ownership
 

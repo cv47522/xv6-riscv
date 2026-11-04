@@ -147,9 +147,13 @@ syscall(void)
   int num;
   struct proc *p = myproc();
 
+  /*
+   * The "Using gdb" lab swaps this line for `num = *(int *)0;` to panic.
+   * That load reads unmapped address 0 in S-mode; `num = 0;` only assigns
+   * a value, so the bounds check refuses it and nothing faults. See
+   * docs/labs/12-syscall-using-gdb.md, "Why num = 0; does not panic".
+   */
   num = p->trapframe->a7;
-  // num = 0; // Q: Why not use this to show panic?
-  // num = *(int*)0; // Q: Isn't this the same as above?
   if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     /*
      * Use num to lookup the system call function for num, call it,

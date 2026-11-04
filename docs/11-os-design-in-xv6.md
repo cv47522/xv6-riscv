@@ -111,7 +111,7 @@ The second row produces `5 isolate: unknown sys call 99` in `isolate badsys`. Ea
 > [!WARNING]
 > The lecture's naming convention, `k<syscallname>()`, holds only for process calls. This tree has `kfork()`, `kexec()`, `kexit()`, `kwait()`, and `kkill()`; file calls go from `sys_read()` to `fileread()`, not to a `kread()`. The full rename table is in [the concordance appendix](book/00-ostep-concordance.md#system-call-naming).
 
-The lecture also suggests editing `syscall()` to print a trace of every system call `init` and `sh` make. That edit is the syscall lab's `trace` exercise, so it is deliberately not done here.
+**The lecture suggests a tracing experiment:** edit `syscall()` to print every system call `init` and `sh` make. The [2026 syscall lab](https://pdos.csail.mit.edu/6.1810/2026/labs/syscall.html) instead assigns GDB practice, sandboxing through `interpose`, and a memory-isolation attack; it has no `trace` exercise. The tracing edit remains an optional lecture experiment.
 
 ## System-call arguments and user memory
 

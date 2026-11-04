@@ -13,8 +13,8 @@
             "customLaunchSetupCommands": [],
             "setupCommands": [
                 {
-                    "description": "Break when the sleep command reaches its kernel handler",
-                    "text": "break sys_pause",
+                    "description": "Break when the sleep command reaches its kernel handler; -f keeps it pending until cppdbg loads kernel/kernel",
+                    "text": "-break-insert -f sys_pause",
                     "ignoreFailures": false
                 }
             ],
@@ -36,8 +36,8 @@
             "customLaunchSetupCommands": [],
             "setupCommands": [
                 {
-                    "description": "Stop before panic() prints and spins, while the trap CSRs still hold a kernel fault",
-                    "text": "break panic",
+                    "description": "Stop before panic() prints and spins, while the trap CSRs still hold a kernel fault; -f keeps it pending until cppdbg loads kernel/kernel",
+                    "text": "-break-insert -f panic",
                     "ignoreFailures": false
                 }
             ],

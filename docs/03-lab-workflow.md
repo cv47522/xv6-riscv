@@ -17,7 +17,7 @@ This repository consolidates them: lab starter code is merged into `study` as yo
 | Lab         | Branch         | Grading script      | Topic                              |
 | ----------- | -------------- | ------------------- | ---------------------------------- |
 | **util**    | `labs/util`    | `grade-lab-util`    | Unix utilities, first system call  |
-| **syscall** | `labs/syscall` | `grade-lab-syscall` | Adding system calls, tracing       |
+| **syscall** | `labs/syscall` | `grade-lab-syscall` | GDB, syscall sandboxing, memory-isolation attack |
 | **pgtbl**   | `labs/pgtbl`   | `grade-lab-pgtbl`   | Page tables, superpages            |
 | **traps**   | `labs/traps`   | `grade-lab-traps`   | Trap handling, backtraces, alarms  |
 | **cow**     | `labs/cow`     | `grade-lab-cow`     | Copy-on-write fork                 |

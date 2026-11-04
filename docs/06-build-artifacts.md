@@ -376,7 +376,13 @@ The three values in that first line are CSRs, read at the moment of the trap:
 | `stval`  | **S**upervisor **T**rap **VAL**ue                    | For a page fault, the address the code was trying to reach — usually the bad pointer itself                          |
 
 > [!NOTE]
-> The same fault in _user_ space is not a panic. `usertrap()` at [`kernel/trap.c`](../kernel/trap.c) prints `usertrap(): unexpected scause ... pid=...`, calls `setkilled(p)`, and the shell prompt comes back. One process dies and the machine lives. Only the kernel faulting on its own behalf stops everything, which is the whole reason a kernel bug is worse than a user-space one.
+> **An unrecoverable user-mode fault usually kills only that process.** `usertrap()` in [`kernel/trap.c`](../kernel/trap.c) prints `usertrap(): unexpected scause ... pid=...`, calls `setkilled(p)`, and exits the process; the rest of the system can continue.
+
+**Check these exceptions before interpreting a user fault:**
+
+- **Lazy allocation:** `vmfault()` can resolve a valid lazy-allocation page fault without killing the process.
+- **Init:** killing `init` causes `kexit()` in `kernel/proc.c` to panic with `init exiting`.
+- **Address 0:** a load is not inherently a user fault, because xv6 maps user program text there. Check the active page table and permissions, not the address alone.
 
 ### Map `sepc` to a function and C source line
 

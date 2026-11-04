@@ -8,6 +8,8 @@
 
 **This is the canonical GDB guide for this tree.** Lab notes and other documents keep only their exercise-specific breakpoints and observations and link here for setup, controls, crash lookup, backtraces, and pitfalls.
 
+**Screenshots and transcripts describe their recorded builds.** The teaching comment in `kernel/syscall.c` now puts the `a7` load on line 156 and the handler call on line 162, rather than lines 150 and 156 shown in older captures. Locate statements by text and take instruction addresses from the binary you are running.
+
 | Task                                                              | Section                                                                                                                                                                                                                                 |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Attach GDB to the emulated machine**                            | [Run a GDB session](#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit)                                                                                                                                                                   |
@@ -225,7 +227,7 @@ _Legend: request red-white for the user-mode request, routing blue for trap entr
 
 #### Why `print num` shows `<optimized out>` in the `syscall` frame
 
-**`num` lives only in register `a3`, and only until the call.** The kernel is built with `-O` (`CFLAGS` in the `Makefile`), so the compiler keeps `num` in a register instead of a stack slot. `info scope syscall` gives its DWARF locations in this build:
+**GDB has no location for `num` while the handler call is active.** The kernel is built with `-O` (`CFLAGS` in the `Makefile`), so the compiler keeps `num` in register `a3` instead of a stack slot. `info scope syscall` gives its DWARF locations in this build:
 
 ```gdb
 (gdb) info scope syscall
@@ -238,13 +240,13 @@ Frame `#1`'s PC is the return address `0x80001d82`, which falls outside both ran
 
 ![GDB's layout split in frame 1 of syscall: sext.w a3,a5 produces num, the status bar shows PC 0x80001d82, and print num shows optimized out](images/riscv-07-gdb-frame1-num-optimized-out.png)
 
-_**1** `sext.w a3,a5` puts `num` in `a3`, inside its location range. **2** The selected frame's PC, `0x80001d82`, is past the `jalr` and outside the range. **3** GDB therefore has no location to read._
+_**1** `sext.w a3,a5` at `0x80001d62` puts `num` in `a3`; its first location range starts at the following instruction, `0x80001d66`. **2** The selected frame's PC, `0x80001d82`, is past the `jalr` and outside the range. **3** GDB therefore has no location to read._
 
-| To see `num`                               | Command                                                           |
-| ------------------------------------------ | ----------------------------------------------------------------- |
-| **Stop inside its range, before the call** | `b *0x80001d66`, then `p num`: this build printed `15` at boot.   |
-| **Read the value it was loaded from**      | `p p->trapframe->a7`, in memory and readable from any frame.      |
-| **Keep every local in a stack slot**       | Rebuild with `-O0` in `CFLAGS`; addresses and line mappings move. |
+| To see `num`                               | Command                                                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Stop inside its range, before the call** | `b *0x80001d66`, then `p num`: this build printed `15` at boot.                                        |
+| **Read the value it was loaded from**      | Select the `syscall` frame, then `p p->trapframe->a7`; `p` is in scope there.                          |
+| **Reduce optimization for inspection**     | Rebuild with `-O0` in `CFLAGS`, then check `info scope syscall`; addresses and line mappings may move. |
 
 #### The same stop in GDB's TUI: `layout src` and `layout split`
 
@@ -268,17 +270,17 @@ The [assembly course's `JALR` section](../../assembly-language/docs/riscv/04-fun
 
 ##### TUI layouts: what `src`, `asm`, `split`, and `regs` show
 
-**A layout names which windows sit above the `(gdb)` command window.** `layout src` and `layout split` are the two used above; the others are worth knowing for kernel work, where many stops land in assembly with no C source:
+**A layout names which windows sit above the `(gdb)` command window.** The [GDB TUI command reference](https://sourceware.org/gdb/current/onlinedocs/gdb.html/TUI-Commands.html) defines the layouts; assembly views help when a stop has no C source:
 
-| Command        | Windows shown above the command window                                   | Use it when                                                                             |
-| -------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `layout src`   | Source only                                                              | Stepping C with `next` and `step`.                                                      |
-| `layout asm`   | Disassembly only                                                         | Stepping `kernel/trampoline.S`, `kernel/entry.S`, or code without debug info; use `si`. |
-| `layout split` | Source and disassembly, half each (`tui new-layout split src 1 asm 1 …`) | Matching a C line to its instructions, as in the `jalr a5` stop above.                  |
-| `layout regs`  | A register window above the current source or assembly window            | Watching `a0`–`a7`, `sp`, and `ra` change; `tui reg csr` swaps in CSRs such as `sepc`.  |
-| `layout next`  | The next layout in the cycle `src`, `asm`, `split`, `regs`               | Flipping views without typing a name; `layout prev` goes backwards.                     |
+| Command        | Windows shown above the command window                        | Use it when                                                                             |
+| -------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `layout src`   | Source only                                                   | Stepping C with `next` and `step`.                                                      |
+| `layout asm`   | Disassembly only                                              | Stepping `kernel/trampoline.S`, `kernel/entry.S`, or code without debug info; use `si`. |
+| `layout split` | Source and disassembly                                        | Matching a C line to its instructions, as in the `jalr a5` stop above.                  |
+| `layout regs`  | A register window above the current source or assembly window | Watching `a0`–`a7`, `sp`, and `ra` change; `tui reg csr` swaps in CSRs such as `sepc`.  |
+| `layout next`  | The next available layout, including user-defined layouts     | Flipping views without typing a name; `layout prev` goes backwards.                     |
 
-**`layout regs` keeps what was already open.** It adds the register window to an assembly layout if a disassembly window is showing, otherwise to source.
+**`layout regs` chooses source or assembly from the current layout.** From `src`, it shows registers and source; from `asm` or `split`, it shows registers and assembly. In the `split` case, the source pane is removed.
 
 - **Choose registers:** `tui reg general`, `tui reg csr`, or `tui reg all`; `maint print reggroups` lists the available groups for RISC-V.
 - **Choose scroll focus:** `focus regs` gives the arrow keys to the register window; `focus cmd` returns them to command history.
@@ -340,11 +342,24 @@ The [sleep note](labs/01-util-sleep.md#inspecting-the-argument-the-grader-does-n
 
 Stack and string addresses vary after a rebuild, but the source file, argument count, and argument text should agree.
 
+**Setting the breakpoint before loading symbols also works, and it is what VS Code does.** With `set breakpoint pending on`, `hbreak user/sleep.c:15` before step 2 stays pending until `add-symbol-file` gives GDB an address for it:
+
+```gdb
+(gdb) set breakpoint pending on
+(gdb) hbreak user/sleep.c:15
+No source file named user/sleep.c.
+Hardware assisted breakpoint 1 (user/sleep.c:15) pending.
+```
+
+Continue to the shell, interrupt GDB with `Ctrl-C`, and load `user/_sleep` as in steps 3–4. `info breakpoints` then shows the resolved address, `0x8` in the recorded build. After running `sleep 10`, the stop has `argc = 2` and `argv[1] = "10"`.
+
+**VS Code uses the interrupt task for this handoff.** Follow the [VS Code user stop](#vs-code-user-stop-sleepcmain) for its actual screenshots and Debug Console commands; the Pause button does not interrupt the recorded launch setup.
+
 <a id="break-source-versus-hbreak"></a>
 
 #### `break -source sleep.c -function main` versus `hbreak`
 
-**`break -source sleep.c -function main` also stops here under QEMU.** `-source` and `-function` are GDB's explicit-location options, and every breakpoint command accepts them; `break sleep.c:main` is the equivalent linespec.
+**`break -source sleep.c -function main` also stops here under QEMU.** `-source` and `-function` are GDB's explicit-location options, accepted by `break`, `tbreak`, and `hbreak`; `break sleep.c:main` is the equivalent linespec.
 
 In a run with both set, the software `break` at `0x0` stopped first on line 10, and an `hbreak` on line 15 at `0x8` stopped next.
 
@@ -399,16 +414,16 @@ Breakpoint 2, main (argc=8224, argv=0x64 <strcmp+6>) at user/sleep.c:10
 
 ### Breakpoints: `break`, `tbreak`, `hbreak`, and `watch`
 
-| Command                                 | Short form | What it does in an xv6 session                                                                                                |
-| --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| **`break FUNC` or `break FILE:LINE`**   | `b`        | Sets a breakpoint by symbol; it resolves only through a loaded ELF, normally `kernel/kernel`.                                 |
-| **`break *0xADDR`**                     | `b *0x…`   | `*` makes the location an instruction address, not a function or line: `b *0x80001d58` stops at a panic's `sepc`. Keep `0x`.  |
-| **`break FUNC if EXPR`**                | `b … if …` | Stops only when the condition holds, for example `b argint if n == 1`; prefer variables over function calls in the condition. |
-| **`tbreak FUNC`**                       | `tb`       | A one-shot breakpoint: GDB deletes it after the first hit.                                                                    |
-| **`hbreak`**                            | —          | Asks QEMU for a hardware breakpoint; [user programs](#debug-usersleep-manually-with-add-symbol-file-and-hbreak) need it.      |
-| **`watch EXPR`**                        | —          | Stops when the value of a variable or memory location changes, for example `watch ticks`.                                     |
-| **`info breakpoints`**                  | `i b`      | Lists numbers, addresses, hit counts, and whether each breakpoint is enabled.                                                 |
-| **`delete N`, `disable N`, `enable N`** | `d N`      | Removes or pauses breakpoint `N`; `delete` with no number removes them all.                                                   |
+| Command                                 | Short form | What it does in an xv6 session                                                                                                                |
+| --------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`break FUNC` or `break FILE:LINE`**   | `b`        | Sets a breakpoint by symbol; it resolves only through a loaded ELF, normally `kernel/kernel`.                                                 |
+| **`break *0xADDR`**                     | `b *0x…`   | `*` makes the location an instruction address, not a function or line: `b *0x80001d58` stops at a panic's `sepc`. Keep `0x`.                  |
+| **`break FUNC if EXPR`**                | `b … if …` | Stops only when the condition holds, for example `b argint if n == 1`; prefer variables over function calls in the condition.                 |
+| **`tbreak FUNC`**                       | `tb`       | A one-shot breakpoint: GDB deletes it after the first hit.                                                                                    |
+| **`hbreak`**                            | —          | Requests a hardware breakpoint; the [user-stop recipe](#debug-usersleep-manually-with-add-symbol-file-and-hbreak) prefers it for portability. |
+| **`watch EXPR`**                        | —          | Stops when the value of a variable or memory location changes, for example `watch ticks`.                                                     |
+| **`info breakpoints`**                  | `i b`      | Lists numbers, addresses, hit counts, and whether each breakpoint is enabled.                                                                 |
+| **`delete N`, `disable N`, `enable N`** | `d N`      | Removes or pauses breakpoint `N`; `delete` with no number removes them all.                                                                   |
 
 ### Inspect values, memory, and registers: `print`, `x`, and `info`
 
@@ -450,13 +465,13 @@ Otherwise, exit QEMU after leaving GDB so its per-user GDB port and `fs.img` are
 
 ## Debug with VS Code: launch configuration and evidence
 
-**Two launch configurations serve three walkthroughs.** Both start QEMU and attach GDB; they differ only in the breakpoint `launch.json` sets. **xv6: debug sys_pause** sets `break sys_pause`, and the user stop adds `user/_sleep`'s symbols later from the Debug Console. **xv6: debug kernel panic** sets `break panic`:
+**Two launch configurations serve three walkthroughs.** Both start QEMU and attach GDB; they differ only in the breakpoint `launch.json` sets. **xv6: debug sys_pause** sets a breakpoint on `sys_pause`, and the user stop adds `user/_sleep`'s symbols later from the Debug Console. **xv6: debug kernel panic** sets one on `panic`:
 
-| VS Code walkthrough                                               | Configuration and breakpoint                 | Extra step                                                                           |
-| ----------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **[Kernel stop in `sys_pause`](#vs-code-kernel-stop-syspause)**   | **xv6: debug sys_pause**, `sys_pause`        | None                                                                                 |
-| **[User stop in `sleep.c:main`](#vs-code-user-stop-sleepcmain)**  | **xv6: debug sys_pause**, a `sleep.c` gutter | At the `$ ` prompt, Pause, then `-exec add-symbol-file user/_sleep 0`                |
-| **[Panic stop](#vs-code-panic-stop-panic-and-the-faulting-sepc)** | **xv6: debug kernel panic**, `panic`         | Read `$sepc` in the Debug Console, then add a gutter breakpoint on the faulting line |
+| VS Code walkthrough                                               | Configuration and breakpoint                 | Extra step                                                                             |
+| ----------------------------------------------------------------- | -------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **[Kernel stop in `sys_pause`](#vs-code-kernel-stop-syspause)**   | **xv6: debug sys_pause**, `sys_pause`        | None                                                                                   |
+| **[User stop in `sleep.c:main`](#vs-code-user-stop-sleepcmain)**  | **xv6: debug sys_pause**, a `sleep.c` gutter | At the `$ ` prompt, run the interrupt task, then `-exec add-symbol-file user/_sleep 0` |
+| **[Panic stop](#vs-code-panic-stop-panic-and-the-faulting-sepc)** | **xv6: debug kernel panic**, `panic`         | Read `$sepc` in the Debug Console, then add a gutter breakpoint on the faulting line   |
 
 The checked-in `.vscode/launch.json` and `.vscode/tasks.json` automate the same two-terminal setup. They require `gdb-multiarch` and Microsoft's C/C++ extension, whose extension identifier is `ms-vscode.cpptools`:
 
@@ -465,6 +480,23 @@ code --install-extension ms-vscode.cpptools
 ```
 
 The launch configuration leaves the initial target stopped instead of issuing `run`, because `kernel/kernel` is not a host executable: GDB controls an already-created remote machine. If startup fails, run the [terminal workflow](#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit) first; it exposes GDB safe-path diagnostics, an occupied port, a missing `gdb-multiarch`, or a QEMU build failure directly.
+
+<a id="vs-code-launch-breakpoints-why-break-insert-f"></a>
+
+**`-break-insert -f` preserves the launch breakpoint until symbols load.** In the observed cppdbg startup, `setupCommands` runs before `-file-exec-and-symbols` loads `kernel/kernel`:
+
+1. **Symbols absent:** GDB reports `No symbol table is loaded`. With `.gdbinit`'s `set confirm off`, a plain `break sys_pause` creates no breakpoint even though the MI command returns `^done`.
+2. **Breakpoint pending:** `-break-insert -f sys_pause` records the unresolved name. The `-f` option permits a pending breakpoint; see [GDB's MI breakpoint reference](https://www.sourceware.org/gdb/current/onlinedocs/gdb.html/GDB_002fMI-Breakpoint-Commands.html).
+3. **Symbols loaded:** GDB resolves the name to an address. The `panic` configuration uses the same mechanism.
+
+**Launch breakpoints are managed in GDB.** They do not appear in VS Code's Breakpoints pane, and the observed stop is reported as **Exception has occurred. Hit breakpoint 1**. Use `-exec info breakpoints` to find their numbers, then `-exec disable N` or `-exec enable N` to control them.
+
+<a id="vs-code-pause-does-not-interrupt-qemu-use-the-interrupt-task"></a>
+
+> [!WARNING]
+> **If Pause (F6) leaves Call Stack at Running, use Terminal → Run Task → xv6: interrupt GDB (Pause).** This is the observed behavior with the checked-in configuration, where `.gdbinit` attaches the remote target.
+
+In that launch, cppdbg sends no `-exec-interrupt` for Pause. The task sends `SIGINT` to the matching `gdb-multiarch` process, which interrupts QEMU as `Ctrl-C` does in a terminal; VS Code reports **Exception has occurred. Interrupt**. This workaround depends on the process command line in `.vscode/tasks.json`; if it reports no matching session, check that the active launch uses this workspace's `.gdbinit`.
 
 > [!IMPORTANT]
 > The `program` value in this repository's `.vscode/launch.json` names `kernel/kernel` for symbols. The configuration does not ask the host operating system to execute that RISC-V file: `.gdbinit` attaches to QEMU's already-running remote target, and `launchCompleteCommand: "None"` prevents a host-style `run` command.
@@ -495,18 +527,20 @@ _After `argint(0, &n)` executes, the debugger can show `n = 10`. The stack remai
 
 1. Open `user/sleep.c` and click the gutter on line 15, `if (argc != 2) {`. The breakpoint stays gray: `kernel/kernel` has no `sleep.c` addresses.
 2. Start **xv6: debug sys_pause** with F5, press Continue once, and wait for the `$ ` prompt in the QEMU terminal.
-3. Press Pause (F6). VS Code stops wherever the hart is, usually `scheduler()` in `kernel/proc.c`.
-4. In the Debug Console, run `-exec add-symbol-file user/_sleep 0`. The `-exec` prefix passes a command to GDB unchanged; `.gdbinit`'s `set confirm off` suppresses the confirmation prompt. GDB resolves the pending breakpoint at `0x8`, `main at user/sleep.c:15`, and the gutter marker should turn red; if it stays gray, toggle it off and on.
-5. Press Continue and type `sleep 10` in the QEMU terminal. VS Code stops on line 15 in `sleep.c`. Variables shows `argc = 2`, and `-exec x/s argv[1]` in the Debug Console prints `"10"`.
-6. **Before continuing,** remove the `sleep.c` breakpoint and run `-exec remove-symbol-file -a 0`. Otherwise the shell's next `getcmd` call, also linked at `0x0`, produces [a false stop labeled `sleep.c`](#break-source-versus-hbreak). Continue: `sleep` enters the kernel through `pause` and stops on the configured `sys_pause` breakpoint, unless that breakpoint is disabled in the Breakpoints pane.
+3. Run the task **xv6: interrupt GDB (Pause)**; [Pause does not work here](#vs-code-pause-does-not-interrupt-qemu-use-the-interrupt-task). VS Code stops wherever the hart is, usually `scheduler()` in `kernel/proc.c`.
+4. In the Debug Console, run `-exec add-symbol-file user/_sleep 0`. The `-exec` prefix passes a command to GDB unchanged; `.gdbinit`'s `set confirm off` suppresses the confirmation prompt. GDB resolves the pending breakpoint at `0x8`, `main at user/sleep.c:15`, and the gutter marker turns red:
 
-<!-- TODO: Move below GDB screenshots to relavant sections & ReCapture/mark/insert VSCode debugger screenshots to clarify & update ./vscode/*.json if needed -->
+    ![VS Code stopped in scheduler after the interrupt task: the sleep.c line-15 breakpoint is now red, and the Debug Console shows add-symbol-file and info breakpoints with the hardware breakpoint at 0x8 in main at user/sleep.c:15](images/vscode-user-sleep-breakpoint-resolved.png)
 
-**The terminal equivalent shows what VS Code does behind the gutter.** The same steps typed at a GDB prompt, with `set breakpoint pending on` standing in for the `-f` flag VS Code sends:
+    _After step 4. **1** Line 15's breakpoint is filled red. **2** Call Stack: the interrupt stopped the hart in `scheduler()`, still kernel code. **3** `info breakpoints` shows the hardware breakpoint at `0x8`, `main at user/sleep.c:15`. **4** The Breakpoints pane shows the same red marker._
 
-![GDB's layout src on user/sleep.c line 15: a pending hardware breakpoint, a Ctrl-C stop in scheduler, add-symbol-file resolving the breakpoint to 0x8, and the stop with argc = 2 and argv[1] = "10"](images/riscv-12-gdb-vscode-user-stop-pending-hbreak.png)
+5. Press Continue and type `sleep 10` in the QEMU terminal. VS Code stops on line 15 in `sleep.c`. Variables shows `argc = 2`, and `-exec x/s argv[1]` in the Debug Console prints `"10"`:
 
-_The GDB side of the steps below, `CPUS=1`. **1** The resolved hardware breakpoint `H+` on line 15, where `main` stopped. **2** Pending, not broken: the gray gutter dot. **3** Pause stops in `scheduler()`, still on kernel symbols. **4** `add-symbol-file` resolves the breakpoint to `0x8`. **5** After `sleep 10`, `argc` and `argv[1]` hold the arguments._
+    ![VS Code stopped on sleep.c line 15 with argc = 2 and argv = 0x3fc0 in Variables, main and start in Call Stack, and x/s argv[1] printing "10" in the Debug Console](images/vscode-user-sleep-main-stop.png)
+
+    _After step 5. **1** Stopped on line 15 before it runs. **2** Variables: `argc = 2` and `argv = 0x3fc0`; `ticks` is `<optimized out>` before line 27 assigns it. **3** Call Stack: `main` called from `start`; the third frame, `strchr`, is an unwinding artifact, because `start` never returns. **4** `x/s argv[1]` prints `"10"`._
+
+6. **Before continuing,** remove the `sleep.c` breakpoint and run `-exec remove-symbol-file -a 0`. Otherwise the shell's next `getcmd` call, also linked at `0x0`, produces [a false stop labeled `sleep.c`](#break-source-versus-hbreak). Continue: `sleep` enters the kernel through `pause` and stops on the configured `sys_pause` breakpoint. To skip that stop, find its number with `-exec info breakpoints` and use `-exec disable N`; launch breakpoints are absent from the Breakpoints pane.
 
 <a id="vs-code-panic-stop-panic-and-the-faulting-sepc"></a>
 
@@ -516,7 +550,7 @@ _The GDB side of the steps below, `CPUS=1`. **1** The resolved hardware breakpoi
 
 1. Make the kernel fault, for example with that edit. The pre-launch task's `make qemu-gdb` rebuilds `kernel/kernel`, so there is no separate build step.
 2. Select **xv6: debug kernel panic** in Run and Debug and press F5. At the connect stop, press Continue; nothing needs typing in the QEMU terminal when the fault happens during boot.
-3. VS Code stops in `panic()` in `kernel/printk.c`. Call Stack shows only `panic`, `kerneltrap`, and `kernelvec`: the unwinder **cannot** cross the trap into the faulting function.
+3. VS Code stops in `panic()` in `kernel/printk.c`, reported as [**Exception has occurred. Hit breakpoint 1**](#vs-code-launch-breakpoints-why-break-insert-f). Call Stack shows only `panic`, `kerneltrap`, and `kernelvec`: the unwinder **cannot** cross the trap into the faulting function.
 4. In the Debug Console, read the fault's CSRs, which still hold it at this stop:
 
     ```text
@@ -526,22 +560,24 @@ _The GDB side of the steps below, `CPUS=1`. **1** The resolved hardware breakpoi
     -exec p /x $stval
     ```
 
-    This build printed `0x80001d58`, `syscall + 16 in section .text`, `0xd`, and `0x0`.
+    This build printed `0x80001d58`, `syscall + 16 in section .text`, `0xd`, and `0x0`:
 
-5. Map `$sepc` to a source line with [`addr2line` or `kernel/kernel.asm`](#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line), then click the gutter on that line, here `num = *(int *)0;` in `kernel/syscall.c`. A line breakpoint resolves to the line's first instruction, which here is the faulting `lw` itself, `0x80001d58`. If the faulting instruction is not the first one on its line, use `-exec hbreak *0x<sepc>` instead.
-6. Press Stop, then F5 again. The same build reproduces the same address, and VS Code stops on the faulting line **before** it executes. Variables now shows `syscall`'s locals: `p` points at init's `proc`, and `num` is [`<optimized out>`](#why-print-num-shows-optimized-out). `-exec p p->name` and `-exec p p->pid` print `"init"` and `1`, and right-clicking the editor and choosing **Open Disassembly View** shows the `lw a3,0(zero)` about to run.
-7. **Continue from this stop only to watch the panic again.** Press Stop when finished, and revert the edit before any other work.
+    ![VS Code stopped in panic with the Hit breakpoint 1 banner, Call Stack panic, kerneltrap, kernelvec, and the Debug Console printing sepc 0x80001d58, syscall + 16, scause 0xd, and stval 0x0](images/vscode-panic-stop-csrs.png)
 
-<!-- TODO: Move below GDB screenshots to relavant sections & ReCapture/mark/insert VSCode debugger screenshots to clarify & update ./vscode/*.json if needed -->
+    _After step 4. **1** The `panic` breakpoint from `launch.json`, reported as an exception. **2** Call Stack ends at `kernelvec`. **3** The CSRs still hold the fault: `sepc` in `syscall + 16`, load page fault `0xd`, address `0x0`._
 
-![GDB's layout split stopped on the faulting line 150 of syscall.c: the H+ hardware breakpoint on num = *(int *)0, lw a3,0(zero) at 0x80001d58, and p->name init, pid 1, num optimized out](images/riscv-13-gdb-vscode-panic-faulting-line-stop.png)
+5. Map `$sepc` to a source line with [`addr2line` or `kernel/kernel.asm`](#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line), then click the gutter on that line, here `num = *(int *)0;` in `kernel/syscall.c`. A line breakpoint resolves to the line's first instruction, which here is the faulting `lw` itself, `0x80001d58`. If the fault is later on the line, record `$sepc` for an address breakpoint instead.
+6. Press Stop, then F5 again, and **stay paused at the initial connect stop**. VS Code restores the gutter breakpoint. For an exact address stop, enter `-exec hbreak *0x<sepc>` **now**, in the new session: a breakpoint entered through the Debug Console is lost when the previous GDB process exits. Keep the same build so the address remains valid, then press Continue.
+7. VS Code stops **before** the faulting load executes. Variables shows `syscall`'s locals: `p` points at init's `proc`, and `num` is [`<optimized out>`](#why-print-num-shows-optimized-out). Run `-exec p p->name`, `-exec p p->pid`, and `-exec x/i $pc` to confirm `"init"`, `1`, and `lw a3,0(zero)`. **Open Disassembly View** in the editor shows the same instruction.
 
-_The GDB side of step 6, `CPUS=1`. **1** The gutter click arrives as a hardware breakpoint, `H+`, on line 150. **2** The faulting `lw` at the panic's `sepc` has not run yet. **3** The status bar confirms `syscall`, line 150, and the PC. **4** `syscall()`'s locals are in scope; `num` is `<optimized out>`. Step 3's stop in `panic()` looks like [the `b panic` screenshot](#backtraces-panics-kernel-mode-faults-and-hangs)._
+    ![VS Code stopped on syscall.c line 150 before the faulting load: num optimized out and p in Variables, syscall and usertrap in Call Stack, and the Debug Console printing init, pid 1, and lw a3,0(zero) at 0x80001d58](images/vscode-panic-faulting-line-stop.png)
+
+    _After step 7, in the recorded build. **1** Stopped on line 150 before the load runs. **2** Variables: `p` points into `proc`; `num` is `<optimized out>`. **3** Call Stack reaches `syscall()` through `usertrap()`. **4** `p->name`, `p->pid`, and `x/i $pc`: `init`, pid `1`, and `lw a3,0(zero)` at `0x80001d58`. **5** The gutter breakpoint from step 5._
+
+8. **Continue from this stop only to watch the panic again.** Press Stop when finished, and revert the edit before any other work.
 
 > [!WARNING]
-> **Do not read the fault's cause from Variables or `$scause` at step 6's stop.** The faulting load has not executed yet, so the trap CSRs still describe the previous trap; see [Live CSRs versus saved user registers](#live-csrs-versus-saved-user-registers). The cause comes from step 4 or the console's `scause=...` line.
-
-<!-- TODO: Capture VS Code screenshots and mark them like the sys_pause ones. User stop: (1) after step 4, Debug Console showing add-symbol-file and the sleep.c:15 breakpoint now red, saved as docs/images/vscode-user-sleep-breakpoint-resolved.png; (2) after step 5, the stop on sleep.c:15 with Variables argc = 2, Call Stack main, and the Debug Console x/s argv[1] output, saved as docs/images/vscode-user-sleep-main-stop.png. Panic stop: (3) after step 4, Call Stack panic/kerneltrap/kernelvec and the Debug Console CSR output, saved as docs/images/vscode-panic-stop-csrs.png; (4) after step 6, the stop on the faulting line with p and num in Variables, saved as docs/images/vscode-panic-faulting-line-stop.png. -->
+> **Do not read the fault's cause from Variables or `$scause` at step 7's stop.** The faulting load has not executed yet, so the trap CSRs still describe the previous trap; see [Live CSRs versus saved user registers](#live-csrs-versus-saved-user-registers). The cause comes from step 4 or the console's `scause=...` line.
 
 ## Find where the kernel crashed: `sepc`, `kernel.asm`, and `addr2line`
 
@@ -585,9 +621,13 @@ For a panic, break on `panic` and let the kernel run into it. [The VS Code panic
 
 _`b panic` with the syscall lab's null-load edit in `syscall()`, `CPUS=1`. **1** The trace ends at `kernelvec`, the S-mode trap entry. **2** `$sepc` still holds the faulting PC, so `info symbol` names the function the unwinder **cannot** reach. **3** That function's locals are out of scope here._
 
-To see the faulting function's locals, set `b *<sepc>` and rerun. That stop comes **before** the faulting instruction executes, so `$scause` there still describes the previous trap; see [the next section](#live-csrs-versus-saved-user-registers). Locals of the faulting function, such as `p`, are in scope only at that stop, not in `panic()`'s frame.
+To see the faulting function's locals, set `b *<sepc>` and rerun. That stop comes **before** the faulting instruction executes, so `$scause` there still describes the previous trap; see [the next section](#live-csrs-versus-saved-user-registers). Locals of the faulting function, such as `p`, are in scope only at that stop, not in `panic()`'s frame. A line breakpoint works too when the faulting instruction is the line's first, as here:
 
-For a **hang** — a **deadlock**, or a loop that **never** exits — there is nothing to break on. Continue, wait for it to wedge, then interrupt it and look at where it stopped:
+![GDB's layout split stopped on the faulting line 150 of syscall.c: the H+ hardware breakpoint on num = *(int *)0, lw a3,0(zero) at 0x80001d58, and p->name init, pid 1, num optimized out](images/riscv-13-gdb-vscode-panic-faulting-line-stop.png)
+
+_`hbreak kernel/syscall.c:150` with the null-load edit, `CPUS=1`. **1** The breakpoint `H+` on line 150. **2** The faulting `lw` at the panic's `sepc` has not run yet. **3** The status bar confirms `syscall`, line 150, and the PC. **4** `syscall()`'s locals are in scope; `num` is [`<optimized out>`](#why-print-num-shows-optimized-out)._
+
+For a **hang** — a **deadlock**, or a loop that **never** exits — there is nothing to break on. Continue, wait for it to wedge, then interrupt it and look at where it stopped. In VS Code, run the [**xv6: interrupt GDB (Pause)** task](#vs-code-pause-does-not-interrupt-qemu-use-the-interrupt-task) instead of `Ctrl-C`:
 
 ```gdb
 (gdb) c
@@ -749,7 +789,9 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 | **GDB cannot insert the breakpoint**                                       | The requested breakpoint type or address is unavailable in the current target state.                                         | Confirm the QEMU remote connection, use `hbreak`, and check `info breakpoints`; do not replace it with a software breakpoint in read-only user text.                                              |
 | **A local is `<optimized out>` or nonsensical**                            | The compiler optimized it or the stop is before its initialization.                                                          | Check the highlighted source line and step past the assignment before printing the value; [`num` in `syscall`](#why-print-num-shows-optimized-out) is a worked example.                           |
 | **`The program is not being run.` and `No symbol "p" in current context`** | GDB has no target: QEMU was started with `make qemu`, which has no GDB stub, so `.gdbinit`'s `target remote` failed.         | Start QEMU with `make qemu-gdb`, attach GDB again, and set breakpoints before `c`.                                                                                                                |
-| **`b *80001d58` prints `Invalid number "80001d58".`**                      | GDB reads digits without `0x` as a decimal number.                                                                           | Write the address in hex: `b *0x80001d58`.                                                                                                                                                        |
+| **VS Code's Pause does nothing; Call Stack stays `Running`**               | cppdbg does not know `.gdbinit` attached a remote target, so it never sends `-exec-interrupt`.                               | Run the task **xv6: interrupt GDB (Pause)**; see [the warning](#vs-code-pause-does-not-interrupt-qemu-use-the-interrupt-task).                                                                    |
+| **A `launch.json` breakpoint never stops the session**                     | A plain `break` in `setupCommands` runs before cppdbg loads symbols and is silently dropped.                                 | Use `-break-insert -f`; see [why](#vs-code-launch-breakpoints-why-break-insert-f).                                                                                                                |
+| **`b *80001d58` prints `Invalid number "80001d58".`**                      | GDB uses decimal input by default; the address needs a hex prefix.                                                           | Write the address in hex: `b *0x80001d58`.                                                                                                                                                        |
 | **The GDB port is already in use**                                         | A previous QEMU instance still owns the per-user port.                                                                       | Run `pgrep -af qemu-system-riscv64`, identify the stale instance, and terminate only that process.                                                                                                |
 | **`exec sleep failed` appears**                                            | The running guest's `fs.img` does not contain the linked user program.                                                       | Quit QEMU, rebuild the image, boot again, and confirm the xv6 shell's `ls` output includes `sleep` before debugging source behavior.                                                              |
 | **The bug disappears with `CPUS=1`**                                       | The failure depends on cross-hart concurrency.                                                                               | Treat the single-hart trace as partial evidence and reproduce with the default three harts.                                                                                                       |

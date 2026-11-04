@@ -6,8 +6,6 @@
 
 ---
 
-<!-- TODO: Add/Explain stub (w/ analogy when useful): stub, user stub, kernel stub, xxx stub, etc. -->
-
 Every acronym and piece of jargon you meet in xv6, the [xv6 book](https://mit-pdos.github.io/xv6-riscv-book/), and the 6.1810 labs — expanded, and explained in terms of where it appears in this repository.
 
 This is the hub the other guides link into. When a book chapter introduces a new term, add it here once rather than re-explaining it in chapter notes.
@@ -205,7 +203,7 @@ Nothing, on purpose. It is worth being blunt about this, because "Unix-like" inv
 | **superblock**            | Block 1, describing the filesystem's layout.                                                                                                                                                                                                                                                                                                                                                     |
 | **logging / journalling** | Writing changes to a log before applying them, so a crash mid-update is recoverable. `kernel/log.c`.                                                                                                                                                                                                                                                                                             |
 | **buffer cache**          | In-memory cache of disk blocks. `kernel/bio.c`.                                                                                                                                                                                                                                                                                                                                                  |
-| **page fault**            | A trap raised when a virtual address has no valid mapping. The basis of the cow and mmap labs.                                                                                                                                                                                                                                                                                                   |
+| **page fault**            | A trap raised when address translation fails or a mapping denies the attempted access. A valid, read-only mapping can fault on a write, as in the cow lab; mmap also uses page faults.                                                                                                                                                                                                                                                                                                   |
 | **copy-on-write**         | Sharing pages between parent and child after `fork`, copying only when one writes.                                                                                                                                                                                                                                                                                                               |
 | **demand paging**         | Allocating a page only when it is first touched.                                                                                                                                                                                                                                                                                                                                                 |
 | **zombie**                | A process that has exited but whose parent has not yet called `wait`.                                                                                                                                                                                                                                                                                                                            |
@@ -275,35 +273,35 @@ Two terms in these guides are precise technical choices rather than casual descr
 
 ### “Stub”: a forwarding role, distinct from size and form
 
-Three different words get offered as substitutes, and each fails for its own reason. "Snippet" gets the axis wrong. "Function" and "module" get the axis right but describe a different one.
+**“Stub” describes a role; “snippet” describes an excerpt; “function” and “module” describe structure.** A complete function can be shown as a snippet and serve as a stub at the same time.
 
-**The analogy: a stub is a forwarding address.**
+**The system-call analogy: a stub is a forwarding address.**
 
-Post arrives there under the right name, and nothing whatsoever happens to it except being sent on. Everything the word has to carry is already in that image:
+Post arrives under the right name and is sent onward. For the simple system-call stubs in this tree, the analogy maps as follows:
 
 | In the analogy                                                | What it stands for                                                                                                                                 |
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **It is a genuine, deliverable address**                      | The stub compiles, links, and occupies a real symbol at a real address. `ld` resolves calls to `fork` because `fork` is really there               |
-| **Nothing is kept there. It all goes onward**                 | Four instructions, no decisions, no work. `li a7`, `ecall`, `ret`                                                                                  |
-| **A scrap of paper with half an address on it**               | A **snippet**. It looks like the same kind of thing and is not deliverable — the post office cannot resolve it, and `ld` cannot resolve a fragment |
+| **Nothing is kept there. It all goes onward**                 | Three instructions: `li a7`, `ecall`, and `ret`. The kernel implements the service. |
+| **An address copied onto a scrap of paper**                   | A **snippet** can show either the complete address or an incomplete fragment. Completeness depends on what was copied. |
 | **"It's an address"**                                         | **Function** or **module**. True, and it tells you nothing: the warehouse has an address too                                                       |
 | **A depot that opens the parcel and attaches a customs form** | A **wrapper**. `sbrk` adding `SBRK_EAGER` is exactly that form                                                                                     |
 | **The warehouse where the goods actually are**                | An **implementation**. `strlen`                                                                                                                    |
 
-The deliverability line is the one that separates a stub from a snippet, and it is not a matter of degree: a forwarding address either resolves or it does not. That is the same test `ld` applies.
+**A callable stub needs a resolvable entry point.** `ld` resolves the `fork` symbol because the generated stub defines it. Calling the same code a snippet says how it is presented, not whether it compiles or links.
 
 Size stays a separate question throughout, which is the whole point about "function" and "module". A forwarding address can be a PO box (one function — `sys_sbrk`), a mail-handling office (a module — QEMU's gdb stub), or an empty building registered as a company's office (a file — `docs/book/ch13-summary.md`). None of those sizes makes it more or less a forwarding address.
 
 > [!NOTE]
 > The analogy earns exactly one thing: it separates _what a thing does_ from _how big it is_. Push it further and it misleads — nothing in the post is privileged, and `ecall` is not a delivery van but a change of CPU privilege level. For what actually happens on the other side of that call, see [Why the system call number goes in `a7`](06-build-artifacts.md#why-the-system-call-number-goes-in-a7).
 
-**Against "snippet"** — the two classify along different axes, and only one of them says anything useful here:
+**Snippet versus executable stub:** neither term determines the code's size, and only “stub” identifies its role.
 
 |                                              | **Snippet**                                    | **Stub**                                         |
 | -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
 | **Defined by**                               | Its form — a short fragment of code            | Its role — standing in for a full implementation |
-| **Is it complete?**                          | Not necessarily; it may not compile on its own | Yes. It compiles, links, and is callable         |
-| **Does it have a name others link against?** | No                                             | **Yes.** That is the entire point                |
+| **Is it complete?**                          | It can show complete code or a partial excerpt. | A callable stub supplies an entry point; it delegates the service. |
+| **Does it have a name others link against?** | It may include a named function, including a stub. | The generated xv6 system-call stubs export callable symbols. |
 
 `fork` in `user/usys.S` is a real function at a real address that `ld` resolves references to; calling it a snippet would describe its length and miss its job. It occupies the name `fork` so that C code can call `fork()` — and then does none of the work itself, handing straight over to the kernel.
 
@@ -319,15 +317,9 @@ Size stays a separate question throughout, which is the whole point about "funct
 
 A word that qualifies a function, a module, _and_ a file **cannot** be a replacement for any of them. It is the role-shaped word that says what a thing does; they are the structural words that say what size of thing it is.
 
-The `sbrk` chain is the sharpest case, because all three roles sit in one call path:
+**The `sbrk` path combines a wrapper and a stub.** `sbrk(n)` in [`user/ulib.c`](../user/ulib.c) supplies `SBRK_EAGER` to `sys_sbrk(n, SBRK_EAGER)`. The `sys_sbrk` stub generated by [`user/usys.pl`](../user/usys.pl) forwards those arguments through `ecall`; it does not choose eager or lazy mode.
 
-```c
-sys_sbrk:  li a7, SYS_sbrk; ecall; ret          // usys.S      — stub: names the call, does nothing
-sbrk(n)    { return sys_sbrk(n, SBRK_EAGER); }  // ulib.c      — wrapper: supplies an argument
-strlen(s)  { ... }                              // ulib.c      — implementation: does the work
-```
-
-**All three are functions, but their roles differ.** The middle one is a wrapper because it decides which eager/lazy mode to request; a stub makes no such decision.
+`strlen()` is a separate example of an implementation: it computes the string length in user space. It is not part of the `sbrk` call path.
 
 That distinction explains the special case in `user/usys.pl`: it emits the stub as `sys_sbrk`, leaving the plain `sbrk` name available for the wrapper.
 
@@ -335,8 +327,8 @@ Substitution fails in both directions, which is the test worth applying to any s
 
 | Sentence         | With "stub"                                                                              | With "function"                                                     |
 | ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| **On behaviour** | "The stub never touches `a0`–`a5`" — worth saying, because pass-through is what stubs do | "The function never touches `a0`–`a5`" — reads as an arbitrary fact |
-| **On counting**  | "22 stubs" — identifies a set                                                            | "22 functions" — identifies nothing; `ulib.c` contributes 14 more   |
+| **On behaviour** | “The xv6 system-call stub preserves `a0`–`a5`” explains argument forwarding in this ABI. | “The function preserves `a0`–`a5`” states a property without identifying the forwarding role. |
+| **On counting**  | “22 system-call stubs” identifies the generated forwarding entry points. | “22 functions” does not identify which set; user-library functions are another set. |
 
 "Module" fails on granularity in the opposite direction: `user/usys.S` as a whole file could fairly be called a module, but the four lines named `fork` inside it could not.
 

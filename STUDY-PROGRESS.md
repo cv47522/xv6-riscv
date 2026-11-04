@@ -45,14 +45,15 @@ When you finish an item:
 
 ## Current checkpoint
 
-**Recorded on 2026-10-28.** These are study milestones, not claims of attendance or homework submission.
+**Checkpoint updated on 2026-11-04.** Individual milestones keep their original dates; they are not claims of attendance or homework submission.
 
 | Area                      | Work on record                                                                                                                                                                                      | Next step                                                                                               |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Lecture 1 practice**    | [Nine programs](#lecture-1-example-practice); commits `965f54e` and `9d2ca97`; [exercise guide](docs/07-exercises.md).                                                                              | Suite fully passing: [19/19 checks](#verification-evidence), including Lectures 2 and 3, on 2026-11-03. |
-| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [19/19 checks](#verification-evidence). | Lecture 3 (OS design) and Homework 3.                                                                   |
+| **C and memory practice** | [memdump](user/memdump.c), [ptr](user/ptr.c), [array](user/array.c), [str](user/str.c), [hwstruct](user/hwstruct.c); [Lecture 2 note](docs/10-c-in-xv6.md); [19/19 checks](#verification-evidence). | Study Lecture 3 (OS design); Homework 3 is answered. |
 | **Lecture 3 draft**       | [isolate](user/isolate.c), [forkfill](user/forkfill.c), [hwdesign](user/hwdesign.c); [draft OS design note](docs/11-os-design-in-xv6.md); [19/19 checks](#verification-evidence). Not yet studied.  | Study Lecture 3 and confirm it; Homework 3 is answered.                                                 |
-| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence).                                                            | Optional shell challenges; then the syscall lab.                                                        |
+| **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence). | Optional shell challenges remain; the syscall lab is now in progress. |
+| **Syscall GDB exercise** | [Answers and debugging evidence](docs/labs/12-syscall-using-gdb.md#solution-walkthrough) (spoiler), recorded 2026-11-04; `answers-syscall.txt` passes the grader's file sanity check. | The remaining syscall exercises are open; the sanity check does not assess answer correctness. |
 | **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                                                                                  | Read the remaining chapters; their files are scaffolding or references, not proof of reading.           |
 
 **Lecture checkboxes record study evidence and confirmation:**
@@ -224,10 +225,10 @@ Additional code includes links found inside the lecture texts. The [archive inve
 ## Labs
 
 - **Dates:** Assigned and due dates follow the schedule, even on holidays or hacking days.
-- **Status:** Util is in progress; no completed work is on record for the later labs in this snapshot.
+- **Status:** Util is closed. The syscall lab has recorded Using gdb answers and evidence; the rest of that lab and all later labs remain open.
 
 - [x] **[util: Unix utilities](https://pdos.csail.mit.edu/6.1810/2026/labs/util.html) · closed 2026-10-27** — assigned 2026-09-09; due 2026-09-17. [Every required exercise passes](#util-exercise-checklist), and `make grade` scores 206/206. The optional shell challenges remain open.
-- [ ] **[syscall: System calls](https://pdos.csail.mit.edu/6.1810/2026/labs/syscall.html)** — assigned 2026-09-16; due 2026-09-24.
+- [ ] **[syscall: System calls](https://pdos.csail.mit.edu/6.1810/2026/labs/syscall.html)** — assigned 2026-09-16; due 2026-09-24. [Using gdb answers and evidence](docs/labs/12-syscall-using-gdb.md#solution-walkthrough) are recorded (spoiler); remaining exercises are open.
 - [ ] **[pgtbl: Page tables](https://pdos.csail.mit.edu/6.1810/2026/labs/pgtbl.html)** — assigned 2026-09-23; due 2026-10-01.
 - [ ] **[traps: Traps](https://pdos.csail.mit.edu/6.1810/2026/labs/traps.html)** — assigned 2026-09-30; due 2026-10-08.
 - [ ] **[cow: Copy-on-write fork](https://pdos.csail.mit.edu/6.1810/2026/labs/cow.html)** — assigned 2026-10-07; due 2026-10-15.

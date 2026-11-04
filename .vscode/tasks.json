@@ -36,6 +36,14 @@
             "command": "pkill -TERM -f \"qemu-system-riscv64.*-gdb tcp::$(make -s print-gdbport)\" || true",
             "options": { "cwd": "${workspaceFolder}" },
             "problemMatcher": []
+        },
+        {
+            "label": "xv6: interrupt GDB (Pause)",
+            "type": "shell",
+            "command": "pkill -INT -f \"[g]db-multiarch --interpreter=mi -x ${workspaceFolder}/.gdbinit\" || echo \"No xv6 GDB session is running.\"",
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": [],
+            "presentation": { "reveal": "silent", "panel": "shared" }
         }
     ]
 }
