@@ -55,7 +55,12 @@ When you finish an item:
 | **Util lab**              | Closed 2026-10-27: all five required exercises, two optional challenges, and `time.txt`; `make grade` [206/206](#verification-evidence).                                                            | Optional shell challenges; then the syscall lab.                                                        |
 | **Book reading**          | [Chapter 1 note](docs/book/ch01-operating-system-interfaces.md); commit `32541d6`.                                                                                                                  | Read the remaining chapters; their files are scaffolding or references, not proof of reading.           |
 
-Lecture 1 is checked based on the nine programs and Chapter 1 notes. Attendance and Homework 1 completion are unconfirmed. Lecture 2 is checked on your confirmation on 2026-10-27, backed by the [Lecture 2 practice](#lecture-2-example-practice) and the [C in xv6](docs/10-c-in-xv6.md) note. Lecture 3 has [draft notes](docs/11-os-design-in-xv6.md) and [practice](#lecture-3-example-practice) from 2026-10-28 but stays open: you said on 2026-10-28 that it is not yet studied. Other lectures stay open until you confirm studying them.
+**Lecture checkboxes record study evidence and confirmation:**
+
+- **Lecture 1:** checked based on the nine programs and Chapter 1 notes; attendance and Homework 1 completion are unconfirmed.
+- **Lecture 2:** checked on your confirmation on 2026-10-27, backed by the [Lecture 2 practice](#lecture-2-example-practice) and the [C in xv6](docs/10-c-in-xv6.md) note.
+- **Lecture 3:** [draft notes](docs/11-os-design-in-xv6.md) and [practice](#lecture-3-example-practice) date from 2026-10-28, but the lecture stays open because you said that day it was not yet studied.
+- **Other lectures:** stay open until you confirm studying them.
 
 ## Lectures
 

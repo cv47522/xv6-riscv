@@ -697,7 +697,9 @@ The fault report identifies both the destination and the store:
 
 ## Lecture 3 — the user/kernel boundary
 
-Lecture 3 ([`l-os.txt`](../lectures/l-os.txt)) publishes no example code, so all three programs are written here to make the lecture's claims observable: `isolate` attacks the boundary four ways, `forkfill` answers the lecture's "what happens if out of proc's?", and `hwdesign` runs Homework 3's three questions on a full table. The concepts, the boot path, and the `fork`/`exec` walkthroughs live in [11-os-design-in-xv6.md](11-os-design-in-xv6.md); these sections cover only the programs.
+**Three local programs make Lecture 3's claims observable.** The lecture ([`l-os.txt`](../lectures/l-os.txt)) publishes no example code; the table below maps each program to its question and teaching point.
+
+The concepts, the boot path, and the `fork`/`exec` walkthroughs live in [11-os-design-in-xv6.md](11-os-design-in-xv6.md); these sections cover only the programs.
 
 | Program                                                         | Source            | Lecture                                                 | What it introduces                                                     |
 | --------------------------------------------------------------- | ----------------- | ------------------------------------------------------- | ---------------------------------------------------------------------- |
@@ -776,7 +778,9 @@ The answer and its reasoning live in [11-os-design-in-xv6.md](11-os-design-in-xv
 
 ## grade-exercises: coverage and mutation checks
 
-[`grade-exercises`](../grade-exercises) covers all nine Lecture 1 exercises, the four Lecture 2 programs, and the three Lecture 3 programs: nineteen tests in about twenty seconds. Each test pins a claim this document or a source comment makes as fact — the point is that the prose **cannot** drift away from the programs without something going red.
+**[`grade-exercises`](../grade-exercises) runs nineteen tests in about twenty seconds:** all nine Lecture 1 exercises, the four Lecture 2 programs, and the three Lecture 3 programs.
+
+Each test pins a claim this document or a source comment makes as fact, so a change that contradicts an asserted claim makes the suite fail.
 
 | Test             | The claim it pins                                                                                                                                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -148,6 +148,8 @@ syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
+  // num = 0; // Q: Why not use this to show panic?
+  // num = *(int*)0; // Q: Isn't this the same as above?
   if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     /*
      * Use num to lookup the system call function for num, call it,

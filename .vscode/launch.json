@@ -23,6 +23,29 @@
             "hardwareBreakpoints": { "require": true },
             "preLaunchTask": "xv6: start QEMU for GDB",
             "postDebugTask": "xv6: stop QEMU GDB"
+        },
+        {
+            "name": "xv6: debug kernel panic",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/kernel/kernel",
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "gdb-multiarch",
+            "miDebuggerArgs": "-x ${workspaceFolder}/.gdbinit",
+            "customLaunchSetupCommands": [],
+            "setupCommands": [
+                {
+                    "description": "Stop before panic() prints and spins, while the trap CSRs still hold a kernel fault",
+                    "text": "break panic",
+                    "ignoreFailures": false
+                }
+            ],
+            "launchCompleteCommand": "None",
+            "stopAtConnect": true,
+            "hardwareBreakpoints": { "require": true },
+            "preLaunchTask": "xv6: start QEMU for GDB",
+            "postDebugTask": "xv6: stop QEMU GDB"
         }
     ]
 }

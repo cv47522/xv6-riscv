@@ -401,7 +401,9 @@ The fault is 0x14 bytes into `usertrap`. Now open `kernel/kernel.asm`, search fo
 ```
 
 > [!TIP]
-> Both files are regenerated on every link, so an address you looked up before a rebuild is meaningless after it. If a lookup lands somewhere absurd, check that you did not edit and rebuild in between. Neither file is in git, for the same reason — see [Finding where the kernel crashed](09-debugging-xv6.md#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line) for the full debugging loop.
+> **Look up addresses in artifacts from the same build as the fault.** Both files are regenerated on every link, so an address from before a rebuild can point somewhere unrelated afterward. If a lookup lands somewhere absurd, check whether you edited and rebuilt in between.
+
+Neither generated file is in git. [Finding where the kernel crashed](09-debugging-xv6.md#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line) shows the full debugging loop.
 
 ## Why the kernel is linked at `0x80000000`
 
@@ -701,7 +703,10 @@ The leading `-` means "silently skip if absent", so a freshly cleaned tree with 
 | `user/usys.S`                                      | **No**  | Generated. Edit `user/usys.pl`.                                        |
 | `.o`, `.d`, `.asm`, `.sym`, `user/_name`, `fs.img` | **No**  | All outputs. Every one is regenerated and none is tracked.             |
 
-The two you will _read_ constantly without ever editing are `.asm` and `.sym`, both regenerated on every link. Turning a fault address into a line of C is what they are for, and the procedure is in [`.asm` versus `.sym`](#asm-versus-sym) above; the debugging loop around it is in [Finding where the kernel crashed](09-debugging-xv6.md#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line).
+**Read `.asm` and `.sym`; do not edit them.** Both are regenerated on every link and let you turn a fault address into a line of C:
+
+- **Artifact lookup:** [`.asm` versus `.sym`](#asm-versus-sym).
+- **Full debugging loop:** [Finding where the kernel crashed](09-debugging-xv6.md#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line).
 
 ## Where each piece would live on Linux
 

@@ -6,6 +6,8 @@
 
 ---
 
+<!-- TODO: Add/Explain stub (w/ analogy when useful): stub, user stub, kernel stub, xxx stub, etc. -->
+
 Every acronym and piece of jargon you meet in xv6, the [xv6 book](https://mit-pdos.github.io/xv6-riscv-book/), and the 6.1810 labs — expanded, and explained in terms of where it appears in this repository.
 
 This is the hub the other guides link into. When a book chapter introduces a new term, add it here once rather than re-explaining it in chapter notes.

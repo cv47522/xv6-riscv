@@ -968,7 +968,10 @@ flowchart TD
 
 _Legend: request red-white, processing yellow, decision blue, stall or held resource red, commit cyan; every node also states its meaning in text._
 
-**`kill()` is deliberately asynchronous.** The victim may be running on another hart or sleeping inside the kernel while holding locks, so destroying it on the spot could leave shared state inconsistent. xv6 instead lets the victim exit itself at a safe point: `usertrap()` checks `killed(p)` on system-call entry and again before returning to user space, and sleep loops such as `piperead()` in `kernel/pipe.c` and `sys_pause()` in `kernel/sysproc.c` check it after every wakeup.
+**`kill()` is deliberately asynchronous.** The victim may be running on another hart or sleeping inside the kernel while holding locks, so destroying it on the spot could leave shared state inconsistent. xv6 instead lets the victim exit itself at a safe point:
+
+- **Trap checks:** `usertrap()` checks `killed(p)` on system-call entry and again before returning to user space.
+- **Sleep-loop checks:** `piperead()` in `kernel/pipe.c` and `sys_pause()` in `kernel/sysproc.c` check it after every wakeup.
 
 **Exiting is not enough either.** `kexit()` is still running on the slot's kernel stack until `sched()` switches away, so the slot cannot be handed out yet, and the parent is owed the exit status. The `ZOMBIE` therefore keeps the slot until the parent's `wait()` reaches `freeproc()`.
 
@@ -984,7 +987,11 @@ _Legend: request red-white, processing yellow, decision blue, stall or held reso
 
 ### Homework 3 evidence: `hwdesign` on a full table
 
-[`user/hwdesign.c`](../user/hwdesign.c) runs all three questions in one process. A probe child is forked **before** the table fills, so it already owns a slot when it is told to `exec("echo", ...)`; the program then refills the probe's freed slot, kills one of its own blocked children, and forks before waiting:
+**[`user/hwdesign.c`](../user/hwdesign.c) tests all three questions in one run.** The order keeps process-slot availability under the parent's control:
+
+1. Fork a probe child **before** filling the table, so it already owns a slot when told to `exec("echo", ...)`.
+2. After the probe exits and is reaped, refill its freed slot.
+3. Kill one of the parent's own blocked children, then fork **before** waiting for it.
 
 ```text
 $ hwdesign
@@ -1016,7 +1023,10 @@ hwdesign: reaped 60 children
 | **An exited process frees its slot**                    | `kexit()` leaves a `ZOMBIE`; only the parent's `wait()` calls `freeproc()`.                       |
 | **A full table panics the kernel**                      | `allocproc()` returns `0` and `fork()` returns `-1`. The failure is per call, not per system.     |
 
-> [!NOTE] **At the shell, a full table ends the shell, not the system.** By reading the code (not run): `fork1()` in `user/sh.c` calls `panic("fork")`, which prints `fork` and calls `exit(1)`. `init`'s `wait()` then reaps the shell, and its next `fork()` reuses the shell's own freed slot to start a new one.
+> [!NOTE]
+> **At the shell, a full table ends the shell, not the system.** This follows from reading the code; it was not run.
+
+`fork1()` in `user/sh.c` calls `panic("fork")`, which prints `fork` and calls `exit(1)`. `init`'s `wait()` then reaps the shell, and its next `fork()` reuses the shell's own freed slot to start a new one.
 
 ## Questions about page-table permissions and trap diagnostics
 

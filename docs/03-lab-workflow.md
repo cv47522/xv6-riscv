@@ -95,7 +95,9 @@ MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) 
 Where an exercise needed more understanding than typing, the derivation is written up under [labs/](labs/) — one note per exercise, covering the existing code the exercise forces you to read and the decisions the implementation reduces to, and stopping short of the solution.
 
 > [!TIP]
-> Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder. Enrolled students are told to ask on Piazza or come to office hours; the self-study equivalent is to go back to the book chapter or step through the code in gdb — see [09-debugging-xv6.md](09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit).
+> **When the rating and time spent diverge, revisit the mechanism.** Spending far longer than the rating suggests usually means something structural is missing, not that you need to push harder.
+
+Enrolled students are told to ask on Piazza or come to office hours. For self-study, return to the book chapter or step through the code with [GDB](09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit).
 
 ## Run graders and interpret failure transcripts
 
@@ -180,7 +182,9 @@ make clean
 ```
 
 > [!NOTE]
-> Expect this to fail occasionally as you progress. Later labs change kernel internals that earlier graders assert on — the lock lab restructures `kalloc` and the buffer cache, cow rewrites page-fault handling. Sometimes that is a genuine regression worth fixing, and sometimes the later lab deliberately changed the behaviour the old grader checked. The transcript in `xv6.out.*` tells you which.
+> **An earlier grader can fail after a deliberate kernel change.** The lock lab restructures `kalloc` and the buffer cache, and cow rewrites page-fault handling; earlier graders may assert on those internals.
+
+Inspect the transcript in `xv6.out.*` to distinguish a genuine regression worth fixing from behaviour the later lab deliberately changed.
 
 ## Create a committed-tree submission with `make zipball`
 

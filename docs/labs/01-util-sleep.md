@@ -154,7 +154,9 @@ A source file is not necessarily a program: `ulib.c`, `printf.c`, and `umalloc.c
 | **U-mode (user mode)**       | A process executes its user program and linked library code, including syscall stubs. | It accesses permitted user memory and requests kernel services through system calls.         |
 | **S-mode (supervisor mode)** | The hart executes xv6 kernel code for system calls, interrupts, and other traps.      | The kernel manages page tables, devices, and process scheduling using privileged operations. |
 
-These are RISC-V hardware privilege levels inside the QEMU guest. The same process enters kernel code for a system call; no separate kernel program is launched. `ecall` transfers control to the configured trap entry, and `sret` returns to user execution on this path. See [the architecture glossary](../04-terminology.md#risc-v-architecture) for the full mode terminology, including M-mode used during boot.
+**These are RISC-V hardware privilege levels inside the QEMU guest.** The same process enters kernel code for a system call; no separate kernel program is launched. `ecall` transfers control to the configured trap entry, and `sret` returns to user execution on this path.
+
+See [the architecture glossary](../04-terminology.md#risc-v-architecture) for the full mode terminology, including M-mode used during boot.
 
 ```mermaid
 flowchart TD
@@ -187,7 +189,9 @@ flowchart TD
 
 _Legend for both diagrams: pink requests, blue routes or decides, yellow processes, cyan commits or returns, and red stalls or fails. Labels carry the meaning without color._
 
-The C call reaches a user-space stub. Hardware crosses the privilege boundary at `ecall` and `sret`; kernel code reads saved user registers from the per-process trapframe. The diagram shows the route; the tables below explain the register and storage rules. For the detailed spatial view of the boundary, register roles, and trapframe offsets, [view the SVG](fig/util-sleep-syscall-boundary.svg) or open [the editable Excalidraw drawing](fig/util-sleep-syscall-boundary.excalidraw) in Excalidraw.
+**The C call reaches a user-space stub; hardware crosses the privilege boundary at `ecall` and `sret`.** Kernel code reads saved user registers from the per-process trapframe. The diagram shows the route; the tables below explain the register and storage rules.
+
+For the detailed spatial view of the boundary, register roles, and trapframe offsets, [view the SVG](fig/util-sleep-syscall-boundary.svg) or open [the editable Excalidraw drawing](fig/util-sleep-syscall-boundary.excalidraw) in Excalidraw.
 
 ### C calls, `ecall`, and `sret`: three control transfers
 
@@ -220,7 +224,12 @@ A user program **cannot** simply `jal sys_pause`, for three reasons that togethe
 
 `a0` does double duty because the RISC-V calling convention already uses it for both the first argument and the return value. The C caller placed `n` in `a0` before the stub ran, and the caller will read the result from `a0` after the stub's `ret`, so the stub **never** moves either value. `a7` is the argument register the six-argument channel leaves free; [`06-build-artifacts.md`](../06-build-artifacts.md#why-the-system-call-number-goes-in-a7) owns the full reasoning.
 
-The widths differ at each end. The register and the trapframe slot are 64-bit; `argint()` truncates to `int`, and `sys_pause()` returns `uint64`, which the user-side declaration `int pause(int)` reads back as `int`. That round trip is why a handler's `return -1`, such as a failing `sys_read()`, arrives as the user `int` value `-1`. The **killed path** in the handler walkthrough below explains why `sys_pause()`'s own `-1` **never** reaches user code.
+**Register width and C type differ at both ends:**
+
+- **Argument:** the register and trapframe slot are 64-bit; `argint()` truncates to `int`.
+- **Return value:** `sys_pause()` returns `uint64`, which the user-side declaration `int pause(int)` reads back as `int`.
+
+That round trip is why a handler's `return -1`, such as a failing `sys_read()`, arrives as the user `int` value `-1`. The **killed path** in the handler walkthrough below explains why `sys_pause()`'s own `-1` **never** reaches user code.
 
 ### The generated `pause` stub
 
@@ -316,7 +325,9 @@ flowchart TD
 
 Publishing `&ticks` before unlocking closes the lost-wakeup gap. Both paths reacquire `tickslock` before rechecking the deadline. Red marks a deliberate stall as well as the killed path; it does not **always** mean failure.
 
-The helper functions `sleep_prepare()`, `sleep()`, `wakeup()`, and `kkill()` live in [`kernel/proc.c`](../../kernel/proc.c). Hart 0 supplies timer wakeups through `clockintr()` in [`kernel/trap.c`](../../kernel/trap.c). For the side-by-side view of that global counter and one waiting process, [view the SVG](fig/util-sleep-tick-wait.svg) or open [the editable Excalidraw drawing](fig/util-sleep-tick-wait.excalidraw) in Excalidraw. These drawings supplement the inline explanation; use the source quotation below for the complete handler and its edge cases.
+**Helper and timer sources:** `sleep_prepare()`, `sleep()`, `wakeup()`, and `kkill()` live in [`kernel/proc.c`](../../kernel/proc.c). Hart 0 supplies timer wakeups through `clockintr()` in [`kernel/trap.c`](../../kernel/trap.c).
+
+For the side-by-side view of that global counter and one waiting process, [view the SVG](fig/util-sleep-tick-wait.svg) or open [the editable Excalidraw drawing](fig/util-sleep-tick-wait.excalidraw) in Excalidraw. These drawings supplement the inline explanation; use the source quotation below for the complete handler and its edge cases.
 
 The complete existing function from [`kernel/sysproc.c`](../../kernel/sysproc.c):
 
@@ -444,7 +455,9 @@ That wait marks the process `SLEEPING`, so `scheduler()` in `kernel/proc.c` skip
 5. **What does the grader require from the missing-argument path?** Compare both no-argument test bodies in `grade-lab-util`; distinguish their output and return checks from local exit-status convention.
 
 > [!NOTE]
-> The exercise requires a missing-argument diagnostic; the grader does not enforce it or define a malformed-input policy. This tree's `atoi()` maps `"0"`, `"abc"`, and `""` to `0` and accepts `"3x"` as `3`, so checking only its result cannot validate the input. [Docs 05](../05-syscall-reference.md#atoi-is-conversion-not-validation) owns the helper's examples and limits. Checking every character and detecting integer overflow would require a separate parser, which is additional scope for this exercise.
+> **The exercise requires a missing-argument diagnostic; the grader does not enforce it or define a malformed-input policy.** Checking every character and detecting integer overflow would require a separate parser, which is additional scope for this exercise.
+
+**`atoi()` cannot validate input by its result alone.** It maps `"0"`, `"abc"`, and `""` to `0` and accepts `"3x"` as `3`. [Docs 05](../05-syscall-reference.md#atoi-is-conversion-not-validation) owns the helper's examples and limits.
 
 ### `sleep` argument, API, and waiting traps
 
@@ -537,7 +550,10 @@ Use the [grader evidence table](#sleep-grader-evidence-limits) when interpreting
 
 QEMU startup and host scheduling add unrelated wall-clock delay. None of these argument observations alone proves that the program did no extra CPU-consuming work.
 
-[Docs 09](../09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit) owns debugger setup, controls, VS Code, and cleanup, and [its `add-symbol-file` recipe](../09-debugging-xv6.md#debug-usersleep-manually-with-add-symbol-file-and-hbreak) explains why a `sleep.c` breakpoint initially remains unresolved and how to stop in user code without changing `.vscode`.
+**Debugger references in Docs 09:**
+
+- **Setup, controls, VS Code, and cleanup:** [Run a GDB session](../09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit).
+- **Unresolved `sleep.c` breakpoint and a user-code stop:** [The `add-symbol-file` recipe](../09-debugging-xv6.md#debug-usersleep-manually-with-add-symbol-file-and-hbreak), which leaves `.vscode` unchanged.
 
 ### `sleep` grader internals: builds, registration, and breakpoints
 
