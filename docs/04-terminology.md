@@ -53,6 +53,44 @@ For reusable definitions and instruction practice, see [the assembly course’s 
 | **PLIC**                     | **P**latform-**L**evel **I**nterrupt **C**ontroller               | Routes device interrupts (UART, disk) to harts. `kernel/plic.c`.                                                                                                                                                                                                        |
 | **CLINT**                    | **C**ore-**L**ocal **INT**erruptor                                | Provides timer interrupts, which drive preemptive scheduling.                                                                                                                                                                                                           |
 
+### Register names: `x0`–`x31`, ABI aliases, and CSR numbers
+
+**Every integer register has a hardware name and an ABI alias; xv6 source, `kernel/kernel.asm`, and GDB all use the alias.** Stack pointer = `sp` = `x2`. The assembly course owns [the full alias table](../../assembly-language/docs/riscv/01-values-registers-instructions.md#register-names-x0x31-and-their-abi-aliases); the column below records where each register shows up in xv6:
+
+| Hardware name          | ABI alias  | Role in xv6                                                                                                        |
+| ---------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| `x0`                   | `zero`     | Always 0; the faulting `lw a3,0(zero)` in the syscall lab loads from address `0 + 0`.                              |
+| `x1`                   | `ra`       | Return address written by `jal`/`call`.                                                                            |
+| `x2`                   | `sp`       | Stack pointer; `_entry` gives each hart a slice of `stack0`, and `uservec` switches to `p->kstack`.                |
+| `x3`                   | `gp`       | Global pointer; xv6 does not use it.                                                                               |
+| `x4`                   | `tp`       | Thread pointer; xv6 stores the hart ID here (`w_tp(id)` in `kernel/start.c`) because S-mode cannot read `mhartid`. |
+| `x5`–`x7`, `x28`–`x31` | `t0`–`t6`  | Temporaries, caller-saved.                                                                                         |
+| `x8`                   | `s0`/`fp`  | Frame pointer: the Makefile's `-fno-omit-frame-pointer` keeps it for `r_fp()` and backtraces.                      |
+| `x9`, `x18`–`x27`      | `s1`–`s11` | Callee-saved; `swtch` in `kernel/swtch.S` saves exactly `ra`, `sp`, and `s0`–`s11`.                                |
+| `x10`–`x11`            | `a0`–`a1`  | Arguments and return value; a system call's result goes back in `p->trapframe->a0`.                                |
+| `x12`–`x17`            | `a2`–`a7`  | Arguments; `a7` carries the system-call number into `ecall`.                                                       |
+
+**`struct trapframe` in `kernel/proc.h` names its fields after the ABI aliases** (`ra`, `sp`, `gp`, `tp`, `t0`, …, `a7`), so `p->trapframe->a7` is the saved user `x17`.
+
+**CSRs have no `x` number.** They live in a separate 12-bit CSR address space reached only by `csrr`/`csrw`-family instructions, which is why `kernel/riscv.h` wraps each one in inline assembly. The assembler accepts either the name or the number, and GDB exposes them as `$name`, such as `p /x $sstatus`:
+
+| CSR        | Number  | Used in xv6 by                                                    |
+| ---------- | ------- | ----------------------------------------------------------------- |
+| `sstatus`  | `0x100` | `intr_on()`, `usertrap()`'s `SPP` check, `usertrapret()`          |
+| `sie`      | `0x104` | `start()` enabling S-mode interrupts                              |
+| `stvec`    | `0x105` | `trapinithart()` (`kernelvec`) and `prepare_return()` (`uservec`) |
+| `sscratch` | `0x140` | `uservec` in `kernel/trampoline.S`                                |
+| `sepc`     | `0x141` | Trap entry and `sret`                                             |
+| `scause`   | `0x142` | `usertrap()`, `kerneltrap()`, `devintr()`                         |
+| `stval`    | `0x143` | Page-fault address printed on a panic                             |
+| `sip`      | `0x144` | Pending S-mode interrupts                                         |
+| `satp`     | `0x180` | `kvminithart()` and `userret`                                     |
+| `mstatus`  | `0x300` | `start()` setting `MPP`                                           |
+| `mepc`     | `0x341` | `start()` pointing `mret` at `main`                               |
+| `mhartid`  | `0xf14` | `start()`, read-only                                              |
+
+The numbers come from the CSR listing in the [privileged spec](riscv-privileged-20211203.pdf), chapter 2; the assembly course's [CSR lesson](../../assembly-language/docs/riscv/06-csrs-and-privilege.md#csrs-how-they-differ-from-integer-registers-and-memory) contrasts CSRs with integer registers and memory.
+
 ### Harts versus physical cores
 
 A **hart** is not always a physical core: simultaneous multithreading can expose several harts from one core. QEMU creates `CPUS` virtual CPUs for this machine, and xv6 identifies each as a hart.
@@ -203,7 +241,7 @@ Nothing, on purpose. It is worth being blunt about this, because "Unix-like" inv
 | **superblock**            | Block 1, describing the filesystem's layout.                                                                                                                                                                                                                                                                                                                                                     |
 | **logging / journalling** | Writing changes to a log before applying them, so a crash mid-update is recoverable. `kernel/log.c`.                                                                                                                                                                                                                                                                                             |
 | **buffer cache**          | In-memory cache of disk blocks. `kernel/bio.c`.                                                                                                                                                                                                                                                                                                                                                  |
-| **page fault**            | A trap raised when address translation fails or a mapping denies the attempted access. A valid, read-only mapping can fault on a write, as in the cow lab; mmap also uses page faults.                                                                                                                                                                                                                                                                                                   |
+| **page fault**            | A trap raised when address translation fails or a mapping denies the attempted access. A valid, read-only mapping can fault on a write, as in the cow lab; mmap also uses page faults.                                                                                                                                                                                                           |
 | **copy-on-write**         | Sharing pages between parent and child after `fork`, copying only when one writes.                                                                                                                                                                                                                                                                                                               |
 | **demand paging**         | Allocating a page only when it is first touched.                                                                                                                                                                                                                                                                                                                                                 |
 | **zombie**                | A process that has exited but whose parent has not yet called `wait`.                                                                                                                                                                                                                                                                                                                            |
@@ -279,14 +317,14 @@ Two terms in these guides are precise technical choices rather than casual descr
 
 Post arrives under the right name and is sent onward. For the simple system-call stubs in this tree, the analogy maps as follows:
 
-| In the analogy                                                | What it stands for                                                                                                                                 |
-| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **It is a genuine, deliverable address**                      | The stub compiles, links, and occupies a real symbol at a real address. `ld` resolves calls to `fork` because `fork` is really there               |
-| **Nothing is kept there. It all goes onward**                 | Three instructions: `li a7`, `ecall`, and `ret`. The kernel implements the service. |
-| **An address copied onto a scrap of paper**                   | A **snippet** can show either the complete address or an incomplete fragment. Completeness depends on what was copied. |
-| **"It's an address"**                                         | **Function** or **module**. True, and it tells you nothing: the warehouse has an address too                                                       |
-| **A depot that opens the parcel and attaches a customs form** | A **wrapper**. `sbrk` adding `SBRK_EAGER` is exactly that form                                                                                     |
-| **The warehouse where the goods actually are**                | An **implementation**. `strlen`                                                                                                                    |
+| In the analogy                                                | What it stands for                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **It is a genuine, deliverable address**                      | The stub compiles, links, and occupies a real symbol at a real address. `ld` resolves calls to `fork` because `fork` is really there |
+| **Nothing is kept there. It all goes onward**                 | Three instructions: `li a7`, `ecall`, and `ret`. The kernel implements the service.                                                  |
+| **An address copied onto a scrap of paper**                   | A **snippet** can show either the complete address or an incomplete fragment. Completeness depends on what was copied.               |
+| **"It's an address"**                                         | **Function** or **module**. True, and it tells you nothing: the warehouse has an address too                                         |
+| **A depot that opens the parcel and attaches a customs form** | A **wrapper**. `sbrk` adding `SBRK_EAGER` is exactly that form                                                                       |
+| **The warehouse where the goods actually are**                | An **implementation**. `strlen`                                                                                                      |
 
 **A callable stub needs a resolvable entry point.** `ld` resolves the `fork` symbol because the generated stub defines it. Calling the same code a snippet says how it is presented, not whether it compiles or links.
 
@@ -297,11 +335,11 @@ Size stays a separate question throughout, which is the whole point about "funct
 
 **Snippet versus executable stub:** neither term determines the code's size, and only “stub” identifies its role.
 
-|                                              | **Snippet**                                    | **Stub**                                         |
-| -------------------------------------------- | ---------------------------------------------- | ------------------------------------------------ |
-| **Defined by**                               | Its form — a short fragment of code            | Its role — standing in for a full implementation |
-| **Is it complete?**                          | It can show complete code or a partial excerpt. | A callable stub supplies an entry point; it delegates the service. |
-| **Does it have a name others link against?** | It may include a named function, including a stub. | The generated xv6 system-call stubs export callable symbols. |
+|                                              | **Snippet**                                        | **Stub**                                                           |
+| -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
+| **Defined by**                               | Its form — a short fragment of code                | Its role — standing in for a full implementation                   |
+| **Is it complete?**                          | It can show complete code or a partial excerpt.    | A callable stub supplies an entry point; it delegates the service. |
+| **Does it have a name others link against?** | It may include a named function, including a stub. | The generated xv6 system-call stubs export callable symbols.       |
 
 `fork` in `user/usys.S` is a real function at a real address that `ld` resolves references to; calling it a snippet would describe its length and miss its job. It occupies the name `fork` so that C code can call `fork()` — and then does none of the work itself, handing straight over to the kernel.
 
@@ -325,10 +363,10 @@ That distinction explains the special case in `user/usys.pl`: it emits the stub 
 
 Substitution fails in both directions, which is the test worth applying to any such word:
 
-| Sentence         | With "stub"                                                                              | With "function"                                                     |
-| ---------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Sentence         | With "stub"                                                                              | With "function"                                                                               |
+| ---------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | **On behaviour** | “The xv6 system-call stub preserves `a0`–`a5`” explains argument forwarding in this ABI. | “The function preserves `a0`–`a5`” states a property without identifying the forwarding role. |
-| **On counting**  | “22 system-call stubs” identifies the generated forwarding entry points. | “22 functions” does not identify which set; user-library functions are another set. |
+| **On counting**  | “22 system-call stubs” identifies the generated forwarding entry points.                 | “22 functions” does not identify which set; user-library functions are another set.           |
 
 "Module" fails on granularity in the opposite direction: `user/usys.S` as a whole file could fairly be called a module, but the four lines named `fork` inside it could not.
 

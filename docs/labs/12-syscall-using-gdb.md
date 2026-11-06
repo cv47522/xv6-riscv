@@ -366,10 +366,30 @@ $4 = 0x200000022
 >
 > _**1** `pid = 0x3`, not init's pid 1. **2** The `name` bytes `0x73 0x6c 0x65 0x65 0x70` spell `sleep`. **3** `a7 = 13` is `SYS_pause`._
 >
-> > ![GDB's p /x *p at a sys_pause stop: pid 3, name bytes 0x73 0x6c 0x65 0x65 0x70, and p->trapframe->a7 = 13](../images/riscv-04
-> > -hex-to-string.png)
+> ![A hex-to-text converter turning the bytes 73 6c 65 65 70 into the ASCII text sleep](../images/riscv-04-hex-to-string.png)
+>
+> _The `name` bytes decoded as ASCII. GDB does the same without a converter: drop `/x` and run `p p->name`, which prints `"sleep"`._
 
 **Answer 3 is a mode, not the register value.** Decode `0x200000022` with the masks in `kernel/riscv.h`, [as above](#decoding-sstatus-the-previous-mode-bit):
+
+**Let GDB do the bit arithmetic.** At the stop, `$sstatus` works in place of the literal; the literal form also works with no target attached:
+
+```gdb
+(gdb) p /t 0x200000022
+$1 = 1000000000000000000000000000100010
+(gdb) p (0x200000022 >> 8) & 1
+$2 = 0
+(gdb) p (0x200000022 >> 5) & 1
+$3 = 1
+(gdb) p (0x200000022 >> 1) & 1
+$4 = 1
+(gdb) p (0x200000022 >> 32) & 3
+$5 = 2
+```
+
+1. **Split the hex into nibbles from the right; each covers four bits.** `0x2_0000_0022`: the low byte `0x22` is binary `0010 0010`, so bits 5 and 1 are set. The leading `2` is the ninth nibble, bits 32–35, so bit 33 is set.
+2. **Read bit 8 for `SPP`.** The third nibble from the right covers bits 8–11 and is `0`, so `(x >> 8) & 1` is `0`.
+3. **Mask the other fields the same way.** Bits 33:32 hold `0b10` = 2, and every bit not listed in the table below is 0.
 
 | Bits           | Field  | Set? | Meaning                                          |
 | -------------- | ------ | ---- | ------------------------------------------------ |
@@ -408,6 +428,10 @@ $1 = "init", '\000' <repeats 11 times>
 $2 = 1
 ```
 
+![GDB layout asm at the session-2 stop: the B+> marker on 0x80001d58 syscall+16, lw a3,0(zero), with the breakpoint report at kernel/syscall.c:157, x/i $pc, p p->name printing init, and p p->pid printing 1](../images/riscv-12-gdb-syscall-lab-session2-faulting-load-tui.png)
+
+_The same stop in `layout asm`, rebuilt from this tree, where the edited load is on line 157 rather than the transcript's 150. `B+>` marks the breakpoint and the PC together on `lw a3,0(zero)`; the next instructions, `addiw a4,a3,-1` and the `bltu` against `li a5,21`, are the `num > 0 && num < NELEM(syscalls)` bounds check that would have consumed `a3`._
+
 **Answer 5 follows from four facts:**
 
 1. **The load reads virtual address 0.** `*(int *)0` makes 0 an address and dereferences it.
@@ -426,6 +450,41 @@ _Answers 4 and 6 in one VS Code stop. **1** Stopped on line 150 before the load 
 ### Why `num = 0;` does not panic but `num = *(int *)0;` does
 
 **Both expressions mention 0, but only one touches memory.** The comment above the `a7` load in `kernel/syscall.c` points here:
+
+```mermaid
+flowchart TD
+    S["syscall() in kernel/syscall.c runs in S-mode on init's first system call."]
+    E{"Which edit replaced num = p->trapframe->a7?"}
+    Z["num = 0: the compiler puts the constant 0 in a register; no memory is read."]
+    BC{"Does the bounds check num > 0 pass?"}
+    U["No: syscall() prints unknown sys call 0 and sets p->trapframe->a0 to -1."]
+    R["usertrapret() returns to init in U-mode; the kernel survives this call."]
+    L["num = *(int *)0: the compiler emits lw a3,0(zero), a load from virtual address 0."]
+    W{"Does the kernel page table map virtual address 0?"}
+    F["No: the MMU raises a load page fault, scause 0xd, stval 0x0."]
+    K["kernelvec calls kerneltrap(), which has no recovery path and calls panic."]
+
+    S --> E
+    E -->|"num = 0"| Z --> BC
+    BC -->|No| U --> R
+    E -->|"num = *(int *)0"| L --> W
+    W -->|No| F --> K
+
+    classDef decision fill:#f0f0ff,stroke:#66c
+    classDef data fill:#f0fff0,stroke:#6a6
+    classDef processing fill:#fffff0,stroke:#cc6
+    classDef commit fill:#f0ffff,stroke:#699
+    classDef failure fill:#ffd9d9,stroke:#c33
+    class E,BC,W decision
+    class L data
+    class S,Z processing
+    class U,R commit
+    class F,K failure
+```
+
+_Legend as in [the trap-path figure](#session-1-and-session-2-on-the-trap-path), plus commit cyan for the result written back to the caller. Only the right branch reads memory, and only that branch can fault._
+
+**The memory picture is one row of [the mapping table](#what-the-kernel-page-table-maps).** Virtual address 0 lies below `PLIC` at `0x0c000000`, the lowest mapped kernel address, so no PTE covers it. The left branch never consults the page table, which is why the kernel survives it; init's later death on that branch is a separate, user-mode failure described below.
 
 | Edited line            | What the compiler emits                               | What happens                                                                             |
 | ---------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
