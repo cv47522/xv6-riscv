@@ -6,9 +6,9 @@
 
 ---
 
-**This is the canonical GDB guide for this tree.** Lab notes and other documents keep only their exercise-specific breakpoints and observations and link here for setup, controls, crash lookup, backtraces, and pitfalls.
+**This is the canonical GDB guide for this tree.** Lab notes keep **only** their exercise-specific breakpoints and observations and link here for setup, controls, GDB crash stops, backtraces, and pitfalls.
 
-**Screenshots and transcripts describe their recorded builds.** The teaching comment in `kernel/syscall.c` now puts the `a7` load on line 156 and the handler call on line 162, rather than lines 150 and 156 shown in older captures. Locate statements by text and take instruction addresses from the binary you are running.
+**Screenshots and transcripts describe their recorded builds.** The teaching comment above the `a7` load in `kernel/syscall.c` pushes it to line 156 and the handler call to line 162, rather than lines 150 and 156 shown in older captures; the recorded `b *0x80001d58` output reports line 157, because that build kept the original load as a comment above the lab's null load. Locate statements by text and take instruction addresses from the binary you are running.
 
 | Task                                                              | Section                                                                                                                                                                                                                                 |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -16,6 +16,7 @@
 | **See a whole session end to end, with screenshots**              | [Follow a system call into `sys_pause`](#follow-a-system-call-into-syspause)                                                                                                                                                            |
 | **Look up a command: `next`, `finish`, `p/x`, `bt`, `layout`, …** | [GDB command reference](#gdb-command-reference-run-control-breakpoints-inspection-and-harts)                                                                                                                                            |
 | **Use VS Code instead of a terminal**                             | [Debug with VS Code](#debug-with-vs-code-launch-configuration-and-evidence): [kernel stop](#vs-code-kernel-stop-syspause), [user stop](#vs-code-user-stop-sleepcmain), or [panic stop](#vs-code-panic-stop-panic-and-the-faulting-sepc) |
+| **Read a `panic:` line and its `scause`, `sepc`, and `stval`**    | [`panic()` output](#panic-invariant-failures-output-and-hart-shutdown)                                                                                                                                                                  |
 | **Turn a panic's `sepc` into a source line**                      | [Find where the kernel crashed](#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line)                                                                                                                                            |
 | **Get a backtrace from a panic or a hang**                        | [Backtraces](#backtraces-panics-kernel-mode-faults-and-hangs)                                                                                                                                                                           |
 | **Decide whether a register value is the user's or the kernel's** | [Live CSRs versus saved user registers](#live-csrs-versus-saved-user-registers)                                                                                                                                                         |
@@ -24,7 +25,7 @@
 | **Choose a hart count**                                           | [Why use `CPUS=1`](#why-use-cpus1)                                                                                                                                                                                                      |
 | **Fix a misbehaving session**                                     | [GDB troubleshooting](#gdb-troubleshooting-symbols-reused-addresses-and-harts)                                                                                                                                                          |
 
-Console output comes first: [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu) owns `printf` tracing and saving a console log with `script`. For register stepping on a tiny bare-metal program, start with [the assembly course's QEMU/GDB exercise](../../assembly-language/docs/riscv/00-tools-and-first-run.md#qemu-and-gdb-run-and-step-the-first-example). Use [04-terminology.md](04-terminology.md) for term lookup.
+Console output comes first: [02-build-boot-and-usage.md](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu) owns `printf` tracing and saving a console log with `script`. For register stepping on a tiny bare-metal program, start with [the assembly course's QEMU/GDB exercise](../../assembly-language/docs/riscv/00-tools-and-first-run.md#qemu-and-gdb-run-and-step-the-first-example). [The `panic()` section](#panic-invariant-failures-output-and-hart-shutdown) explains what `panic()` prints and what `scause`, `sepc`, and `stval` mean. Use [04-terminology.md](04-terminology.md) for term lookup.
 
 Kernel bugs rarely announce themselves clearly. MIT's [lab guidance](https://pdos.csail.mit.edu/6.1810/2026/labs/guidance.html) says learning these tools is well worth the time, and the sections below turn most "it just hangs" sessions into a short investigation.
 
@@ -681,6 +682,70 @@ It is the same stop as the [terminal session's](#follow-a-system-call-into-syspa
 > [!WARNING]
 > **Do not read the fault's cause from Variables or `$scause` at step 7's stop.** The faulting load has not executed yet, so the trap CSRs still describe the previous trap; see [Live CSRs versus saved user registers](#live-csrs-versus-saved-user-registers). The cause comes from step 4 or the console's `scause=...` line.
 
+## `panic()`: invariant failures, output, and hart shutdown
+
+**`panic()`** is the kernel's assert. It is what the kernel calls when it detects a condition it has no defined way to continue from — a buffer cache with no free buffers, a log write outside a transaction, a trap it **cannot** attribute to any device. All of [`kernel/printk.c`](../kernel/printk.c):
+
+```c
+void
+panic(char *s)
+{
+  panicking = 1;
+  printk("panic: ");
+  printk("%s\n", s);
+  panicked = 1; // freeze uart output from other CPUs
+  for (;;)
+    ;
+}
+```
+
+| It does                                                                                                                                                  | It does not                                                                                             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Print `panic: ` followed by one fixed message                                                                                                            | Print an address, a register dump, or a backtrace                                                       |
+| Set `panicked`, which parks every _other_ hart forever inside `uartputc_sync` ([`kernel/uart.c`](../kernel/uart.c)) so nothing can overwrite the message | Reboot, unwind, or return — it is `__attribute__((noreturn))` in `kernel/defs.h` and ends in `for(;;);` |
+| Stop the machine dead while leaving QEMU running, so gdb can still attach                                                                                | Kill only the faulting process. A panic is the entire kernel giving up                                  |
+
+There are 63 `panic()` call sites across 13 files in `kernel/`, and the string is **always** a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
+
+```bash
+$ grep -rn 'panic("bget: no buffers")' kernel/
+kernel/bio.c:95:  panic("bget: no buffers");
+```
+
+> [!IMPORTANT]
+> `panic()` never prints an address. When a panic on your console _is_ accompanied by one, that line came from the caller immediately before it. The usual source is `kerneltrap()` at [`kernel/trap.c`](../kernel/trap.c), which takes a trap it cannot attribute to a device and dumps the trap CSRs before giving up:
+>
+> ```c
+> printk("scause=0x%lx sepc=0x%lx stval=0x%lx\n", scause, r_sepc(), r_stval());
+> panic("kerneltrap");
+> ```
+>
+> So the console shows two lines written by two different functions:
+>
+> ```
+> scause=0x000000000000000d sepc=0x0000000080001a70 stval=0x0000000000000058
+> panic: kerneltrap
+> ```
+>
+> The first line is the evidence and the second is the verdict. Knowing which is which matters, because only the first one has the address in it.
+
+The three values in that first line are CSRs, read at the moment of the trap. [The next section](#find-where-the-kernel-crashed-sepc-kernelasm-and-addr2line) turns `sepc` into a source line:
+
+| Value    | Expansion                                            | What it tells you                                                                                                    |
+| -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `scause` | **S**upervisor **CAUSE**                             | Why the trap happened. `0xd` is a load page fault, `0xf` a store page fault, `0xc` an instruction page fault         |
+| `sepc`   | **S**upervisor **E**xception **P**rogram **C**ounter | The [PC](04-terminology.md#risc-v-architecture) of the instruction that faulted. **This is the address you look up** |
+| `stval`  | **S**upervisor **T**rap **VAL**ue                    | For a page fault, the address the code was trying to reach — usually the bad pointer itself                          |
+
+> [!NOTE]
+> **An unrecoverable user-mode fault usually kills only that process.** `usertrap()` in [`kernel/trap.c`](../kernel/trap.c) prints `usertrap(): unexpected scause ... pid=...`, calls `setkilled(p)`, and exits the process; the rest of the system can continue.
+
+**Check these exceptions before interpreting a user fault:**
+
+- **Lazy allocation:** `vmfault()` can resolve a valid lazy-allocation page fault without killing the process.
+- **Init:** killing `init` causes `kexit()` in `kernel/proc.c` to panic with `init exiting`.
+- **Address 0:** a load is not inherently a user fault, because xv6 maps user program text there. Check the active page table and permissions, not the address alone.
+
 ## Find where the kernel crashed: `sepc`, `kernel.asm`, and `addr2line`
 
 When the kernel takes an unexpected fault — an invalid memory address, most often — `kerneltrap()` prints `scause`, `sepc`, and `stval` before `panic("kerneltrap")`. `sepc` is the program counter of the faulting instruction. Two ways to turn that number into a location:
@@ -692,7 +757,7 @@ riscv64-linux-gnu-addr2line -f -e kernel/kernel 0x80001f2a   # function, file, a
 
 `kernel/kernel.asm` is produced on every kernel build, and the Makefile emits a `.asm` next to every user program too. It is also the answer to "what assembly did the compiler actually generate for this", which matters more than usual in the traps and pgtbl labs. The host's plain `addr2line` may also read the RISC-V ELF, depending on how binutils was built.
 
-[06-build-artifacts.md](06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown) owns what `panic()` prints, which console line is evidence and which is verdict, the meaning of `scause`, `sepc`, and `stval`, and the [`.sym`-then-`.asm` lookup](06-build-artifacts.md#map-sepc-to-a-function-and-c-source-line). Addresses go stale after every rebuild.
+[The `panic()` section above](#panic-invariant-failures-output-and-hart-shutdown) owns what `panic()` prints, which console line is evidence and which is verdict, and the meaning of `scause`, `sepc`, and `stval`. [06-build-artifacts.md](06-build-artifacts.md#map-sepc-to-a-function-and-c-source-line) owns the `.sym`-then-`.asm` lookup. Addresses go stale after every rebuild.
 
 ## Backtraces: panics, kernel-mode faults, and hangs
 
@@ -757,11 +822,11 @@ For a **hang** — a **deadlock**, or a loop that **never** exits — there is n
 
 **Decode `$sstatus` with the `SSTATUS_*` masks in `kernel/riscv.h`:**
 
-| Field  | Bit | Meaning                                  |
-| ------ | --- | ---------------------------------------- |
-| `SPP`  | 8   | Previous mode: 1 = Supervisor, 0 = User. |
-| `SPIE` | 5   | Supervisor Previous Interrupt Enable.    |
-| `SIE`  | 1   | Supervisor Interrupt Enable.             |
+| Field  | Constant in `kernel/riscv.h` | Value     | Meaning                                  |
+| ------ | ---------------------------- | --------- | ---------------------------------------- |
+| `SPP`  | `SSTATUS_SPP`                | `1L << 8` | Previous mode: 1 = Supervisor, 0 = User. |
+| `SPIE` | `SSTATUS_SPIE`               | `1L << 5` | Supervisor Previous Interrupt Enable.    |
+| `SIE`  | `SSTATUS_SIE`                | `1L << 1` | Supervisor Interrupt Enable.             |
 
 On RV64 the printed value is large because bits 33:32 hold the `UXL` field, U-mode's register width, which says nothing about the previous mode.
 
@@ -898,6 +963,12 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 | **`exec sleep failed` appears**                                            | The running guest's `fs.img` does not contain the linked user program.                                                       | Quit QEMU, rebuild the image, boot again, and confirm the xv6 shell's `ls` output includes `sleep` before debugging source behavior.                                                              |
 | **The bug disappears with `CPUS=1`**                                       | The failure depends on cross-hart concurrency.                                                                               | Treat the single-hart trace as partial evidence and reproduce with the default three harts.                                                                                                       |
 
+**GDB needs QEMU's remote debugging stub enabled.** This repository's `make qemu-gdb` adds `-S -gdb tcp::<port>`, which halts the machine at reset and lets GDB attach. A custom QEMU command can enable the same facility; see [QEMU's GDB documentation](https://www.qemu.org/docs/master/system/gdb.html). Attaching after `make qemu` instead looks like this:
+
+![Two terminals: make qemu panicking with scause=0xd sepc=0x80001d58, and GDB showing exec No process, The program is not being run., and No symbol "p" in current context.](images/riscv-09-gdb-syscall-lab-no-target-after-make-qemu.png)
+
+_The syscall lab's null-load edit under `make qemu`. **1** `make qemu` starts QEMU without a GDB stub. **2** GDB's TUI status reads `exec No process`, showing that no live target is attached; the screenshot does not show a `target remote` error. **3** `c` has nothing to resume, and with no frame there is no `p`. **4** The kernel had already panicked during boot._
+
 ## Assembly, GDB, ELF, and lab references
 
 - [Assembly practice: stepping instructions and inspecting memory](../../assembly-language/docs/riscv/00-tools-and-first-run.md)
@@ -906,6 +977,6 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 - [Console output and `script` logs](02-build-boot-and-usage.md#debug-xv6-with-console-output-gdb-and-qemu)
 - [Terminology lookup](04-terminology.md)
 - [ELF and build artifacts](06-build-artifacts.md#elf-headers-segments-and-load-addresses)
-- [`panic()` output and `sepc` lookup](06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown)
+- [`.asm` and `.sym` lookup of a `sepc`](06-build-artifacts.md#map-sepc-to-a-function-and-c-source-line)
 - [The util `sleep` exercise](labs/01-util-sleep.md)
 - [The syscall lab's gdb exercise](labs/12-syscall-using-gdb.md)

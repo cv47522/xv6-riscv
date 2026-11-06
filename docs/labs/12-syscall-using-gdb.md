@@ -13,7 +13,7 @@ Derive the answers to the first exercise of MIT's [syscall lab](https://pdos.csa
 | **Starting the exercise**          | [The contract](#using-gdb-contract), then [the six questions](#using-gdb-questions-and-their-evidence)                          |
 | **Setting up the debugger**        | [Prerequisites](#using-gdb-prerequisites-and-references), then [Verifying it](#verifying-using-gdb-sessions-revert-and-grading) |
 | **Matching the handout's output**  | [Where this tree differs from the handout](#where-this-tree-differs-from-the-handout)                                           |
-| **Reading a register in gdb**      | [Live CSRs versus saved user registers](#live-csrs-versus-saved-user-registers)                                                 |
+| **Reading a register in gdb**      | [Live CSRs versus saved user registers in 09](../09-debugging-xv6.md#live-csrs-versus-saved-user-registers)                     |
 | **Looking up a gdb command**       | [GDB command reference in 09](../09-debugging-xv6.md#gdb-command-reference-run-control-breakpoints-inspection-and-harts)        |
 | **Stuck on a reading that is odd** | [Traps](#using-gdb-traps-misleading-readings-and-stale-addresses)                                                               |
 | **Checking finished answers**      | [Solution walkthrough](#solution-walkthrough), a spoiler                                                                        |
@@ -29,7 +29,7 @@ Derive the answers to the first exercise of MIT's [syscall lab](https://pdos.csa
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Deliverable**           | `answers-syscall.txt` at the repository root, answering [the six questions](#using-gdb-questions-and-their-evidence). The handout's _Submit_ section says to `git add` and commit it. Here it is a symlink to this note, whose [solution walkthrough](#solution-walkthrough) holds the answers. |
 | **Session 1**             | Run `make qemu-gdb`, break on `syscall`, and inspect the first system call: backtrace, `p /x *p`, and `$sstatus`.                                                                                                                                                                               |
-| **Session 2**             | Temporarily replace `num = p->trapframe->a7;` in `syscall()` with `num = * (int *) 0;`, observe the panic, and inspect the faulting instruction in `kernel/kernel.asm` and gdb.                                                                                                                 |
+| **Session 2**             | Temporarily replace `num = p->trapframe->a7;` in `syscall()` with `num = *(int *)0;`, observe the panic, and inspect the faulting instruction in `kernel/kernel.asm` and gdb.                                                                                                                   |
 | **Revert**                | Undo the session-2 edit before the sandbox exercises. This is a repository convention: the handout never says so, but every later test would panic on the first system call.                                                                                                                    |
 | **Tools**                 | `gdb-multiarch` (or `riscv64-linux-gnu-gdb`), run from the repository root so it finds `.gdbinit`.                                                                                                                                                                                              |
 | **Lab setup**             | This tree merges `labs/syscall` and sets `LAB=syscall` in `conf/lab.mk`, instead of the handout's `git checkout syscall`; [03-lab-workflow.md](../03-lab-workflow.md#starting-a-lab) owns that.                                                                                                 |
@@ -43,7 +43,7 @@ Derive the answers to the first exercise of MIT's [syscall lab](https://pdos.csa
 | **2** | Value of `p->trapframe->a7`, and what it represents      | `p /x *p` after stepping past `myproc()`; `user/init.c`, `user/init.asm`, `kernel/syscall.h` | [`a0` versus `a7`](01-util-sleep.md#a0-versus-a7)                                                                                               |
 | **3** | The CPU's previous mode                                  | `p /x $sstatus`, decoded with `SSTATUS_SPP` in `kernel/riscv.h`                              | [Decoding `sstatus`](#decoding-sstatus-the-previous-mode-bit)                                                                                   |
 | **4** | The faulting instruction, and which register holds `num` | The console's `sepc`, looked up in `kernel/kernel.asm`; confirmed with `b *<sepc>`           | [Map `sepc` to a source line](../06-build-artifacts.md#map-sepc-to-a-function-and-c-source-line)                                                |
-| **5** | Why the kernel crashes; whether `scause` confirms it     | The kernel page table built by `kvmmake()`; the console's `scause` and `stval`               | [Kernel mappings](#what-the-kernel-page-table-maps) and [CSR table](../06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown) |
+| **5** | Why the kernel crashes; whether `scause` confirms it     | The kernel page table built by `kvmmake()`; the console's `scause` and `stval`               | [Kernel mappings](#what-the-kernel-page-table-maps) and [CSR table](../09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown) |
 | **6** | Name and pid of the process running at the panic         | `p p->name` and `p p->pid` at the `b *<sepc>` stop                                           | [`struct proc` in `kernel/proc.h`](../../kernel/proc.h)                                                                                         |
 
 Question 5 has three parts: the cause, whether address 0 is mapped in the kernel's address space (the handout points to the book's kernel-address-space figure, Figure 3.3 in `mem.tex`), and whether `scause` agrees.
@@ -69,7 +69,7 @@ The test body's own comment says it is "just a simple sanity check, will be grad
 | --------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | **Read first**                    | [Debugging with gdb](../09-debugging-xv6.md#start-a-kernel-gdb-session-qemu-gdb-and-gdbinit)             | Owns `make qemu-gdb`, `.gdbinit`, the per-user port, `Ctrl-C`, `detach`, and quitting.                       |
 | **Read first**                    | [The trap path, on loan](01-util-sleep.md#the-foundation-a-c-call-that-becomes-a-trap)                   | How `ecall` reaches `syscall()`, and what the trapframe holds. `ch04` is still a placeholder.                |
-| **Read before session 2**         | [`panic()` and the CSR line](../06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown) | Which console line is the evidence and which is the verdict; what `scause`, `sepc`, and `stval` mean.        |
+| **Read before session 2**         | [`panic()` and the CSR line](../09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown) | Which console line is the evidence and which is the verdict; what `scause`, `sepc`, and `stval` mean.        |
 | **Use when mapping an address**   | [Map `sepc` to a source line](../06-build-artifacts.md#map-sepc-to-a-function-and-c-source-line)         | The `.sym` then `.asm` lookup, and why addresses go stale after a rebuild.                                   |
 | **Use when gdb shows "Thread 2"** | [Why use `CPUS=1`](../09-debugging-xv6.md#why-use-cpus1)                                                 | gdb threads are QEMU harts, not xv6 processes or user threads.                                               |
 | **Use when gdb misbehaves**       | [GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts)     | Wrong binary, stale port, gray breakpoints.                                                                  |
@@ -80,12 +80,12 @@ The test body's own comment says it is "just a simple sanity check, will be grad
 
 ## Where this tree differs from the handout
 
-| Handout shows                                             | This tree (measured on 2026-11-03, `LAB=syscall`, 3 harts)                        | Why it matters                                                               |
-| --------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| **`Breakpoint 1 at 0x80002142: ... syscall.c, line 243`** | `Breakpoint 1 at 0x80001d48: file kernel/syscall.c, line 146.`                    | Line numbers and addresses differ by build; both are setup, not answers.     |
-| **`b *0x80001bfe ... line 138`**                          | Use the `sepc` your own console prints; the faulting line is the edited line 150. | Copying the handout's address sets a breakpoint on an unrelated instruction. |
-| **`panic` in `kernel/printf.c`**                          | `panic()` is in `kernel/printk.c`, and the kernel prints with `printk()`.         | `b panic` still works; grepping for `printf.c` does not.                     |
-| **`Thread 2 hit Breakpoint 1`**                           | Any of the three harts may hit it first.                                          | The thread number is not part of any answer.                                 |
+| Handout shows                                             | This tree (measured on 2026-11-03, `LAB=syscall`, 3 harts)                                                         | Why it matters                                                               |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| **`Breakpoint 1 at 0x80002142: ... syscall.c, line 243`** | `Breakpoint 1 at 0x80001d48: file kernel/syscall.c, line 146.`                                                     | Line numbers and addresses differ by build; both are setup, not answers.     |
+| **`b *0x80001bfe ... line 138`**                          | Use the `sepc` your own console prints; the faulting line is the edited `a7` load, line 156 in the current source. | Copying the handout's address sets a breakpoint on an unrelated instruction. |
+| **`panic` in `kernel/printf.c`**                          | `panic()` is in `kernel/printk.c`, and the kernel prints with `printk()`.                                          | `b panic` still works; grepping for `printf.c` does not.                     |
+| **`Thread 2 hit Breakpoint 1`**                           | Any of the three harts may hit it first.                                                                           | The thread number is not part of any answer.                                 |
 
 ## The code to read first
 
@@ -113,7 +113,7 @@ From [`kernel/syscall.c`](../../kernel/syscall.c):
 **Two consequences determine where to inspect:**
 
 - **Step before printing `p`:** the breakpoint is on the function's opening brace, so the handout's "type `n` a few times" is required, not optional.
-- **Follow the kernel trap path in session 2:** the replacement load is a kernel-mode access, so it goes to `kerneltrap()` rather than to `usertrap()`.
+- **Follow the kernel trap path in session 2:** the replacement load is a kernel-mode access, so it goes to `kerneltrap()`, not to the handler that dispatched the system call.
 
 > [!NOTE]
 > **Find the statement by its text, not a screenshot's line number.** The recorded sessions show the `a7` load on line 150 and the handler call on line 156. The teaching comment now puts those statements on lines 156 and 162, respectively; source-line labels in the retained transcripts and screenshots describe the earlier source revision. Rebuilding can also change addresses and register allocation.
@@ -122,9 +122,11 @@ From [`kernel/syscall.c`](../../kernel/syscall.c):
 
 ### Session 1 and session 2 on the trap path
 
+S-mode is supervisor mode, where the kernel runs; U-mode is user mode. [04-terminology.md](../04-terminology.md#risc-v-architecture) defines both.
+
 ```mermaid
 flowchart TD
-    U["User mode: init's system-call stub executes ecall."]
+    U["User mode: the first user program's system-call stub executes ecall."]
     T["Trampoline uservec in kernel/trampoline.S saves user registers into the trapframe."]
     UT["A C trap handler in kernel/trap.c sees scause 8 and dispatches the system call."]
     B["Breakpoint: gdb stops at syscall()'s opening brace."]
@@ -150,11 +152,11 @@ flowchart TD
     class F,KV,P failure
 ```
 
-_Legend: request red-white, data movement green, processing yellow, decision blue, failure red; every node also states its meaning in text. S-mode is supervisor mode, where the kernel runs; U-mode is user mode._
+_Legend: request red-white, data movement green, processing yellow, decision blue, failure red; every node also states its meaning in text._
 
-Session 1 stops on the left path's way in; session 2 shows the right path's way out. The fault happens **before** any system call handler runs, which is why the very first system call after boot panics the kernel.
+Session 1 stops on the left path's way in; session 2 shows the right path's way out. The fault happens **before** any system call handler runs.
 
-### Live CSRs versus saved user registers
+### Saved and live readings in this exercise
 
 [09-debugging-xv6.md](../09-debugging-xv6.md#live-csrs-versus-saved-user-registers) owns the distinction between the hart's live registers and the trapframe's saved copies. In this exercise it decides two readings:
 
@@ -165,13 +167,7 @@ Session 1 stops on the left path's way in; session 2 shows the right path's way 
 
 ### Decoding `sstatus`: the previous-mode bit
 
-| Constant in `kernel/riscv.h` | Value     | Comment in the source                |
-| ---------------------------- | --------- | ------------------------------------ |
-| `SSTATUS_SPP`                | `1L << 8` | Previous mode, 1=Supervisor, 0=User  |
-| `SSTATUS_SPIE`               | `1L << 5` | Supervisor Previous Interrupt Enable |
-| `SSTATUS_SIE`                | `1L << 1` | Supervisor Interrupt Enable          |
-
-**Test bit 8 for the previous mode.** The other set bits do not answer that question; [09](../09-debugging-xv6.md#live-csrs-versus-saved-user-registers) explains why the value is large on RV64.
+**Test bit 8, `SSTATUS_SPP`, for the previous mode.** The other set bits do not answer that question. [09's `sstatus` table](../09-debugging-xv6.md#live-csrs-versus-saved-user-registers) owns the `SSTATUS_*` masks from `kernel/riscv.h` and explains why the value is large on RV64.
 
 `usertrap()` itself checks the same bit, `(r_sstatus() & SSTATUS_SPP) != 0`, to refuse a trap that did not come from user mode.
 
@@ -195,7 +191,7 @@ From `kvmmake()` in [`kernel/vm.c`](../../kernel/vm.c), with constants from `ker
 
 **Nothing else is mapped.** xv6 has no lazy kernel mappings, so an address outside these mappings has no valid PTE.
 
-**The book draws the same layout as Figure 3.3**, the figure the handout's question 5 points to. Virtual address 0 sits at the bottom of the left column, below every mapped device:
+**The book draws the same layout as Figure 3.3**, the figure the handout's question 5 points to. Find virtual address 0 in the left column:
 
 ![Figure 3.3 from the xv6 book: kernel virtual addresses on the left map to physical addresses on the right; KERNBASE is 0x80000000 and PHYSTOP is 0x88000000](../book/fig/xv6_layout.svg)
 
@@ -203,7 +199,7 @@ _Figure 3.3, Chapter 3, Page tables: kernel virtual mappings and the physical ad
 
 **`PHYSTOP` is `0x88000000`, distinct from `KERNBASE` at `0x80000000`.** These are the values in `kernel/memlayout.h`; the SVG's virtual and physical columns mark the same boundary.
 
-`scause` codes for the faults you may meet are in the [CSR table in docs/06](../06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown): `0xc`, `0xd`, and `0xf` are instruction, load, and store page faults. Code 8 is an environment call from U-mode, the system-call cause `usertrap()` tests for.
+`scause` codes for the faults you may meet are in the [CSR table in docs/09](../09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown): `0xc`, `0xd`, and `0xf` are instruction, load, and store page faults. Code 8 is an environment call from U-mode, the system-call cause `usertrap()` tests for.
 
 ## Deriving the answers: what to decide for each question
 
@@ -218,20 +214,20 @@ Link each answer back to [its evidence row](#using-gdb-questions-and-their-evide
 
 ### Using gdb traps: misleading readings and stale addresses
 
-| Trap                                                | What you see                                                         | What to do                                                                                                                                                |
-| --------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **gdb itself will not start or attach**             | `Undefined item: "riscv:rv64"`, no `riscv:rv64` line, or a busy port | Wrong binary, wrong directory, or a stale QEMU: see [GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts). |
-| **Printing `*p` at the breakpoint**                 | Garbage, or an error                                                 | `next` past `myproc()` first; the stop is at the opening brace.                                                                                           |
-| **Reading `$a7` for question 2**                    | A kernel value                                                       | Read `p->trapframe->a7`, the saved user register.                                                                                                         |
-| **Answering question 2 from a later stop**          | Another process's call, such as `sleep`'s at a `sys_pause` stop      | Use the first `b syscall` hit after boot; `p p->name` confirms which program made the call.                                                               |
-| **`print num` in `syscall()`**                      | `<optimized out>`                                                    | Expected under `-O`; see [why in 09](../09-debugging-xv6.md#why-print-num-shows-optimized-out). Question 4 asks for the register, not the value.          |
-| **`b *80001d58` without `0x`**                      | `Invalid number "80001d58".`                                         | GDB uses decimal input by default: write `b *0x80001d58`.                                                                                                 |
-| **Attaching GDB after `make qemu`**                 | `The program is not being run.`, then `No symbol "p"`                | `make qemu` has no GDB stub. Use `make qemu-gdb` and set the breakpoint before `c`; the fault happens during boot.                                        |
-| **Reading `$scause` at the `b *<sepc>` stop**       | The system-call cause or an intervening interrupt, not the fault     | Use the console line; see [the saved-versus-live table](#live-csrs-versus-saved-user-registers).                                                          |
-| **`bt` after `b panic`**                            | It stops at `kernelvec`, never reaching `syscall()`                  | Read `$sepc` at that stop instead; see [Backtraces](../09-debugging-xv6.md#backtraces-panics-kernel-mode-faults-and-hangs).                               |
-| **`p p->name` at the `panic` stop**                 | `p` is not in scope                                                  | Ask question 6 at the `b *<sepc>` stop, inside `syscall()`.                                                                                               |
-| **Using the handout's or an old build's addresses** | A breakpoint on an unrelated instruction                             | Take `sepc` from the current run; addresses move with every rebuild.                                                                                      |
-| **Leaving `num = * (int *) 0;` in place**           | Every boot panics; every sandbox test fails                          | Revert, then check `git diff --exit-code kernel/syscall.c`.                                                                                               |
+| Trap                                                | What you see                                                         | What to do                                                                                                                                                                                              |
+| --------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **gdb itself will not start or attach**             | `Undefined item: "riscv:rv64"`, no `riscv:rv64` line, or a busy port | Wrong binary, wrong directory, or a stale QEMU: see [GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts).                                               |
+| **Printing `*p` at the breakpoint**                 | Garbage, or an error                                                 | `next` past `myproc()` first; the stop is at the opening brace.                                                                                                                                         |
+| **Reading `$a7` for question 2**                    | A kernel value                                                       | Read `p->trapframe->a7`, the saved user register.                                                                                                                                                       |
+| **Answering question 2 from a later stop**          | Another process's call, such as `sleep`'s at a `sys_pause` stop      | Use the first `b syscall` hit after boot; `p p->name` confirms which program made the call.                                                                                                             |
+| **`print num` in `syscall()`**                      | `<optimized out>`                                                    | Expected under `-O`; see [why in 09](../09-debugging-xv6.md#why-print-num-shows-optimized-out). Question 4 asks for the register, not the value.                                                        |
+| **`b *80001d58` without `0x`**                      | `Invalid number "80001d58".`                                         | Write the address with `0x`; see [GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts).                                                                  |
+| **Attaching GDB after `make qemu`**                 | `The program is not being run.`, then `No symbol "p"`                | Use `make qemu-gdb` and set the breakpoint before `c`, because the fault happens during boot; see [GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts). |
+| **Reading `$scause` at the `b *<sepc>` stop**       | The system-call cause or an intervening interrupt, not the fault     | Use the console line; see [the saved-versus-live table](#saved-and-live-readings-in-this-exercise).                                                                                                     |
+| **`bt` after `b panic`**                            | It stops at `kernelvec`, never reaching `syscall()`                  | Read `$sepc` at that stop instead; see [Backtraces](../09-debugging-xv6.md#backtraces-panics-kernel-mode-faults-and-hangs).                                                                             |
+| **`p p->name` at the `panic` stop**                 | `p` is not in scope                                                  | Ask question 6 at the `b *<sepc>` stop, inside `syscall()`.                                                                                                                                             |
+| **Using the handout's or an old build's addresses** | A breakpoint on an unrelated instruction                             | Take `sepc` from the current run; addresses move with every rebuild.                                                                                                                                    |
+| **Leaving `num = *(int *)0;` in place**             | Every boot panics; every sandbox test fails                          | Revert, then check `git diff --exit-code kernel/syscall.c`.                                                                                                                                             |
 
 ## Verifying Using gdb: sessions, revert, and grading
 
@@ -301,9 +297,9 @@ The grader's name filter is a case-insensitive substring match on test titles, s
 
 ## Questions about Using gdb: traps, mappings, and faults
 
-1. The session-2 load reads address 0. Would `num = * (int *) 0x80000000;` also panic? Use the `KERNBASE` row of [the mapping table](#what-the-kernel-page-table-maps) and its permissions.
-2. **Failure scenario:** if the edit were a store, `* (int *) 0 = 1;`, which `scause` would the console print, and why does the kernel still panic rather than kill the process?
-3. **Failure scenario:** if a user program instead loaded from an unmapped address outside its valid lazy-allocation region, which function in `kernel/trap.c` would handle it, and why does the machine survive? How would a fault inside that region differ? See the note under [the CSR table](../06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown).
+1. The session-2 load reads address 0. Would `num = *(int *)0x80000000;` also panic? Use the `KERNBASE` row of [the mapping table](#what-the-kernel-page-table-maps) and its permissions.
+2. **Failure scenario:** if the edit were a store, `*(int *)0 = 1;`, which `scause` would the console print, and why does the kernel still panic rather than kill the process?
+3. **Failure scenario:** if a user program instead loaded from an unmapped address outside its valid lazy-allocation region, which function in `kernel/trap.c` would handle it, and why does the machine survive? How would a fault inside that region differ? See the note under [the CSR table](../09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown).
 4. Why can gdb print `p->trapframe->a7` at all, given that the trapframe is mapped at `TRAPFRAME` in the **user** page table? Check which kernel mapping covers the physical page `p->trapframe` points to.
 5. Why does the session-1 backtrace end with an unnamed frame at an address just above `0x3ffffff000`? Compare `TRAMPOLINE` with the address `kernel/kernel.sym` gives the `trampoline` symbol.
 6. With three harts, why does the recorded boot show one `scause=... sepc=...` line? Which processes exist before the first system call, and does `panicked` stop other harts or only block their UART output? Check `userinit()` in `kernel/proc.c`, `panic()` in `kernel/printk.c`, and `uartputc_sync()` in `kernel/uart.c`; do not assume that every multicore fault produces exactly one diagnostic.
@@ -430,7 +426,7 @@ $2 = 1
 
 ![GDB layout asm at the session-2 stop: the B+> marker on 0x80001d58 syscall+16, lw a3,0(zero), with the breakpoint report at kernel/syscall.c:157, x/i $pc, p p->name printing init, and p p->pid printing 1](../images/riscv-12-gdb-syscall-lab-session2-faulting-load-tui.png)
 
-_The same stop in `layout asm`, rebuilt from this tree, where the edited load is on line 157 rather than the transcript's 150. `B+>` marks the breakpoint and the PC together on `lw a3,0(zero)`; the next instructions, `addiw a4,a3,-1` and the `bltu` against `li a5,21`, are the `num > 0 && num < NELEM(syscalls)` bounds check that would have consumed `a3`._
+_The same stop in `layout asm`, from a later build, where the edited load is on line 157 rather than the transcript's 150. `B+>` marks the breakpoint and the PC together on `lw a3,0(zero)`; the next instructions, `addiw a4,a3,-1` and the `bltu` against `li a5,21`, are the `num > 0 && num < NELEM(syscalls)` bounds check that would have consumed `a3`._
 
 **Answer 5 follows from four facts:**
 
@@ -441,11 +437,7 @@ _The same stop in `layout asm`, rebuilt from this tree, where the edited load is
 
 **Answer 6 is consistent with answer 2.** The faulting load runs on the first system call after boot, which `init` makes.
 
-**The same stop in VS Code** uses the **xv6: debug kernel panic** configuration; [the walkthrough in 09](../09-debugging-xv6.md#vs-code-panic-stop-panic-and-the-faulting-sepc) covers its steps:
-
-![VS Code stopped on syscall.c line 150 before the faulting load: num optimized out and p in Variables, syscall and usertrap in Call Stack, and the Debug Console printing init, pid 1, and lw a3,0(zero) at 0x80001d58](../images/vscode-panic-faulting-line-stop.png)
-
-_Answers 4 and 6 in one VS Code stop. **1** Stopped on line 150 before the load runs. **2** `p` is in scope; `num` is `<optimized out>`. **3** Call Stack reaches `syscall()` through `usertrap()`. **4** `init`, pid `1`, and `lw a3,0(zero)` at `0x80001d58`. **5** The gutter breakpoint on the faulting line._
+**The same stop in VS Code** uses the **xv6: debug kernel panic** configuration; [the walkthrough in 09](../09-debugging-xv6.md#vs-code-panic-stop-panic-and-the-faulting-sepc) covers its steps.
 
 ### Why `num = 0;` does not panic but `num = *(int *)0;` does
 
@@ -509,12 +501,4 @@ _**1** `num = 0;` replaces the `a7` load. **2** Every call from init is refused 
 
 ### Why GDB could not continue after `make qemu`, and what `*` means in `b *`
 
-![Two terminals: make qemu panicking with scause=0xd sepc=0x80001d58, and GDB showing exec No process, The program is not being run., and No symbol "p" in current context.](../images/riscv-09-gdb-syscall-lab-no-target-after-make-qemu.png)
-
-_**1** `make qemu` starts QEMU without a GDB stub. **2** GDB's TUI status reads `exec No process`, showing that no live target is attached; the screenshot does not show a `target remote` error. **3** `c` has nothing to resume, and with no frame there is no `p`. **4** The kernel had already panicked during boot._
-
-**GDB needs QEMU's remote debugging stub enabled.** This repository's `make qemu-gdb` adds `-S -gdb tcp::<port>`, which halts the machine at reset and lets GDB attach. A custom QEMU command can enable the same facility; see [QEMU's GDB documentation](https://www.qemu.org/docs/master/system/gdb.html).
-
-Set the breakpoint **before** `c`, because the faulting load runs on the first system call during boot. Once `panic()` runs, the hart spins and the unwinder cannot reach `syscall()` across the trap frame; rerun to inspect its locals before the load.
-
-**`*` makes the breakpoint location an address.** `b syscall` names a function, and `b 150` names a line; `b *0x80001d58` stops at that exact instruction. A bare `b *80001d58` fails with `Invalid number "80001d58".`, because GDB uses decimal input by default. [The GDB guide](../09-debugging-xv6.md#breakpoints-break-tbreak-hbreak-and-watch) lists the forms.
+[GDB troubleshooting](../09-debugging-xv6.md#gdb-troubleshooting-symbols-reused-addresses-and-harts) shows the `make qemu` session without a GDB stub, and [Breakpoints](../09-debugging-xv6.md#breakpoints-break-tbreak-hbreak-and-watch) explains why `b *0x80001d58` needs both `*` and `0x`.

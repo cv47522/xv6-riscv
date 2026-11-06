@@ -320,73 +320,9 @@ Both are produced from the same ELF on every link, both are pure output, and the
 | **Answers**           | "What does the code at this address actually do, and which line of C is it?" | "Which function contains this address?"                                                                     |
 | **Reach for it when** | You have narrowed a fault to one function and need the instruction           | You have a raw [PC](04-terminology.md#risc-v-architecture) off a crashed kernel and no idea where it landed |
 
-### `panic()`: invariant failures, output, and hart shutdown
-
-**`panic()`** is the kernel's assert. It is what the kernel calls when it detects a condition it has no defined way to continue from — a buffer cache with no free buffers, a log write outside a transaction, a trap it **cannot** attribute to any device. All of [`kernel/printk.c`](../kernel/printk.c):
-
-```c
-void
-panic(char *s)
-{
-  panicking = 1;
-  printk("panic: ");
-  printk("%s\n", s);
-  panicked = 1; // freeze uart output from other CPUs
-  for (;;)
-    ;
-}
-```
-
-| It does                                                                                                                                                  | It does not                                                                                             |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Print `panic: ` followed by one fixed message                                                                                                            | Print an address, a register dump, or a backtrace                                                       |
-| Set `panicked`, which parks every _other_ hart forever inside `uartputc_sync` ([`kernel/uart.c`](../kernel/uart.c)) so nothing can overwrite the message | Reboot, unwind, or return — it is `__attribute__((noreturn))` in `kernel/defs.h` and ends in `for(;;);` |
-| Stop the machine dead while leaving QEMU running, so gdb can still attach                                                                                | Kill only the faulting process. A panic is the entire kernel giving up                                  |
-
-There are 62 `panic()` call sites across 13 files in `kernel/`, and the string is **always** a short fixed label naming the invariant that broke — `panic("kerneltrap")`, `panic("bget: no buffers")`, `panic("log_write outside of trans")`. Because the string is a literal, grepping it takes you straight to the line that gave up:
-
-```bash
-$ grep -rn 'panic("bget: no buffers")' kernel/
-kernel/bio.c:95:  panic("bget: no buffers");
-```
-
-> [!IMPORTANT]
-> `panic()` never prints an address. When a panic on your console _is_ accompanied by one, that line came from the caller immediately before it. The usual source is `kerneltrap()` at [`kernel/trap.c`](../kernel/trap.c), which takes a trap it cannot attribute to a device and dumps the trap CSRs before giving up:
->
-> ```c
-> printk("scause=0x%lx sepc=0x%lx stval=0x%lx\n", scause, r_sepc(), r_stval());
-> panic("kerneltrap");
-> ```
->
-> So the console shows two lines written by two different functions:
->
-> ```
-> scause=0x000000000000000d sepc=0x0000000080001a70 stval=0x0000000000000058
-> panic: kerneltrap
-> ```
->
-> The first line is the evidence and the second is the verdict. Knowing which is which matters, because only the first one has the address in it.
-
-The three values in that first line are CSRs, read at the moment of the trap:
-
-| Value    | Expansion                                            | What it tells you                                                                                                    |
-| -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `scause` | **S**upervisor **CAUSE**                             | Why the trap happened. `0xd` is a load page fault, `0xf` a store page fault, `0xc` an instruction page fault         |
-| `sepc`   | **S**upervisor **E**xception **P**rogram **C**ounter | The [PC](04-terminology.md#risc-v-architecture) of the instruction that faulted. **This is the address you look up** |
-| `stval`  | **S**upervisor **T**rap **VAL**ue                    | For a page fault, the address the code was trying to reach — usually the bad pointer itself                          |
-
-> [!NOTE]
-> **An unrecoverable user-mode fault usually kills only that process.** `usertrap()` in [`kernel/trap.c`](../kernel/trap.c) prints `usertrap(): unexpected scause ... pid=...`, calls `setkilled(p)`, and exits the process; the rest of the system can continue.
-
-**Check these exceptions before interpreting a user fault:**
-
-- **Lazy allocation:** `vmfault()` can resolve a valid lazy-allocation page fault without killing the process.
-- **Init:** killing `init` causes `kexit()` in `kernel/proc.c` to panic with `init exiting`.
-- **Address 0:** a load is not inherently a user fault, because xv6 maps user program text there. Check the active page table and permissions, not the address alone.
-
 ### Map `sepc` to a function and C source line
 
-`.sym` is a coarse index and `.asm` is the detail, so the two are used in that order. Taking the `sepc=0x0000000080001a70` from the two-line panic above, sort the symbol table and find the last symbol at or below it:
+`.sym` is a coarse index and `.asm` is the detail, so the two are used in that order. Taking the `sepc=0x0000000080001a70` from [the two-line panic in 09](09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown), sort the symbol table and find the last symbol at or below it:
 
 ```bash
 $ sort kernel/kernel.sym | awk '$1 <= "0000000080001a70"' | tail -1

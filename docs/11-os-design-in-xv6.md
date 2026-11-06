@@ -400,7 +400,7 @@ After those checks, `devintr()` determines the path:
 | `2`                | Supervisor timer interrupt; runs `clockintr()`.                          | Calls `yield()` if `myproc() != 0`, then eventually returns.            |
 | `0`                | Unrecognized cause, including kernel exceptions.                         | Prints `scause`, `sepc`, and `stval`, then calls `panic("kerneltrap")`. |
 
-For PLIC interrupts, the handler also reports an unexpected nonzero IRQ and completes a nonzero claim. The [panic reference](06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown) owns panic output and halt behavior.
+For PLIC interrupts, the handler also reports an unexpected nonzero IRQ and completes a nonzero claim. The [panic reference](09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown) owns panic output and halt behavior.
 
 **Kernel exceptions have no recovery branch here.** Unlike `usertrap()`, this handler does not resolve lazy page faults or kill just one process.
 

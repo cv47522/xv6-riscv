@@ -1,18 +1,18 @@
 # xv6 Terminology and Technical Vocabulary
 
+Every acronym and piece of jargon you meet in xv6, the [xv6 book](https://mit-pdos.github.io/xv6-riscv-book/), and the 6.1810 labs — expanded, and explained in terms of where it appears in this repository.
+
+This is the hub the other guides link into. When a book chapter introduces a new term, add it here once rather than re-explaining it in chapter notes.
+
 ---
 
 [toc]
 
 ---
 
-Every acronym and piece of jargon you meet in xv6, the [xv6 book](https://mit-pdos.github.io/xv6-riscv-book/), and the 6.1810 labs — expanded, and explained in terms of where it appears in this repository.
-
-This is the hub the other guides link into. When a book chapter introduces a new term, add it here once rather than re-explaining it in chapter notes.
-
 ## xv6, RISC-V, and QEMU: names and roles
 
-**xv6** — "**x**86 **v**ersion **6**". A re-implementation of Dennis Ritchie and Ken Thompson's **Unix Version 6** (1975), written at MIT for teaching. The name kept its `x86` origin even after the port to RISC-V, which is why this repository is `xv6-riscv` rather than something tidier. It is deliberately small: around 9,000 lines, small enough that one person can read all of it.
+**xv6** — "**x**86 **v**ersion **6**". A re-implementation of Dennis Ritchie and Ken Thompson's **Unix Version 6** (1975), written at MIT for teaching. The name kept its `x86` origin even after the port to RISC-V, which is why this repository is `xv6-riscv` rather than something tidier. It is deliberately small: about 7,000 lines of kernel code, small enough that one person can read all of it.
 
 **RISC-V** — "**R**educed **I**nstruction **S**et **C**omputer, **f**ive", pronounced "risk five". The fifth RISC design from UC Berkeley. Unlike x86 or ARM it is an open standard: the specification is free to implement, which is why it is a good teaching target. xv6 targets **RV64GC** — 64-bit, with the G and C extension bundles.
 
@@ -20,16 +20,16 @@ This is the hub the other guides link into. When a book chapter introduces a new
 
 ## RISC-V architecture
 
-For reusable definitions and instruction practice, see [the assembly course’s register lesson](../../assembly-language/docs/riscv/01-values-registers-instructions.md). The sibling [assembly glossary](../../assembly-language/docs/general/terminology.md) covers shared vocabulary; the entries below retain xv6-specific symbols and usage.
+For reusable definitions and instruction practice, see [the assembly course's register lesson](../../assembly-language/docs/riscv/01-values-registers-instructions.md). The sibling [assembly glossary](../../assembly-language/docs/general/terminology.md) covers shared vocabulary; the entries below retain xv6-specific symbols and usage.
 
 | Term                         | Expansion                                                         | Meaning in xv6                                                                                                                                                                                                                                                          |
 | ---------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **hart**                     | **har**dware **t**hread                                           | One independently executing RISC-V register and control-state set, commonly exposed as a logical CPU. See [harts versus cores](#harts-versus-physical-cores).                                                                                                           |
-| **RV64GC**                   | RISC-**V** **64**-bit, **G** + **C**                              | The target ISA. **G** is shorthand for IMAFD: **I**nteger, **M**ultiply/divide, **A**tomic, single-precision **F**loat, **D**ouble. **C** is compressed 16-bit instructions. Set by `-march=rv64gc` in the Makefile.                                                    |
+| **RV64GC**                   | RISC-**V** **64**-bit, **G** + **C**                              | The target ISA. **G** is shorthand for IMAFD plus Zicsr and Zifencei: **I**nteger, **M**ultiply/divide, **A**tomic, single-precision **F**loat, **D**ouble. **C** is compressed 16-bit instructions. Set by `-march=rv64gc` in the Makefile.                            |
 | **ISA**                      | **I**nstruction **S**et **A**rchitecture                          | The contract between hardware and software: what instructions exist and what they do.                                                                                                                                                                                   |
 | **CSR**                      | **C**ontrol and **S**tatus **R**egister                           | Special registers holding privileged state. `kernel/riscv.h` is mostly accessors for these.                                                                                                                                                                             |
-| **satp**                     | **S**upervisor **A**ddress **T**ranslation and **P**rotection     | The CSR holding the root page table's physical address. Writing it switches address spaces.                                                                                                                                                                             |
-| **stvec**                    | **S**upervisor **T**rap **VEC**tor                                | Where the CPU jumps on a trap. Set to `kernelvec` or `trampoline` depending on the current mode.                                                                                                                                                                        |
+| **satp**                     | **S**upervisor **A**ddress **T**ranslation and **P**rotection     | The CSR holding the paging mode and the root page table's PPN. Writing it switches address spaces.                                                                                                                                                                      |
+| **stvec**                    | **S**upervisor **T**rap **VEC**tor                                | Where the CPU jumps on a trap. Set to `kernelvec` or to `uservec` in the trampoline page depending on the current mode.                                                                                                                                                 |
 | **PC**                       | **P**rogram **C**ounter                                           | The address of the instruction currently executing. RISC-V has no general-purpose register holding it; on a trap the hardware copies it into `sepc`. Turning a raw PC back into a function and a line of C is what `kernel/kernel.sym` and `kernel/kernel.asm` are for. |
 | **mepc**                     | **M**achine **E**xception **P**rogram **C**ounter                 | The M-mode twin of `sepc`: `mret` jumps to it. `start()` writes `main` there so `mret` lands in `main()`.                                                                                                                                                               |
 | **epc** (trapframe field)    | **e**xception **p**rogram **c**ounter                             | Not a CSR: `p->trapframe->epc` holds the user PC that `usertrap()` copies from `sepc`, advancing it by 4 past an `ecall` so the call is not repeated.                                                                                                                   |
@@ -51,24 +51,24 @@ For reusable definitions and instruction practice, see [the assembly course’s 
 | **TLB**                      | **T**ranslation **L**ookaside **B**uffer                          | The CPU's cache of recent translations. Flushed with `sfence.vma` after changing page tables.                                                                                                                                                                           |
 | **M-mode / S-mode / U-mode** | **M**achine, **S**upervisor, **U**ser                             | The three privilege levels. xv6 boots in M-mode (`kernel/start.c`), drops to S-mode for the kernel, and runs user programs in U-mode.                                                                                                                                   |
 | **PLIC**                     | **P**latform-**L**evel **I**nterrupt **C**ontroller               | Routes device interrupts (UART, disk) to harts. `kernel/plic.c`.                                                                                                                                                                                                        |
-| **CLINT**                    | **C**ore-**L**ocal **INT**erruptor                                | Provides timer interrupts, which drive preemptive scheduling.                                                                                                                                                                                                           |
+| **CLINT**                    | **C**ore-**L**ocal **INT**erruptor                                | The `virt` board's timer device. This tree only defines `CLINT_BASE` in `kernel/memlayout.h`; timer interrupts come from `stimecmp` instead.                                                                                                                            |
 
 ### Register names: `x0`–`x31`, ABI aliases, and CSR numbers
 
 **Every integer register has a hardware name and an ABI alias; xv6 source, `kernel/kernel.asm`, and GDB all use the alias.** Stack pointer = `sp` = `x2`. The assembly course owns [the full alias table](../../assembly-language/docs/riscv/01-values-registers-instructions.md#register-names-x0x31-and-their-abi-aliases); the column below records where each register shows up in xv6:
 
-| Hardware name          | ABI alias  | Role in xv6                                                                                                        |
-| ---------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| `x0`                   | `zero`     | Always 0; the faulting `lw a3,0(zero)` in the syscall lab loads from address `0 + 0`.                              |
-| `x1`                   | `ra`       | Return address written by `jal`/`call`.                                                                            |
-| `x2`                   | `sp`       | Stack pointer; `_entry` gives each hart a slice of `stack0`, and `uservec` switches to `p->kstack`.                |
-| `x3`                   | `gp`       | Global pointer; xv6 does not use it.                                                                               |
-| `x4`                   | `tp`       | Thread pointer; xv6 stores the hart ID here (`w_tp(id)` in `kernel/start.c`) because S-mode cannot read `mhartid`. |
-| `x5`–`x7`, `x28`–`x31` | `t0`–`t6`  | Temporaries, caller-saved.                                                                                         |
-| `x8`                   | `s0`/`fp`  | Frame pointer: the Makefile's `-fno-omit-frame-pointer` keeps it for `r_fp()` and backtraces.                      |
-| `x9`, `x18`–`x27`      | `s1`–`s11` | Callee-saved; `swtch` in `kernel/swtch.S` saves exactly `ra`, `sp`, and `s0`–`s11`.                                |
-| `x10`–`x11`            | `a0`–`a1`  | Arguments and return value; a system call's result goes back in `p->trapframe->a0`.                                |
-| `x12`–`x17`            | `a2`–`a7`  | Arguments; `a7` carries the system-call number into `ecall`.                                                       |
+| Hardware name          | ABI alias  | Role in xv6                                                                                                                                                 |
+| ---------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `x0`                   | `zero`     | Always 0; the faulting `lw a3,0(zero)` in the syscall lab loads from address `0 + 0`.                                                                       |
+| `x1`                   | `ra`       | Return address written by `jal`/`call`; `allocproc()` sets `p->context.ra = forkret`, so the first `swtch()` into a new process "returns" into `forkret()`. |
+| `x2`                   | `sp`       | Stack pointer; `_entry` gives each hart a slice of `stack0`, and `uservec` saves the user value at trapframe offset 48 and switches to `p->kstack`.         |
+| `x3`                   | `gp`       | Global pointer; xv6 does not use it.                                                                                                                        |
+| `x4`                   | `tp`       | Thread pointer; xv6 stores the hart ID here (`w_tp(id)` in `kernel/start.c`) because S-mode cannot read `mhartid`, and `cpuid()` reads it back.             |
+| `x5`–`x7`, `x28`–`x31` | `t0`–`t6`  | Temporaries, caller-saved; a trap still saves them because it can interrupt any instruction. See the [Q/A in `kernel/proc.h`](../kernel/proc.h).            |
+| `x8`                   | `s0`/`fp`  | Frame pointer: the Makefile's `-fno-omit-frame-pointer` keeps it for `r_fp()` and backtraces.                                                               |
+| `x9`, `x18`–`x27`      | `s1`–`s11` | Callee-saved; `swtch` in `kernel/swtch.S` saves exactly `ra`, `sp`, and `s0`–`s11`.                                                                         |
+| `x10`–`x11`            | `a0`–`a1`  | Arguments and return value; a system call's result goes back in `p->trapframe->a0`.                                                                         |
+| `x12`–`x17`            | `a2`–`a7`  | Arguments; `a7` carries the system-call number into `ecall`.                                                                                                |
 
 **`struct trapframe` in `kernel/proc.h` names its fields after the ABI aliases** (`ra`, `sp`, `gp`, `tp`, `t0`, …, `a7`), so `p->trapframe->a7` is the saved user `x17`.
 
@@ -76,7 +76,7 @@ For reusable definitions and instruction practice, see [the assembly course’s 
 
 | CSR        | Number  | Used in xv6 by                                                    |
 | ---------- | ------- | ----------------------------------------------------------------- |
-| `sstatus`  | `0x100` | `intr_on()`, `usertrap()`'s `SPP` check, `usertrapret()`          |
+| `sstatus`  | `0x100` | `intr_on()`, `usertrap()`'s `SPP` check, `prepare_return()`       |
 | `sie`      | `0x104` | `start()` enabling S-mode interrupts                              |
 | `stvec`    | `0x105` | `trapinithart()` (`kernelvec`) and `prepare_return()` (`uservec`) |
 | `sscratch` | `0x140` | `uservec` in `kernel/trampoline.S`                                |
@@ -84,7 +84,7 @@ For reusable definitions and instruction practice, see [the assembly course’s 
 | `scause`   | `0x142` | `usertrap()`, `kerneltrap()`, `devintr()`                         |
 | `stval`    | `0x143` | Page-fault address printed on a panic                             |
 | `sip`      | `0x144` | Pending S-mode interrupts                                         |
-| `satp`     | `0x180` | `kvminithart()` and `userret`                                     |
+| `satp`     | `0x180` | `kvminithart()`, `uservec`, and `userret`                         |
 | `mstatus`  | `0x300` | `start()` setting `MPP`                                           |
 | `mepc`     | `0x341` | `start()` pointing `mret` at `main`                               |
 | `mhartid`  | `0xf14` | `start()`, read-only                                              |
@@ -95,21 +95,9 @@ The numbers come from the CSR listing in the [privileged spec](riscv-privileged-
 
 A **hart** is not always a physical core: simultaneous multithreading can expose several harts from one core. QEMU creates `CPUS` virtual CPUs for this machine, and xv6 identifies each as a hart.
 
-- **Boot messages:** `kernel/main.c` reports the harts starting.
+- **Boot messages:** `kernel/main.c` prints `hart N starting` for every hart except hart 0, which prints `xv6 kernel is booting`.
 - **Supported count:** `NCPU` in `kernel/param.h` caps how many xv6 supports.
-
-### Integer register names: `sp`, `ra`, `tp`, and the ABI groups
-
-**ABI names describe a register's calling-convention role; `x0`–`x31` are the hardware numbers.** The trapframe and `struct context` in `kernel/proc.h` use the ABI names.
-
-| Register      | Expansion                              | Role in xv6                                                                                                                                              |
-| ------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **sp** (`x2`) | **s**tack **p**ointer                  | The current stack top; stacks grow down. `_entry` points it into `stack0` before any C runs, and the trapframe saves the user value at offset 48.        |
-| **ra** (`x1`) | **r**eturn **a**ddress                 | Where `ret` jumps. `allocproc()` sets `p->context.ra = forkret`, so the first `swtch()` into a new process "returns" into `forkret()`.                   |
-| **tp** (`x4`) | **t**hread **p**ointer                 | Repurposed to hold the hart id: `start()` writes `mhartid` into it and `cpuid()` reads it back.                                                          |
-| **a0–a7**     | **a**rgument registers                 | `a0`–`a5` carry system-call arguments, `a7` the system-call number, and `a0` the result.                                                                 |
-| **s0–s11**    | **s**aved (callee-saved) registers     | A called function must preserve them, which is why `struct context` holds only these plus `ra` and `sp`. `s0` doubles as the frame pointer `fp`.         |
-| **t0–t6**     | **t**emporary (caller-saved) registers | Scratch values a call may destroy; a trap still saves them because it can interrupt any instruction. See the [Q/A in `kernel/proc.h`](../kernel/proc.h). |
+- **Hart 0 / boot hart:** the hart whose id is 0. `main()` picks it by id, not by arrival order, to initialise shared state while the others wait.
 
 ## Compilers, debuggers, libraries, and device terms
 
@@ -117,8 +105,8 @@ A **hart** is not always a physical core: simultaneous multithreading can expose
 | ----------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **GCC**                 | **G**NU **C**ompiler **C**ollection                         | The compiler. Here in cross form: `riscv64-linux-gnu-gcc`.                                                                                                                                                                                                                                                                       |
 | **binutils**            | **bin**ary **utils**                                        | `ld`, `as`, `objdump`, `objcopy`, `nm`.                                                                                                                                                                                                                                                                                          |
-| **GDB**                 | **G**NU **D**e**B**ugger                                    | The debugger client. In the native notes it launches a host process; here it controls QEMU's emulated machine through the remote GDB protocol and labels machine addresses with separately loaded ELF symbols.                                                                                                                   |
-| **target / debuggee**   | —                                                           | The execution being controlled by a debugger. In the native notes it is one host process; in this session it is QEMU's RISC-V machine, reached through QEMU's remote stub.                                                                                                                                                       |
+| **GDB**                 | **G**NU **D**e**B**ugger                                    | The debugger client. For a native host program it launches that process; here it controls QEMU's emulated machine through the remote GDB protocol and labels machine addresses with separately loaded ELF symbols.                                                                                                               |
+| **target / debuggee**   | —                                                           | The execution being controlled by a debugger. For a native host program it is that process; for xv6 it is QEMU's RISC-V machine, reached through QEMU's remote stub.                                                                                                                                                             |
 | **remote GDB stub**     | —                                                           | The protocol server inside QEMU that exposes registers, memory, execution control, and emulated CPUs. It does not understand xv6 source files, `fs.img`, or processes; GDB supplies those labels from ELF symbols.                                                                                                               |
 | **symbol table**        | —                                                           | ELF names mapped to addresses, such as `sys_pause` in `kernel/kernel`. Symbols let GDB name functions and globals; source-level stepping also needs debug information.                                                                                                                                                           |
 | **debug information**   | —                                                           | Compiler-emitted DWARF records mapping machine addresses to source files, lines, types, and some variable locations. `-ggdb` adds it, but GDB can use it only after the containing ELF is loaded as a symbol file.                                                                                                               |
@@ -126,7 +114,7 @@ A **hart** is not always a physical core: simultaneous multithreading can expose
 | **hardware breakpoint** | —                                                           | A stop implemented by the target's execution machinery rather than by patching an instruction into memory. `hbreak` asks QEMU's remote stub for this form.                                                                                                                                                                       |
 | **GDB thread**          | —                                                           | One execution context reported by the debug target. QEMU reports emulated harts this way; the entry is not an xv6 process or a user-level software thread.                                                                                                                                                                       |
 | **glibc**               | **GNU** **C** **Lib**rary                                   | Linux's standard C library: ISO C, POSIX, and the pre-`main` runtime. **Never** linked into anything xv6 builds, though its RISC-V headers are installed. See [What glibc actually is](06-build-artifacts.md#what-glibc-actually-is).                                                                                            |
-| **ULIB**                | **u**ser **lib**rary                                        | A Makefile variable, not a real library: the four objects (`ulib.o`, `usys.o`, `printf.o`, `umalloc.o`) every user program links against. See [`ULIB` versus glibc](06-build-artifacts.md#ulib-versus-glibc).                                                                                                                    |
+| **ULIB**                | **u**ser **lib**rary                                        | A Makefile variable, not a real library: the four objects (`ulib.o`, `usys.o`, `printf.o`, `umalloc.o`), plus `statistics.o` in the lock lab, that every user program links against. See [`ULIB` versus glibc](06-build-artifacts.md#ulib-versus-glibc).                                                                         |
 | **ELF**                 | **E**xecutable and **L**inkable **F**ormat                  | The binary container for `kernel/kernel` and each user program. The executable sections are loaded into the target; symbol and DWARF sections let tools label their addresses. `kernel/elf.h` defines the headers that `kernel/exec.c` parses. See [What ELF is](06-build-artifacts.md#elf-headers-segments-and-load-addresses). |
 | **cross-compilation**   | —                                                           | Building on one architecture for another. Nothing built here runs natively on your x86 machine.                                                                                                                                                                                                                                  |
 | **TOOLPREFIX**          | —                                                           | The Makefile variable holding the cross-tool prefix, e.g. `riscv64-linux-gnu-`.                                                                                                                                                                                                                                                  |
@@ -165,6 +153,8 @@ glibc implements both, which is why one library satisfies two unrelated standard
 ### Hosted versus freestanding: the part of ISO C that xv6 does obey
 
 ISO C anticipates being used without an operating system, and defines two kinds of implementation to say so. That distinction is not a footnote — it is exactly what `-ffreestanding` selects, and it is the standard's own blessing for everything this tree does.
+
+"Freestanding" names the missing dependency, a host environment; "independent" would leave "independent of what?" unanswered, since the xv6 kernel still depends on its compiler, RV64GC, QEMU's `virt` board, and correct placement by the linker script.
 
 |                              | **Hosted**                                                          | **Freestanding**                                                                                                                                               |
 | ---------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -215,10 +205,10 @@ Nothing, on purpose. It is worth being blunt about this, because "Unix-like" inv
 
 | Term                      | Meaning in xv6                                                                                                                                                                                                                                                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **host**                  | The Linux environment running VS Code, GDB, Make, and the QEMU host process. “Host” names the outside of the emulation boundary, not the privileged side of xv6.                                                                                                                                                                                                                                 |
-| **guest**                 | The entire emulated xv6 machine. Both the xv6 kernel and its user programs are guest software, so “guest program” is broader than “user program.”                                                                                                                                                                                                                                                |
-| **native program**        | A program compiled for and executed directly under the host operating system, such as the selected exercises in the C notes. xv6's RISC-V ELFs are not native to the x86 host.                                                                                                                                                                                                                   |
-| **kernel**                | The shared privileged guest code linked into `kernel/kernel` and executed in S-mode for system calls, traps, interrupts, and kernel work. It is not an ordinary “kernel process.”                                                                                                                                                                                                                |
+| **host**                  | The Linux environment running VS Code, GDB, Make, and the QEMU host process. "Host" names the outside of the emulation boundary, not the privileged side of xv6.                                                                                                                                                                                                                                 |
+| **guest**                 | The entire emulated xv6 machine. Both the xv6 kernel and its user programs are guest software, so "guest program" is broader than "user program."                                                                                                                                                                                                                                                |
+| **native program**        | A program compiled for and executed directly under the host operating system, such as `mkfs/mkfs`. xv6's RISC-V ELFs are not native to the x86 host.                                                                                                                                                                                                                                             |
+| **kernel**                | The shared privileged guest code linked into `kernel/kernel` and executed in S-mode for system calls, traps, interrupts, and kernel work. It is not an ordinary "kernel process."                                                                                                                                                                                                                |
 | **user program**          | Guest code linked as a separate ELF under `user/`, installed in `fs.img`, loaded by xv6 `exec`, and executed by an xv6 process in U-mode. It is guest software but not synonymous with all guest software.                                                                                                                                                                                       |
 | **user space**            | The unprivileged virtual-address region and execution context in which an xv6 process runs its user program in U-mode. The source is usually under `user/`, but the term describes privilege and address-space context rather than a host directory.                                                                                                                                             |
 | **kernel space**          | The privileged mappings and S-mode execution context shared by the xv6 kernel. A system call changes privilege and page-table context; it does not launch a separate kernel program.                                                                                                                                                                                                             |
@@ -249,7 +239,7 @@ Nothing, on purpose. It is worth being blunt about this, because "Unix-like" inv
 
 ### System-call, GDB, and placeholder stubs
 
-**Standing in, rather than doing the full implementation, is the shared role.** This repository uses “stub” for three unrelated things:
+**Standing in, rather than doing the full implementation, is the shared role.** This repository uses "stub" for three unrelated things:
 
 | Stub kind            | Where it appears                       | What it stands in for                                                                  |
 | -------------------- | -------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -273,45 +263,30 @@ EOF need not persist forever: later file growth or console input can make a late
 
 ### Panic output and whole-machine failure
 
-**A panic stops the whole machine; a user-space process fault kills only that process.** The 62 `panic()` call sites across 13 kernel files pass a message naming the broken invariant.
+**A panic stops the whole machine; a user-space process fault kills only that process.** The 63 `panic()` call sites across 13 kernel files pass a message naming the broken invariant.
 
-`panic("message")` in `kernel/printk.c`:
-
-1. Prints `panic: ` and the message.
-2. Sets `panicked`, making every other hart park forever in `uartputc_sync` so it cannot overwrite the message.
-3. Spins forever. It is declared `__attribute__((noreturn))` and never returns or reboots.
-
-See [What a panic is, and what it prints](06-build-artifacts.md#panic-invariant-failures-output-and-hart-shutdown).
+See [What a panic is, and what it prints](09-debugging-xv6.md#panic-invariant-failures-output-and-hart-shutdown).
 
 ## Course names, build variables, and repository files
 
-| Term                   | Meaning                                                                                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 6.1810                 | MIT's Operating System Engineering course. Previously numbered 6.828.                                                                                        |
-| **PDOS**               | **P**arallel and **D**istributed **O**perating **S**ystems, the MIT group behind xv6.                                                                        |
-| `fs.img`               | The disk image holding xv6's root filesystem, built by `mkfs/mkfs`.                                                                                          |
-| `fs.img.bk`            | The previous image, rotated aside by the `newfs.img` target on every `make qemu`. Regenerated constantly and git-ignored; `make qemu-fs` skips the rotation. |
-| `mkfs`                 | **m**a**k**e **f**ile**s**ystem. Host-compiled, since it runs on your machine.                                                                               |
-| `UPROGS`               | The Makefile list of user programs that go into `fs.img`.                                                                                                    |
-| `conf/lab.mk`          | One line selecting the active lab. See [03-lab-workflow.md](03-lab-workflow.md).                                                                             |
-| `gradelib.py`          | MIT's grading harness — boots QEMU, drives the shell, matches output.                                                                                        |
-| **hart 0 / boot hart** | The hart whose id is 0. `main()` picks it by id, not by arrival order, to initialise shared state while the others wait.                                     |
+| Term          | Meaning                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **6.1810**    | MIT's Operating System Engineering course. Previously numbered 6.828.                                                                                        |
+| **PDOS**      | **P**arallel and **D**istributed **O**perating **S**ystems, the MIT group behind xv6.                                                                        |
+| `fs.img`      | The disk image holding xv6's root filesystem, built by `mkfs/mkfs`.                                                                                          |
+| `fs.img.bk`   | The previous image, rotated aside by the `newfs.img` target on every `make qemu`. Regenerated constantly and git-ignored; `make qemu-fs` skips the rotation. |
+| `mkfs`        | **m**a**k**e **f**ile**s**ystem. Host-compiled, since it runs on your machine.                                                                               |
+| `UPROGS`      | The Makefile list of user programs that go into `fs.img`.                                                                                                    |
+| `conf/lab.mk` | One line selecting the active lab. See [03-lab-workflow.md](03-lab-workflow.md).                                                                             |
+| `gradelib.py` | MIT's grading harness — boots QEMU, drives the shell, matches output.                                                                                        |
 
-## Why “freestanding” and “stub” are precise terms
+## Why "stub" is a precise term
 
-Two terms in these guides are precise technical choices rather than casual description, and both are easier to trust once you know where they come from.
+"Stub" in these guides is a precise technical choice rather than casual description, and it is easier to trust once you know where it comes from.
 
-### “Freestanding”: the ISO C term for having no host environment
+### "Stub": a forwarding role, distinct from size and form
 
-`freestanding` is not an adjective someone reached for. It is the term **ISO C uses itself**: the standard defines a _freestanding implementation_ in contrast to a _hosted_ one, and GCC's flag is named after the standard's word — `-ffreestanding`. Picking a synonym would cut the connection to both.
-
-**“Freestanding” identifies the missing dependency precisely:** a host environment, meaning an underlying operating system that supplies a C library and calls `main`. ISO C specifies which headers remain available and where the program may start; see [Hosted versus freestanding](#hosted-versus-freestanding-the-part-of-iso-c-that-xv6-does-obey).
-
-“Independent” leaves “independent of what?” unanswered. The xv6 kernel still depends on its compiler, RV64GC, QEMU's `virt` board, and correct placement by the linker script.
-
-### “Stub”: a forwarding role, distinct from size and form
-
-**“Stub” describes a role; “snippet” describes an excerpt; “function” and “module” describe structure.** A complete function can be shown as a snippet and serve as a stub at the same time.
+**"Stub" describes a role; "snippet" describes an excerpt; "function" and "module" describe structure.** A complete function can be shown as a snippet and serve as a stub at the same time.
 
 **The system-call analogy: a stub is a forwarding address.**
 
@@ -326,14 +301,12 @@ Post arrives under the right name and is sent onward. For the simple system-call
 | **A depot that opens the parcel and attaches a customs form** | A **wrapper**. `sbrk` adding `SBRK_EAGER` is exactly that form                                                                       |
 | **The warehouse where the goods actually are**                | An **implementation**. `strlen`                                                                                                      |
 
-**A callable stub needs a resolvable entry point.** `ld` resolves the `fork` symbol because the generated stub defines it. Calling the same code a snippet says how it is presented, not whether it compiles or links.
-
 Size stays a separate question throughout, which is the whole point about "function" and "module". A forwarding address can be a PO box (one function — `sys_sbrk`), a mail-handling office (a module — QEMU's gdb stub), or an empty building registered as a company's office (a file — `docs/book/ch13-summary.md`). None of those sizes makes it more or less a forwarding address.
 
 > [!NOTE]
 > The analogy earns exactly one thing: it separates _what a thing does_ from _how big it is_. Push it further and it misleads — nothing in the post is privileged, and `ecall` is not a delivery van but a change of CPU privilege level. For what actually happens on the other side of that call, see [Why the system call number goes in `a7`](06-build-artifacts.md#why-the-system-call-number-goes-in-a7).
 
-**Snippet versus executable stub:** neither term determines the code's size, and only “stub” identifies its role.
+**Snippet versus executable stub:** neither term determines the code's size, and only "stub" identifies its role.
 
 |                                              | **Snippet**                                        | **Stub**                                                           |
 | -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------ |
@@ -365,12 +338,12 @@ Substitution fails in both directions, which is the test worth applying to any s
 
 | Sentence         | With "stub"                                                                              | With "function"                                                                               |
 | ---------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **On behaviour** | “The xv6 system-call stub preserves `a0`–`a5`” explains argument forwarding in this ABI. | “The function preserves `a0`–`a5`” states a property without identifying the forwarding role. |
-| **On counting**  | “22 system-call stubs” identifies the generated forwarding entry points.                 | “22 functions” does not identify which set; user-library functions are another set.           |
+| **On behaviour** | "The xv6 system-call stub preserves `a0`–`a5`" explains argument forwarding in this ABI. | "The function preserves `a0`–`a5`" states a property without identifying the forwarding role. |
+| **On counting**  | "22 system-call stubs" identifies the generated forwarding entry points.                 | "22 functions" does not identify which set; user-library functions are another set.           |
 
 "Module" fails on granularity in the opposite direction: `user/usys.S` as a whole file could fairly be called a module, but the four lines named `fork` inside it could not.
 
-**“Stub” has the same standing-in role across several fields:**
+**"Stub" has the same standing-in role across several fields:**
 
 - **RPC:** client and server stubs marshal calls across a network.
 - **GDB:** the debugger talks to a remote stub inside the target.
