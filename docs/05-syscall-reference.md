@@ -13,6 +13,9 @@ Every system call this tree provides, grouped by what you are trying to do. xv6 
 > [!NOTE]
 > This file owns xv6's behaviour, not the portable model behind it. For the concepts — what a descriptor is, what `fork` means — read [The Process Abstraction](../../operating-system/The_Process_Abstraction.md) first. Where xv6 and POSIX disagree, and they do in several places, [Divergences from POSIX](#divergences-from-posix) is the authority for this tree.
 
+> [!NOTE]
+> **Sandbox lab in progress:** the working-tree declaration of `interpose` is not yet backed by a generated stub or a registered kernel handler, so it is not included in the 22 implemented calls below. See [the mask-sandbox derivation guide](labs/13-syscall-sandbox.md) for the exercise contract.
+
 ## System-call path: declaration, stub, dispatch, implementation
 
 For the hardware distinction between a call, a trap, and a privileged return, read [CSRs and privilege](../../assembly-language/docs/riscv/06-csrs-and-privilege.md#control-transfers-calls-traps-and-privilege-returns). The details below apply to this xv6 tree.
