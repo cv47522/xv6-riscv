@@ -95,6 +95,12 @@ sys_pause(void)
   int n;
   uint ticks0;
 
+  /*
+   * Q: Is the first argument in a0 "sleep" or a number?
+   * A: The number. For pause(10), saved a0 holds 10 ticks and saved a7
+   *    holds SYS_pause; the command name never reaches the kernel.
+   *    Index 0 selects a0, and argint stores its low 32 bits in n.
+   */
   argint(0, &n);
   if (n < 0)
     n = 0;
@@ -136,4 +142,28 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+/*
+ * Q: Why return uint64 rather than an int used as a boolean?
+ * A: syscalls[] in kernel/syscall.c holds uint64 (*)(void) pointers, and
+ *    syscall() stores the result in the 64-bit saved a0. The user-side
+ *    int is a status, 0 for success and -1 for failure; read as a
+ *    boolean, -1 would mean true.
+ *
+ * Rejecting a negative mask is this tree's choice, not the handout's;
+ * it makes bit 31 unusable. The path argument (a1) is ignored until the
+ * pathname exercise. The mask lives in struct proc, so kexec keeps it,
+ * kfork copies it, and freeproc clears it.
+ */
+uint64
+sys_interpose(void)
+{
+  int mask;
+
+  argint(0, &mask);
+  if (mask < 0)
+    return -1;
+  myproc()->mask = mask;
+  return 0;
 }

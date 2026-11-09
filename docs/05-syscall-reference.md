@@ -8,13 +8,13 @@
 
 Every system call this tree provides, grouped by what you are trying to do. xv6 has no manual pages, so this is the lookup: signature, return value, failure mode, and the file that implements it.
 
-**There are 22 system calls**, all declared in the `// system calls` block of [`../user/user.h`](../user/user.h). A function outside that block is not a system call, however much it resembles one; see [User-space helpers](#user-space-helpers-declared-in-useruserh).
+**There are 23 registered system calls**, declared in the system-call block of [`../user/user.h`](../user/user.h). A function outside that block is not a system call, however much it resembles one; see [User-space helpers](#user-space-helpers-declared-in-useruserh).
 
 > [!NOTE]
 > This file owns xv6's behaviour, not the portable model behind it. For the concepts — what a descriptor is, what `fork` means — read [The Process Abstraction](../../operating-system/The_Process_Abstraction.md) first. Where xv6 and POSIX disagree, and they do in several places, [Divergences from POSIX](#divergences-from-posix) is the authority for this tree.
 
 > [!NOTE]
-> **Sandbox lab in progress:** the working-tree declaration of `interpose` is not yet backed by a generated stub or a registered kernel handler, so it is not included in the 22 implemented calls below. See [the mask-sandbox derivation guide](labs/13-syscall-sandbox.md) for the exercise contract.
+> **`interpose` (23) comes from the sandbox lab**, not upstream xv6. It implements only the mask exercise; the pathname argument is accepted but ignored. See [the mask-sandbox derivation guide](labs/13-syscall-sandbox.md) for the exercise contract.
 
 ## System-call path: declaration, stub, dispatch, implementation
 
@@ -51,32 +51,33 @@ flowchart LR
 > [!IMPORTANT]
 > Adding a system call means editing four files, not one: `user/usys.pl`, `user/user.h`, `kernel/syscall.h`, and `kernel/syscall.c`, plus the `sys_*` implementation. Editing `user/usys.S` directly is wasted work — it is generated and `.gitignore`d.
 
-## All 22 system calls and their numbers
+## All 23 system calls and their numbers
 
-| Call       | Number            | Group       | One line                                                |
-| ---------- | ----------------- | ----------- | ------------------------------------------------------- |
-| `fork()`   | `SYS_fork` = 1    | Process     | Duplicate this process.                                 |
-| `exit()`   | `SYS_exit` = 2    | Process     | End this process with a status. **Never** returns.      |
-| `wait()`   | `SYS_wait` = 3    | Process     | Block until a child exits; collect its status.          |
-| `pipe()`   | `SYS_pipe` = 4    | Files       | Create a pipe and two descriptors for it.               |
-| `read()`   | `SYS_read` = 5    | Files       | Read up to n bytes from a descriptor.                   |
-| `kill()`   | `SYS_kill` = 6    | Process     | Mark a process to die at its next kernel entry or exit. |
-| `exec()`   | `SYS_exec` = 7    | Process     | Replace this process's image. Returns only on failure.  |
-| `fstat()`  | `SYS_fstat` = 8   | Files       | Describe the file behind a descriptor.                  |
-| `chdir()`  | `SYS_chdir` = 9   | Directories | Change the working directory.                           |
-| `dup()`    | `SYS_dup` = 10    | Files       | Duplicate a descriptor, sharing one offset.             |
-| `getpid()` | `SYS_getpid` = 11 | Process     | This process's pid.                                     |
-| `sbrk()`   | `SYS_sbrk` = 12   | Memory      | Grow or shrink the data segment.                        |
-| `pause()`  | `SYS_pause` = 13  | Time        | Block for n clock ticks. This tree's name for `sleep`.  |
-| `uptime()` | `SYS_uptime` = 14 | Time        | Clock ticks since boot.                                 |
-| `open()`   | `SYS_open` = 15   | Files       | Open or create a file; return a descriptor.             |
-| `write()`  | `SYS_write` = 16  | Files       | Write n bytes to a descriptor.                          |
-| `mknod()`  | `SYS_mknod` = 17  | Directories | Create a device file.                                   |
-| `unlink()` | `SYS_unlink` = 18 | Directories | Remove a name; free the inode when the last link goes.  |
-| `link()`   | `SYS_link` = 19   | Directories | Add a second name for one inode.                        |
-| `mkdir()`  | `SYS_mkdir` = 20  | Directories | Create a directory.                                     |
-| `close()`  | `SYS_close` = 21  | Files       | Release a descriptor.                                   |
-| `sync()`   | `SYS_sync` = 22   | System      | Wait until the log has committed.                       |
+| Call          | Number               | Group       | One line                                                |
+| ------------- | -------------------- | ----------- | ------------------------------------------------------- |
+| `fork()`      | `SYS_fork` = 1       | Process     | Duplicate this process.                                 |
+| `exit()`      | `SYS_exit` = 2       | Process     | End this process with a status. **Never** returns.      |
+| `wait()`      | `SYS_wait` = 3       | Process     | Block until a child exits; collect its status.          |
+| `pipe()`      | `SYS_pipe` = 4       | Files       | Create a pipe and two descriptors for it.               |
+| `read()`      | `SYS_read` = 5       | Files       | Read up to n bytes from a descriptor.                   |
+| `kill()`      | `SYS_kill` = 6       | Process     | Mark a process to die at its next kernel entry or exit. |
+| `exec()`      | `SYS_exec` = 7       | Process     | Replace this process's image. Returns only on failure.  |
+| `fstat()`     | `SYS_fstat` = 8      | Files       | Describe the file behind a descriptor.                  |
+| `chdir()`     | `SYS_chdir` = 9      | Directories | Change the working directory.                           |
+| `dup()`       | `SYS_dup` = 10       | Files       | Duplicate a descriptor, sharing one offset.             |
+| `getpid()`    | `SYS_getpid` = 11    | Process     | This process's pid.                                     |
+| `sbrk()`      | `SYS_sbrk` = 12      | Memory      | Grow or shrink the data segment.                        |
+| `pause()`     | `SYS_pause` = 13     | Time        | Block for n clock ticks. This tree's name for `sleep`.  |
+| `uptime()`    | `SYS_uptime` = 14    | Time        | Clock ticks since boot.                                 |
+| `open()`      | `SYS_open` = 15      | Files       | Open or create a file; return a descriptor.             |
+| `write()`     | `SYS_write` = 16     | Files       | Write n bytes to a descriptor.                          |
+| `mknod()`     | `SYS_mknod` = 17     | Directories | Create a device file.                                   |
+| `unlink()`    | `SYS_unlink` = 18    | Directories | Remove a name; free the inode when the last link goes.  |
+| `link()`      | `SYS_link` = 19      | Directories | Add a second name for one inode.                        |
+| `mkdir()`     | `SYS_mkdir` = 20     | Directories | Create a directory.                                     |
+| `close()`     | `SYS_close` = 21     | Files       | Release a descriptor.                                   |
+| `sync()`      | `SYS_sync` = 22      | System      | Wait until the log has committed.                       |
+| `interpose()` | `SYS_interpose` = 23 | Process     | Deny the calls whose bits are set; children inherit it. |
 
 ## Process creation, exit, waiting, and execution
 
@@ -98,6 +99,16 @@ Four behaviours are easy to get wrong:
 
 > [!NOTE]
 > The kernel-side names carry a `k` prefix — `kfork`, `kexec`, `kwait`, `kexit` — where the book and OSTEP use the bare POSIX names. See [the naming table](book/00-ostep-concordance.md#system-call-naming).
+
+### `interpose`: per-process syscall mask
+
+| Call        | Declared as                  | On success                                       | On failure                   | Implemented in                       |
+| ----------- | ---------------------------- | ------------------------------------------------ | ---------------------------- | ------------------------------------ |
+| `interpose` | `int interpose(int, char *)` | `0`; replaces the caller's mask and ignores path | `-1` if the mask is negative | `kernel/sysproc.c` `sys_interpose()` |
+
+- **Bit `n` set denies call number `n`.** `syscall()` in `kernel/syscall.c` tests the bit before running the handler, prints `<pid> <name>: sys call <n> is forbidden`, and returns `-1`. The handler's side effects never happen.
+- **The mask belongs to `struct proc`.** `kfork()` copies it to the child, `kexec()` leaves it in place, and `freeproc()` clears it for the slot's next occupant.
+- **A negative mask is rejected by this tree's choice**, not the handout's, so bit 31 cannot be set. A later `interpose` call replaces the mask rather than adding to it.
 
 ## Files and descriptors
 

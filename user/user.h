@@ -2,7 +2,17 @@
 
 struct stat;
 
-// system calls
+/*
+ * System calls
+ *
+ * Q: Which files implement these, and why open() versus sys_open()?
+ * A: These declare user stubs. user/usys.pl generates them in
+ *    user/usys.S: open() loads SYS_open into a7 and executes ecall.
+ *    syscalls[] in kernel/syscall.c maps that number to sys_open() in
+ *    kernel/sysfile.c; no C call crosses the privilege boundary, so the
+ *    names may differ. Other handlers live in kernel/sysproc.c and
+ *    kernel/log.c. See docs/05-syscall-reference.md.
+ */
 int fork(void);
 int exit(int) __attribute__((noreturn));
 int wait(int *);
@@ -25,6 +35,7 @@ char *sys_sbrk(int, int);
 int pause(int);
 int uptime(void);
 int sync(void);
+int interpose(int, char *); // mask, path; path not length-checked here
 
 // ulib.c
 int stat(const char *, struct stat *);

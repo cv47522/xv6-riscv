@@ -358,6 +358,7 @@ LAB_PRACTICE_PROGS = \
 	isolate\
 	forkfill\
 	hwdesign\
+	sandbox\
 
 UPROGS=\
 	$U/_cat\

@@ -437,7 +437,7 @@ That wait marks the process `SLEEPING`, so `scheduler()` in `kernel/proc.c` skip
 | **User library**     | Below `// ulib.c` in `user/user.h`           | User programs through ordinary C calls  |
 | **Kernel internals** | `kernel/defs.h`                              | Kernel code through ordinary C calls    |
 
-[Docs 05](../05-syscall-reference.md#all-22-system-calls-and-their-numbers) owns the complete inventory: 22 calls, from `SYS_fork` = 1 to `SYS_sync` = 22, used by every user program including the shell. [Docs 06](../06-build-artifacts.md#ulib-versus-glibc) owns the four `ULIB` objects and their functions.
+[Docs 05](../05-syscall-reference.md#all-23-system-calls-and-their-numbers) owns the complete inventory: 23 calls, from `SYS_fork` = 1 to `SYS_interpose` = 23, the one this tree adds for the sandbox lab. [Docs 06](../06-build-artifacts.md#ulib-versus-glibc) owns the four `ULIB` objects and their functions.
 
 > [!WARNING]
 > Keep the interfaces separate. Kernel code already runs in S-mode and uses internal functions: `sleep()`, `printk()`, `kalloc()`, and `copyout()`. It does not call user stubs such as `pause()`. Including `user/user.h` in kernel code, or `kernel/defs.h` in user code, does not make the other interface callable.

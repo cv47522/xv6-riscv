@@ -182,6 +182,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->mask = 0;
 }
 
 /*
@@ -285,6 +286,31 @@ int
 kfork(void)
 {
   int i, pid;
+  /*
+   * Q: np vs p?
+   * A: p is the parent (myproc()); np is the new child slot from
+   *    allocproc(). uvmcopy copies user memory, not struct proc, so
+   *    each kernel field, including mask, is copied explicitly below.
+   *
+   * Q: Why copy struct proc field by field instead of *np = *p?
+   * A: Few fields are plain values. The rest name resources the child
+   *    must own or reference-count, so a whole-struct copy would share
+   *    or corrupt them:
+   *
+   *      Fields                Child gets
+   *      --------------------  ---------------------------------------
+   *      lock, kstack          its own slot's: lock held, boot stack
+   *      state, pid, parent    its own identity, set here or allocproc
+   *      chan, killed, xstate  cleared values; nothing is inherited
+   *      pagetable, trapframe  new pages; their contents copied below
+   *      context               allocproc's forkret entry, not p's
+   *      ofile[], cwd          shared objects, refcounted by
+   *                            filedup()/idup()
+   *      sz, name, mask        copied by value
+   *
+   *    See docs/labs/13-syscall-sandbox.md, "Why kfork copies struct
+   *    proc field by field".
+   */
   struct proc *np;
   struct proc *p = myproc();
 
@@ -314,6 +340,7 @@ kfork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+  np->mask = p->mask; // copy before RUNNABLE so the child never runs unmasked
 
   pid = np->pid;
 
