@@ -164,5 +164,5 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
   int mask;                    // Mask of disallowed system calls
-  char allowed_path[MAXPATH];      // Path of executable file
+  char allowed_path[MAXPATH];  // Masked open/exec may use this path
 };

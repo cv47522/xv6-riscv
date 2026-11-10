@@ -155,12 +155,61 @@ static uint64 (*syscalls[])(void) = {
   // clang-format on
 };
 
+/*
+ * -------------------------------------------------------------------------
+ *  SANDBOX CHECK
+ * -------------------------------------------------------------------------
+ *
+ * Decide whether p's interpose() policy refuses call num. It runs before
+ * the handler, because an error returned afterwards could not undo the
+ * handler's side effects (a created file, a replaced image).
+ *
+ *   Bit num set?  num is open/exec?  Argument 0 == allowed_path?  Result
+ *   ------------  -----------------  ---------------------------  -------
+ *    no            -                  not read                     allow
+ *    yes           no                 not read                     deny
+ *    yes           yes                yes                          allow
+ *    yes           yes                no, or unreadable            deny
+ *
+ * The pathname is matched as text over the whole string (bound MAXPATH),
+ * so "./README" and "READ" do not match "README". It names the program
+ * when exec is masked and the file when open is masked. Contract and edge
+ * cases: docs/labs/14-syscall-sandbox-path.md.
+ *
+ * Test membership, not equality, so a combined mask such as 32896 covers
+ * both open and exec. The caller has already bounded num below
+ * NELEM(syscalls) (24), so the int shift is defined.
+ */
+static int
+sandbox_denies(struct proc *p, int num)
+{
+  char path[MAXPATH];
+
+  if ((p->mask & (1 << num)) == 0)
+    return 0;
+  if (num != SYS_open && num != SYS_exec) {
+    printk("%d %s: sys call %d is forbidden\n", p->pid, p->name, num);
+    return 1;
+  }
+  // Both sys_open and sys_exec take the path as argument 0.
+  if (argstr(0, path, MAXPATH) < 0) {
+    printk("%d %s: sys call %d is forbidden: unreadable path\n", p->pid,
+           p->name, num);
+    return 1;
+  }
+  if (strncmp(path, p->allowed_path, MAXPATH) != 0) {
+    printk("%d %s: sys call %d is forbidden: path %s not allowed\n",
+           p->pid, p->name, num, path);
+    return 1;
+  }
+  return 0;
+}
+
 void
 syscall(void)
 {
   int num;
   struct proc *p = myproc();
-  char path_buf[MAXPATH];
 
   /*
    * The "Using gdb" lab swaps this line for `num = *(int *)0;` to panic.
@@ -170,33 +219,12 @@ syscall(void)
    */
   num = p->trapframe->a7;
   if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    if (p->mask & (1 << num)) {
-      if (num == SYS_open || num == SYS_exec) {
-        if (argstr(0, path_buf, MAXPATH) < 0) { // first arg in sys_open() or sys_exec() not the signatures in user/user.h
-          printk("%d %s: error when copying path\n", p->pid, p->name);
-          p->trapframe->a0 = -1;
-          return;
-        }
-        if (strncmp(path_buf, p->allowed_path, MAXPATH) != 0) { // open() path not equal to interpose() path
-          printk("%d %s: sys call %d is forbidden for mismatched path\n", p->pid, p->name, num);
-          p->trapframe->a0 = -1;
-          return;
-        }
-      } else {
-        /*
-        * Deny before the handler runs: an error returned afterwards could
-        * not undo its side effects. Test membership, not equality, so a
-        * combined mask such as 32896 denies both open and exec. The bounds
-        * check above keeps num below NELEM(syscalls) (24), so the int shift
-        * is defined.
-        */
-        printk("%d %s: sys call %d is forbidden\n", p->pid, p->name, num);
-        p->trapframe->a0 = -1;
-        return;
-      }
+    if (sandbox_denies(p, num)) {
+      p->trapframe->a0 = -1;
+    } else {
+      // Call the handler for num; its return value becomes user a0.
+      p->trapframe->a0 = syscalls[num]();
     }
-    // Call the handler for num; its return value becomes user a0.
-    p->trapframe->a0 = syscalls[num]();
   } else {
     printk("%d %s: unknown sys call %d\n", p->pid, p->name, num);
     p->trapframe->a0 = -1;

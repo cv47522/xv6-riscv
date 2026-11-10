@@ -152,9 +152,10 @@ sys_uptime(void)
  *    boolean, -1 would mean true.
  *
  * Rejecting a negative mask is this tree's choice, not the handout's;
- * it makes bit 31 unusable. The path argument (a1) is ignored until the
- * pathname exercise. The mask lives in struct proc, so kexec keeps it,
- * kfork copies it, and freeproc clears it.
+ * it makes bit 31 unusable. The path argument (a1) is the one pathname a
+ * masked open or exec may still use; sandbox_denies() in kernel/syscall.c
+ * compares it. Both live in struct proc, so kexec keeps them, kfork
+ * copies them, and freeproc clears them.
  *
  * Q: Does losing bit 31 matter when the highest call number is 23?
  * A: Not yet: no call is numbered 31, and syscall() never tests a bit
@@ -167,16 +168,16 @@ uint64
 sys_interpose(void)
 {
   int mask;
-  char path_buf[MAXPATH];
+  char path[MAXPATH];
+  struct proc *p = myproc();
 
   argint(0, &mask); // first arg in interpose()
   if (mask < 0)
     return -1;
-  if (argstr(1, path_buf, MAXPATH) < 0) {// second arg in interpose()
-    printk("%d %s: error when copying path", myproc()->pid, myproc()->name);
+  // Fetch before committing, so a bad path leaves the old policy intact.
+  if (argstr(1, path, MAXPATH) < 0) // second arg in interpose()
     return -1;
-  }
-  myproc()->mask = mask;
-  strncpy(myproc()->allowed_path, path_buf, sizeof(path_buf));
+  p->mask = mask;
+  safestrcpy(p->allowed_path, path, sizeof(p->allowed_path));
   return 0;
 }

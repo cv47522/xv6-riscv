@@ -282,7 +282,7 @@ cat README
 | **13** | `sandbox 32896 grep grep xv6 README`                            | `sys call 15 is forbidden`, `grep: cannot open README`     | Both masked: the program name passes `exec`, then fails at `open`.                              |
 | **14** | `echo cat README > c.sh`, then `sandbox 32768 README sh < c.sh` | `sys call 15 is forbidden` from `sh`, then the full README | Inheritance: `sh`'s own `open("console")` is denied, but its forked `cat` inherits `README`.    |
 
-**Captured from a passing reference build** (all five pathname-related grader tests pass), run through `gradelib`'s `shell_script` on a fresh `fs.img`. The leading number in each kernel line is the pid and varies between runs; the diagnostic text after it is whatever your `printk` prints. Row 14's README is truncated here.
+**Captured from this tree's implementation** (all five sandbox grader tests pass), run through `gradelib`'s `shell_script` after `make grade`. The leading number in each kernel line is the pid and varies between runs. The text after `forbidden` is this tree's choice: a pathname denial names the path the program tried, so row 4 shows `README`, the string `grep` passed, not the allowed `./README`. Row 14's README is elided as `...`: the inner `sh` prints `$ ` prompts that made the harness type its next command early, so the README text landed after that echo in the raw capture.
 
 ```text
 $ sandbox 0 nosuchfile grep xv6 README
@@ -300,16 +300,16 @@ Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
 (kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
 $ sandbox 32768 README cat x
-8 cat: sys call 15 is forbidden
+8 cat: sys call 15 is forbidden: path x not allowed
 cat: cannot open x
 $ sandbox 32768 ./README grep xv6 README
-10 grep: sys call 15 is forbidden
+10 grep: sys call 15 is forbidden: path README not allowed
 grep: cannot open README
 $ sandbox 32768 README grep xv6 ./README
-12 grep: sys call 15 is forbidden
+12 grep: sys call 15 is forbidden: path ./README not allowed
 grep: cannot open ./README
 $ sandbox 32768 READ grep xv6 README
-14 grep: sys call 15 is forbidden
+14 grep: sys call 15 is forbidden: path README not allowed
 grep: cannot open README
 $ sandbox 32768 - cat -
 cat: cannot open -
@@ -319,26 +319,23 @@ Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
 (kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
 $ sandbox 128 cat grep xv6 README
-20 sandbox: sys call 7 is forbidden
+20 sandbox: sys call 7 is forbidden: path grep not allowed
 sandbox: exec grep failed
 $ sandbox 128 README grep xv6 README
-22 sandbox: sys call 7 is forbidden
+22 sandbox: sys call 7 is forbidden: path grep not allowed
 sandbox: exec grep failed
 $ sandbox 32768 grep grep xv6 README
-24 grep: sys call 15 is forbidden
+24 grep: sys call 15 is forbidden: path README not allowed
 grep: cannot open README
 $ sandbox 32896 README grep xv6 README
-26 sandbox: sys call 7 is forbidden
+26 sandbox: sys call 7 is forbidden: path grep not allowed
 sandbox: exec grep failed
 $ sandbox 32896 grep grep xv6 README
-28 grep: sys call 15 is forbidden
+28 grep: sys call 15 is forbidden: path README not allowed
 grep: cannot open README
 $ echo cat README > c.sh
 $ sandbox 32768 README sh < c.sh
-31 sh: sys call 15 is forbidden
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+31 sh: sys call 15 is forbidden: path console not allowed
 ...
 ```
 
@@ -371,10 +368,10 @@ Interpret results with the [assertion table and limits](#grader-assertions-and-t
 ```gdb
 print p->trapframe->a7
 print p->mask
-print p->filepath
+print p->allowed_path
 ```
 
-At `a7 == 15`, inspect the user string through your kernel copy after `argstr` runs, not through `p->trapframe->a0`, which is a user virtual address the kernel page table does not map. `filepath` is whatever name you gave the new member.
+At `a7 == 15`, `break sandbox_denies` and `finish` past its `argstr` call, then `print path`: that is the kernel copy. **Do not** print `*(char *)p->trapframe->a0`; it is a user virtual address the kernel page table does not map.
 
 ## Questions to answer from the source
 
@@ -386,3 +383,151 @@ At `a7 == 15`, inspect the user string through your kernel copy after `argstr` r
 6. Why does `sandbox_path` assert zero `exec ls failed` even though a correct kernel would deny `exec("ls")` under `sandbox 128 sh`?
 7. In `sandbox_most`, why are there exactly 25 denied `write` calls, and why must the kernel diagnostic avoid one particular word?
 8. Allowed path `x` and `ln README x` (after removing the old `x`): what does the sandbox now permit, and what does that say about textual matching?
+
+## Solution walkthrough
+
+> [!CAUTION]
+> **Spoiler: this section shows the passing implementation.** Stop here to derive it yourself from the sections above.
+
+**One `MAXPATH` buffer in `struct proc`, and one helper that `syscall()` asks before dispatch.** All five sandbox tests pass with the code below (`make grade`: `sandbox_mask`, `sandbox_fork`, `sandbox_path`, `sandbox_most`, `sandbox_minus` OK); `attack` is the next, separate exercise.
+
+| Checklist decision  | Answer in this tree                                                                  | Source                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| **Storage**         | `char allowed_path[MAXPATH]` beside `mask`                                           | `kernel/proc.h`                                                               |
+| **Fetching**        | `argstr(1, …)` into a local buffer; commit mask and path only after it succeeds      | `sys_interpose()` in `kernel/sysproc.c`                                       |
+| **Lifetime**        | `safestrcpy` in `kfork()` before `RUNNABLE`; `allowed_path[0] = 0` in `freeproc()`   | `kernel/proc.c`                                                               |
+| **Which call**      | Test `num`'s own bit first; only then ask whether `num` is `open` or `exec`          | `sandbox_denies()` in `kernel/syscall.c`                                      |
+| **Which argument**  | `argstr(0, …)` for both calls                                                        | `sys_open`, `sys_exec` in `kernel/sysfile.c`                                  |
+| **Comparator**      | `strncmp(path, p->allowed_path, MAXPATH)`: both buffers hold at most `MAXPATH` bytes | `kernel/string.c`                                                             |
+| **Placeholder `-`** | No special case: `-` is just a path, as probe 7 shows                                | [Edge-case probes](#edge-case-probes-what-the-allowed-pathname-is-and-is-not) |
+
+### Deciding before dispatch: `sandbox_denies`
+
+From [`kernel/syscall.c`](../../kernel/syscall.c), below its `SANDBOX CHECK` banner, which carries the [outcome table](#outcomes-the-contract-defines) as an ASCII table:
+
+```c
+static int
+sandbox_denies(struct proc *p, int num)
+{
+  char path[MAXPATH];
+
+  if ((p->mask & (1 << num)) == 0)
+    return 0;
+  if (num != SYS_open && num != SYS_exec) {
+    printk("%d %s: sys call %d is forbidden\n", p->pid, p->name, num);
+    return 1;
+  }
+  // Both sys_open and sys_exec take the path as argument 0.
+  if (argstr(0, path, MAXPATH) < 0) {
+    printk("%d %s: sys call %d is forbidden: unreadable path\n", p->pid,
+           p->name, num);
+    return 1;
+  }
+  if (strncmp(path, p->allowed_path, MAXPATH) != 0) {
+    printk("%d %s: sys call %d is forbidden: path %s not allowed\n",
+           p->pid, p->name, num, path);
+    return 1;
+  }
+  return 0;
+}
+```
+
+```mermaid
+flowchart TB
+    A{"Is bit num set in p->mask?"}:::decision
+    B{"Is num SYS_open or SYS_exec?"}:::decision
+    C["argstr(0) copies the user path into the kernel."]:::data
+    D{"Did the copy succeed and equal allowed_path?"}:::decision
+    OK["return 0: syscall() runs the handler."]:::process
+    NO["printk the denial, return 1: syscall() stores -1 in user a0."]:::fail
+    A -- "no" --> OK
+    A -- "yes" --> B
+    B -- "no" --> NO
+    B -- "yes" --> C --> D
+    D -- "yes" --> OK
+    D -- "no" --> NO
+    classDef decision fill:#f0f0ff,stroke:#333,color:#000
+    classDef data fill:#f0fff0,stroke:#333,color:#000
+    classDef process fill:#fffff0,stroke:#333,color:#000
+    classDef fail fill:#ffd9d9,stroke:#333,color:#000
+```
+
+**The bit test comes first, and that ordering is the whole exercise.** Every wrong version of this check seen while deriving it tested something other than `num`'s own bit: `mask & (1 << SYS_open)` alone path-checked `write` and `exit`; `mask & (open | exec)` path-checked an unmasked `exec`, which broke `sandbox_mask`, `sandbox_fork`, `sandbox_path`, and `sandbox_minus` at once. Testing the bit first also means an unmasked call never pays for an `argstr` copy.
+
+**`syscall()` keeps a single dispatch line.** The helper returns a verdict and prints its own diagnostic; the caller decides what reaches user `a0`:
+
+```c
+  if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    if (sandbox_denies(p, num)) {
+      p->trapframe->a0 = -1;
+    } else {
+      // Call the handler for num; its return value becomes user a0.
+      p->trapframe->a0 = syscalls[num]();
+    }
+```
+
+**Three diagnostics, one prefix.** Every denial prints `<pid> <name>: sys call <n> is forbidden`, so `sandbox_most`'s zero-`exec` assertion and the mask note's grep patterns still hold. A pathname denial adds `: path <p> not allowed`, naming the string the program tried; an unreadable user pointer adds `: unreadable path`. The attempted path is printed only after `argstr` succeeded, so it is always a terminated kernel string. One caveat: a path that itself contained `exec` would now put that word in the transcript.
+
+### Recording the path: `sys_interpose`
+
+From [`kernel/sysproc.c`](../../kernel/sysproc.c):
+
+```c
+uint64
+sys_interpose(void)
+{
+  int mask;
+  char path[MAXPATH];
+  struct proc *p = myproc();
+
+  argint(0, &mask);
+  if (mask < 0)
+    return -1;
+  // Fetch before committing, so a bad path leaves the old policy intact.
+  if (argstr(1, path, MAXPATH) < 0)
+    return -1;
+  p->mask = mask;
+  safestrcpy(p->allowed_path, path, sizeof(p->allowed_path));
+  return 0;
+}
+```
+
+**Fetch, then commit.** Copying straight into `p->allowed_path` would leave a half-written path behind when `argstr` fails partway, with `-1` returned and the old mask still active. The local buffer makes the update all-or-nothing. `safestrcpy` matches the `kfork` copy and always terminates; `argstr` already guarantees a terminator within `MAXPATH`, so it is the consistent choice rather than a fix. No `printk` here: a bad pointer is an ordinary syscall error, which `sandbox` reports as `interpose failed`.
+
+### Storage and lifetime: `struct proc`, `kfork`, `freeproc`
+
+From [`kernel/proc.h`](../../kernel/proc.h):
+
+```c
+  int mask;                    // Mask of disallowed system calls
+  char allowed_path[MAXPATH];  // Masked open/exec may use this path
+```
+
+From `kfork()` in [`kernel/proc.c`](../../kernel/proc.c), still under the child's lock and before `RUNNABLE`:
+
+```c
+  np->mask = p->mask; // copy before RUNNABLE so the child never runs unmasked
+  safestrcpy(np->allowed_path, p->allowed_path, sizeof(p->allowed_path));
+```
+
+From `freeproc()` in the same file:
+
+```c
+  p->mask = 0;
+  p->allowed_path[0] = 0;
+```
+
+**Clearing in `freeproc` is hygiene, not a correctness requirement today.** `sandbox_denies` reads `allowed_path` only after a mask bit matched, and a new occupant's mask is `0` until its own `interpose` overwrites the path. The clear keeps a stale name out of gdb and out of any future reader.
+
+### Answers to the source questions
+
+| #     | Short answer                                                                                                                                                                                 |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | `sandbox` calls `exec` right after `interpose`; `kexec` replaces the address space holding the string, so only a kernel copy survives.                                                       |
+| **2** | `kexec` reads the binary with `namei` and `readi` inside the kernel. The mask is checked only at syscall dispatch, so masking `open` does not block `exec`'s file access.                    |
+| **3** | It reads `exit`'s status `0` as a user address and copies whatever bytes are there (or fails); the strings mismatch, so `exit` is refused and execution continues past a `noreturn` call.    |
+| **4** | `MAXPATH`, the size of both buffers, forces the compare to a terminator. A bound of `4` stops after `READ` and reports equal.                                                                |
+| **5** | Not with this check: the path is consulted only after a mask bit matches, and the new occupant's `interpose` overwrites it. It still leaks stale data to debuggers and to any future reader. |
+| **6** | The inner `sh` prints `$ ` before reading `exec.sh`; `shell_script` stops on that prompt, so the `exec … failed` lines are never captured.                                                   |
+| **7** | `grep: cannot open README\n` is 25 bytes, and `putc` in `user/printf.c` issues one 1-byte `write` per character. The word is `exec`: any occurrence fails the count.                         |
+| **8** | Whatever file is currently named `x`, here README's contents. A textual match grants a name, not a file.                                                                                     |

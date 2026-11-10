@@ -368,6 +368,9 @@ For `sandbox_fork`, the supplied `DONE` termination regex is matched with `re.ma
 
 **One `int` in `struct proc`, tested before dispatch, covers the whole mask exercise.** `./grade-lab-syscall sandbox_mask` and `./grade-lab-syscall sandbox_fork` both pass with the changes below; the pathname tests are out of scope.
 
+> [!NOTE]
+> **These quotations are the mask-only snapshot at commit `c511493`.** The pathname exercise later moved the bit test into `sandbox_denies()` and made `sys_interpose()` record a path, so two quoted lines no longer appear in the current tree. View the snapshot with `git show c511493:kernel/syscall.c` and `git show c511493:kernel/sysproc.c`; the current code is in [the pathname note's walkthrough](14-syscall-sandbox-path.md#solution-walkthrough).
+
 | Checklist decision      | Answer in this tree                                                   | Source                                  |
 | ----------------------- | --------------------------------------------------------------------- | --------------------------------------- |
 | **Ownership**           | An `int mask` member of `struct proc`                                 | `kernel/proc.h`                         |
