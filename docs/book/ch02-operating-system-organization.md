@@ -51,6 +51,20 @@ The book describes five run states informally; `enum procstate` in `kernel/proc.
 
 `p->kstack` is a virtual address computed by `KSTACK(p)` in `kernel/memlayout.h`, two pages per slot below `TRAMPOLINE`, so each kernel stack has an unmapped guard page beneath it. `proc_mapstacks()` in `kernel/proc.c` maps one page per slot into the kernel page table and `procinit()` records the address, both once at boot; nothing allocates a kernel stack per `fork`.
 
+#### Kernel stack vs. user stack
+
+**Every process has two call stacks, and the mode decides which one `sp` points at.** Both hold ordinary frames (`ra`, saved registers, locals); they differ in owner, mapping, and lifetime:
+
+| Property           | User stack                                                                               | Kernel stack (`p->kstack`)                                                               |
+| ------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Used while**     | the process runs user code in U-mode                                                     | the process is in a trap or system call in S-mode                                        |
+| **Mapped in**      | the process's user page table, with `PTE_U`                                              | the kernel page table only, no `PTE_U`                                                   |
+| **Size and guard** | `USERSTACK` pages in `kernel/param.h`, above a page `uvmclear()` makes user-inaccessible | one page at `KSTACK(p)`, above an unmapped guard page                                    |
+| **Created**        | by `kexec()` in `kernel/exec.c`, fresh for each program image                            | by `proc_mapstacks()` and `procinit()` once at boot; reused by every process in the slot |
+| **Copied by fork** | yes, as part of user memory in `uvmcopy()`                                               | no; the child starts on its own slot's stack at `forkret` via `p->context`               |
+
+**Why the kernel never runs on the user stack:** the user program controls its own `sp`, so it could point it at garbage or at memory it later reads back. `uservec` in `kernel/trampoline.S` therefore loads `p->trapframe->kernel_sp`, which `prepare_return()` in `kernel/trap.c` sets to `p->kstack + PGSIZE`, before calling any C code. A kernel stack also holds the `struct context` that `swtch()` saves, so a process blocked in `sleep()` keeps its kernel frames there until it is rescheduled.
+
 ### Boot, from `_entry` to the shell
 
 **Assembly prerequisite:** [CSR fields and privilege returns](../../../assembly-language/docs/riscv/06-csrs-and-privilege.md). Use it for the machine-level foundation before reading this tree’s implementation below.

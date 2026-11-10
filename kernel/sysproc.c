@@ -155,6 +155,13 @@ sys_uptime(void)
  * it makes bit 31 unusable. The path argument (a1) is ignored until the
  * pathname exercise. The mask lives in struct proc, so kexec keeps it,
  * kfork copies it, and freeproc clears it.
+ *
+ * Q: Does losing bit 31 matter when the highest call number is 23?
+ * A: Not yet: no call is numbered 31, and syscall() never tests a bit
+ *    above 23. The cost is twofold: an all-ones "deny everything" mask
+ *    such as -1 is refused rather than accepted, and a future call
+ *    numbered 31 could never be denied. Bits 24-30 are accepted but
+ *    have no effect.
  */
 uint64
 sys_interpose(void)

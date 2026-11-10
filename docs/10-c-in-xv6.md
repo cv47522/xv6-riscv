@@ -128,6 +128,22 @@ The Linux comparison is illustrated in [Memory Management and Organization](../.
 
 <a id="inspect-usercat-with-objdump-and-nm"></a>
 
+### Kernel stack vs. user stack
+
+**Every process has two call stacks, and the mode decides which one `sp` points at.** Both hold ordinary frames (`ra`, saved registers, locals); they differ in owner, mapping, and lifetime:
+
+| Property           | User stack                                                                               | Kernel stack (`p->kstack`)                                                               |
+| ------------------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Used while**     | the process runs user code in U-mode                                                     | the process is in a trap or system call in S-mode                                        |
+| **Mapped in**      | the process's user page table, with `PTE_U`                                              | the kernel page table only, no `PTE_U`                                                   |
+| **Size and guard** | `USERSTACK` pages in `kernel/param.h`, above a page `uvmclear()` makes user-inaccessible | one page at `KSTACK(p)`, above an unmapped guard page                                    |
+| **Created**        | by `kexec()` in `kernel/exec.c`, fresh for each program image                            | by `proc_mapstacks()` and `procinit()` once at boot; reused by every process in the slot |
+| **Copied by fork** | yes, as part of user memory in `uvmcopy()`                                               | no; the child starts on its own slot's stack at `forkret` via `p->context`               |
+
+**Why the kernel never runs on the user stack:** the user program controls its own `sp`, so it could point it at garbage or at memory it later reads back. `uservec` in `kernel/trampoline.S` therefore loads `p->trapframe->kernel_sp`, which `prepare_return()` in `kernel/trap.c` sets to `p->kstack + PGSIZE`, before calling any C code. A kernel stack also holds the `struct context` that `swtch()` saves, so a process blocked in `sleep()` keeps its kernel frames there until it is rescheduled.
+
+The same comparison appears in [ch02](book/ch02-operating-system-organization.md#kernel-stack-vs-user-stack), where `struct proc` introduces `p->kstack`.
+
 ## Inspect user/\_cat with objdump and nm
 
 Practice the tools on a smaller C/assembly program in [C, ELF, linker symbols, and disassembly](../../assembly-language/docs/riscv/05-c-elf-and-disassembly.md). The details below apply to this xv6 tree.

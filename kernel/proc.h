@@ -139,6 +139,22 @@ struct proc {
   struct proc *parent; // Parent process
 
   // these are private to the process, so p->lock need not be held.
+  /*
+   * Q: How does the kernel stack differ from the user call stack?
+   * A: Both hold ordinary call frames; they differ in who uses them:
+   *
+   *      Stack   Used while         Lives in                Set up by
+   *      ------  -----------------  ----------------------  -----------
+   *      user    U-mode code runs   user page table, below  kexec in
+   *                                 a PTE_U-less guard      kernel/exec.c
+   *      kernel  this process is    kernel page table at    procinit, once
+   *              in a trap/syscall  KSTACK(slot), one page  at boot
+   *
+   *    uservec in kernel/trampoline.S switches sp to trapframe->kernel_sp
+   *    because the user sp is untrusted, and kernel frames must not be
+   *    visible to user code. See "Kernel stack vs. user stack" in
+   *    docs/book/ch02-operating-system-organization.md.
+   */
   uint64 kstack;               // Virtual address of kernel stack
   uint64 sz;                   // Size of process memory (bytes)
   pagetable_t pagetable;       // User page table

@@ -319,7 +319,13 @@ kfork(void)
     return -1;
   }
 
-  // Copy user memory from parent to child.
+  /*
+   * Q: What does uvmcopy stand for?
+   * A: "user virtual memory copy"; uvm prefixes every user address-space
+   *    helper in kernel/vm.c (docs/04-terminology.md). It copies both the
+   *    PTEs and every physical page, so fork costs O(p->sz) here; the
+   *    cow lab replaces it with shared, copy-on-write pages.
+   */
   if (uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
     freeproc(np);
     release(&np->lock);
@@ -337,11 +343,20 @@ kfork(void)
   for (i = 0; i < NOFILE; i++)
     if (p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
-  np->cwd = idup(p->cwd);
 
+  np->cwd = idup(p->cwd);
+  /*
+   * Q: Why safestrcpy rather than strcpy or memcpy?
+   * A: kernel/string.c has no strcpy, and its memcpy exists only to
+   *    placate GCC (callers use memmove). safestrcpy is the kernel's one
+   *    bounded string copy: it never writes past n bytes and always
+   *    NUL-terminates, so a name that somehow filled all 16 bytes still
+   *    yields a valid string. memmove of sizeof(p->name) would also work
+   *    here, since both arrays are 16 bytes, but it would not say "this
+   *    is a string" and would not repair a missing terminator.
+   */
   safestrcpy(np->name, p->name, sizeof(p->name));
   np->mask = p->mask; // copy before RUNNABLE so the child never runs unmasked
-
   pid = np->pid;
 
   release(&np->lock);

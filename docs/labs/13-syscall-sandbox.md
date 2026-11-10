@@ -314,8 +314,16 @@ Use the [assertion table and evidence limits](#grader-assertions-and-their-limit
 **Inspect saved user registers at dispatch.** Follow [the existing GDB setup](12-syscall-using-gdb.md) to launch `make qemu-gdb` and attach; use the correct debugger for your toolchain.
 
 ```gdb
+// Kernel stop
 break syscall
 continue
+
+// User stop
+add-symbol-file user/_sandbox 0
+break -source sandbox.c -function main
+break interpose
+continue
+# Type in xv6 terminal $ sandbox 32768 - cat README
 ```
 
 Advance past the initialization of local `p` before inspecting it:
@@ -326,6 +334,10 @@ print p->name
 print /x p->trapframe->a7
 print /x p->trapframe->a0
 print /x p->trapframe->a1
+
+print argc
+print *argv
+print *(argv+1)
 ```
 
 **Interpret `a0` by the saved call number.** At `interpose` entry it contains the mask; at `open` entry it contains a user pathname address. After dispatch it contains the result. The live supervisor `$a0` may hold an unrelated compiler temporary; do not substitute it for the saved user register.
@@ -384,7 +396,7 @@ sys_interpose(void)
 }
 ```
 
-**Rejecting a negative mask is a local policy**, not a handout requirement, so bit 31 is unusable; `sandbox_most`'s `2147483643` (`0x7ffffffb`) stays positive. A second call replaces the mask, so a sandboxed program that is not itself denied `interpose` (bit 23) can lift its own restrictions; the [unspecified-policy warning](#deriving-the-changes-decisions-and-traps) still applies.
+**Rejecting a negative mask is a local policy**, not a handout requirement, so bit 31 is unusable; `sandbox_most`'s `2147483643` (`0x7ffffffb`) stays positive. With `SYS_interpose` (23) the highest call number, no call is lost today: the cost is that an all-ones "deny everything" mask such as `-1` is refused, and a future call numbered 31 could never be denied. Bits 24 through 30 are accepted but `syscall()` never tests them. A second call replaces the mask, so a sandboxed program that is not itself denied `interpose` (bit 23) can lift its own restrictions; the [unspecified-policy warning](#deriving-the-changes-decisions-and-traps) still applies.
 
 ### Denying before dispatch: `syscall`
 

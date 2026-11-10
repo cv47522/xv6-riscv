@@ -61,6 +61,16 @@ main(int argc, char *argv[])
       printf("%s: interpose failed\n", argv[0]);
       exit(1);
     }
+    /*
+     * Q: exec() is always called after interpose() succeeds, so how can
+     *    the printf below run?
+     * A: exec returns only on failure; on success the image that held
+     *    this printf is gone. It fails when the mask denies exec itself
+     *    (bit 7, e.g. 128): syscall() in kernel/syscall.c returns -1
+     *    before kexec runs, which is the "sandbox: exec grep failed"
+     *    line the sandbox_mask grader expects. kexec also fails on a
+     *    missing file, bad ELF, or exhausted memory.
+     */
     exec(nargv[0], nargv);
     printf("%s: exec %s failed\n", argv[0], nargv[0]);
     exit(1);
