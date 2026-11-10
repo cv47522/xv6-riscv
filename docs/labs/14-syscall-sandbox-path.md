@@ -258,6 +258,101 @@ cat README
 
 **Watch the inner shell finish in the guest.** Under `sandbox 128 sh sh < exec.sh`, the inner shell's `exec echo failed` and `exec ls failed` lines **should** appear interactively: `exec` of `echo` and `ls` mismatches `sh`. The grader stops before them, so this manual run is the only place that behavior is visible. The final unrestricted `cat README` checks that no pathname leaked into the shell.
 
+### Edge-case probes: what the allowed pathname is and is not
+
+> [!WARNING]
+> **The allowed pathname is not "the file the command may open".** It is compared with argument 0 of whichever call is being dispatched, but only when that call's bit is set and the call is `open` or `exec`. With mask `128` it names the **program** `exec` may load; with mask `32768` it names the **file** `open` may open; with both bits it must name both, so one string almost never satisfies both.
+
+**Each row isolates one rule from the [outcome table](#outcomes-the-contract-defines).** Run them in a fresh guest after `make qemu`; `x` does not exist yet unless you ran the earlier list.
+
+| #      | Command                                                         | Correct result                                             | Rule it isolates                                                                                |
+| ------ | --------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **1**  | `sandbox 0 nosuchfile grep xv6 README`                          | 4 `xv6` lines                                              | Mask `0`: the path is never consulted, even a nonsense one.                                     |
+| **2**  | `sandbox 32768 README grep xv6 README README`                   | 8 `xv6` lines                                              | The exception is not single-use; every matching `open` passes.                                  |
+| **3**  | `sandbox 32768 README cat x`                                    | `sys call 15 is forbidden`, `cat: cannot open x`           | A different file is denied by the kernel, before `x`'s existence matters.                       |
+| **4**  | `sandbox 32768 ./README grep xv6 README`                        | `sys call 15 is forbidden`, `grep: cannot open README`     | Textual match: `./README` and `README` are the same file but different strings.                 |
+| **5**  | `sandbox 32768 README grep xv6 ./README`                        | `sys call 15 is forbidden`, `grep: cannot open ./README`   | The same rule from the other side.                                                              |
+| **6**  | `sandbox 32768 READ grep xv6 README`                            | `sys call 15 is forbidden`, `grep: cannot open README`     | Full-string compare: a prefix is not a match.                                                   |
+| **7**  | `sandbox 32768 - cat -`                                         | `cat: cannot open -` with **no** kernel line               | `-` is ordinary text: `open("-")` is allowed and fails only because the file is missing.        |
+| **8**  | `sandbox 128 grep grep xv6 README`                              | 4 `xv6` lines                                              | Exec masked: the path names the **program**. `open` is unmasked, so `README` is never compared. |
+| **9**  | `sandbox 128 cat grep xv6 README`                               | `sys call 7 is forbidden`, `sandbox: exec grep failed`     | A different program is denied.                                                                  |
+| **10** | `sandbox 128 README grep xv6 README`                            | `sys call 7 is forbidden`, `sandbox: exec grep failed`     | Naming the data file does not help when only `exec` is masked.                                  |
+| **11** | `sandbox 32768 grep grep xv6 README`                            | `sys call 15 is forbidden`, `grep: cannot open README`     | Open masked: naming the program does not help; `exec` is unmasked and runs regardless.          |
+| **12** | `sandbox 32896 README grep xv6 README`                          | `sys call 7 is forbidden`, `sandbox: exec grep failed`     | Both masked: the file name fails at `exec`, before `open` is ever reached.                      |
+| **13** | `sandbox 32896 grep grep xv6 README`                            | `sys call 15 is forbidden`, `grep: cannot open README`     | Both masked: the program name passes `exec`, then fails at `open`.                              |
+| **14** | `echo cat README > c.sh`, then `sandbox 32768 README sh < c.sh` | `sys call 15 is forbidden` from `sh`, then the full README | Inheritance: `sh`'s own `open("console")` is denied, but its forked `cat` inherits `README`.    |
+
+**Captured from a passing reference build** (all five pathname-related grader tests pass), run through `gradelib`'s `shell_script` on a fresh `fs.img`. The leading number in each kernel line is the pid and varies between runs; the diagnostic text after it is whatever your `printk` prints. Row 14's README is truncated here.
+
+```text
+$ sandbox 0 nosuchfile grep xv6 README
+xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
+Version 6 (v6).  xv6 loosely follows the structure and style of v6,
+xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
+(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
+$ sandbox 32768 README grep xv6 README README
+xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
+Version 6 (v6).  xv6 loosely follows the structure and style of v6,
+xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
+(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
+xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
+Version 6 (v6).  xv6 loosely follows the structure and style of v6,
+xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
+(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
+$ sandbox 32768 README cat x
+8 cat: sys call 15 is forbidden
+cat: cannot open x
+$ sandbox 32768 ./README grep xv6 README
+10 grep: sys call 15 is forbidden
+grep: cannot open README
+$ sandbox 32768 README grep xv6 ./README
+12 grep: sys call 15 is forbidden
+grep: cannot open ./README
+$ sandbox 32768 READ grep xv6 README
+14 grep: sys call 15 is forbidden
+grep: cannot open README
+$ sandbox 32768 - cat -
+cat: cannot open -
+$ sandbox 128 grep grep xv6 README
+xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
+Version 6 (v6).  xv6 loosely follows the structure and style of v6,
+xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
+(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
+$ sandbox 128 cat grep xv6 README
+20 sandbox: sys call 7 is forbidden
+sandbox: exec grep failed
+$ sandbox 128 README grep xv6 README
+22 sandbox: sys call 7 is forbidden
+sandbox: exec grep failed
+$ sandbox 32768 grep grep xv6 README
+24 grep: sys call 15 is forbidden
+grep: cannot open README
+$ sandbox 32896 README grep xv6 README
+26 sandbox: sys call 7 is forbidden
+sandbox: exec grep failed
+$ sandbox 32896 grep grep xv6 README
+28 grep: sys call 15 is forbidden
+grep: cannot open README
+$ echo cat README > c.sh
+$ sandbox 32768 README sh < c.sh
+31 sh: sys call 15 is forbidden
+xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
+Version 6 (v6).  xv6 loosely follows the structure and style of v6,
+but is implemented for a modern RISC-V multiprocessor using ANSI C.
+...
+```
+
+**Read the process name in each kernel line.** `sandbox: sys call 7` means the wrapper's child was refused at `exec`, so the command never started. `grep: sys call 15` means the command did start and was refused at `open`. If a row that should show `grep:` shows `sandbox:` instead, your check is comparing the path for a call whose bit is not set.
+
+| Symptom in these probes                                         | Likely cause                                                                    |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **Rows 2–7 or 14 print `sandbox: sys call 7`**                  | `exec` is path-checked although only `open`'s bit is set.                       |
+| **Row 8 prints `grep: sys call 15`**                            | `open` is path-checked although only `exec`'s bit is set.                       |
+| **Row 6 prints README's lines**                                 | The comparison bound is the allowed path's length, so a prefix matches.         |
+| **Rows 8 and 13 print `sandbox: exec grep failed`**             | `exec`'s path is read from argument 1, the `argv` array, instead of argument 0. |
+| **Row 7 prints a kernel line**                                  | `-` is treated specially or the comparison is wrong for one-character paths.    |
+| **Row 14 shows two kernel lines and `cat: cannot open README`** | The pathname is not copied in `kfork()`.                                        |
+
 ### Focused grader commands
 
 Exit QEMU with `Ctrl-a`, then `x`, before grading.

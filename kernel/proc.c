@@ -183,6 +183,7 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
   p->mask = 0;
+  p->allowed_path[0] = 0;
 }
 
 /*
@@ -357,6 +358,7 @@ kfork(void)
    */
   safestrcpy(np->name, p->name, sizeof(p->name));
   np->mask = p->mask; // copy before RUNNABLE so the child never runs unmasked
+  safestrcpy(np->allowed_path, p->allowed_path, sizeof(p->allowed_path));
   pid = np->pid;
 
   release(&np->lock);

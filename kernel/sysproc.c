@@ -167,10 +167,16 @@ uint64
 sys_interpose(void)
 {
   int mask;
+  char path_buf[MAXPATH];
 
-  argint(0, &mask);
+  argint(0, &mask); // first arg in interpose()
   if (mask < 0)
     return -1;
+  if (argstr(1, path_buf, MAXPATH) < 0) {// second arg in interpose()
+    printk("%d %s: error when copying path", myproc()->pid, myproc()->name);
+    return -1;
+  }
   myproc()->mask = mask;
+  strncpy(myproc()->allowed_path, path_buf, sizeof(path_buf));
   return 0;
 }
