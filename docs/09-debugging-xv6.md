@@ -398,6 +398,111 @@ Breakpoint 2, main (argc=8224, argv=0x64 <strcmp+6>) at user/sleep.c:10
 > [!WARNING]
 > `add-symbol-file` teaches GDB how to label addresses; it does not teach GDB which xv6 process owns the current page table. xv6 links user programs at the same virtual addresses, so `user/_sleep` labels become wrong when another user program runs. Load them for a focused stop, then remove them.
 
+<a id="user-stop-breakpoint-pitfalls"></a>
+
+#### User-stop breakpoint pitfalls: no target, duplicates, ambiguous names, and a frozen console
+
+> [!IMPORTANT]
+> **Follow the [user-stop steps](#debug-usersleep-manually-with-add-symbol-file-and-hbreak) in order:** attach with `-x .gdbinit`, continue to the `$ ` prompt, interrupt, then add the user symbols and **one** narrow breakpoint, and `continue` before typing the command. Each pitfall below comes from skipping or widening one of those steps.
+
+| Symptom                                                          | Cause                                                                            | Fix                                                                        |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **`No hardware breakpoint support in the target.`**              | GDB has no remote target, because `.gdbinit` was not sourced                     | [Reattach with `-x .gdbinit`](#hbreak-no-hardware-breakpoint-support)      |
+| **`Note: breakpoint 1 also set at pc 0x0.`**                     | The same location was requested twice; GDB keeps both                            | [Delete the duplicates](#duplicate-breakpoints-same-pc)                    |
+| **`Breakpoint 1 at 0x0: main. (2 locations)`**                   | A bare user name such as `main` or `memset` also exists in `kernel/kernel`       | [Qualify it with the source file](#user-function-names-need-a-source-file) |
+| **Terminal 1 ignores input, or echoes `secret abcd` and stalls** | GDB is stopped, often on a broad kernel breakpoint the shell's `fork` hits first | [Narrow or condition the breakpoint](#console-freezes-after-b-kalloc)      |
+| **`b` and `hbreak` seem to behave the same**                     | Under QEMU they do; both match the PC                                            | [Why the recipe still uses `hbreak`](#break-source-versus-hbreak)          |
+
+<a id="hbreak-no-hardware-breakpoint-support"></a>
+
+##### `No hardware breakpoint support in the target.`: GDB has no remote target
+
+**Q: Why does `hbreak` work for `user/_sleep` but fail for `user/_secret` while `break` succeeds?** The ELF is not the cause; **GDB has no remote target**, so `hbreak` is asked of GDB's local `exec` target, which cannot provide hardware breakpoints. Any user program fails the same way in that state:
+
+```gdb
+(gdb) add-symbol-file user/_secret 0
+(gdb) hbreak -source secret.c -function main
+No hardware breakpoint support in the target.
+(gdb) break -source secret.c -function main
+Breakpoint 1 at 0x0: file user/secret.c, line 12.
+```
+
+**`break` only appears to succeed:** with no target, GDB records the location from the symbol file and inserts nothing.
+
+The usual way to get here is `gdb-multiarch kernel/kernel` **without** `-x .gdbinit`. GDB declines to auto-load the repository's `.gdbinit`, so its `target remote` never runs, yet `kernel/kernel` still loads from the command line and `layout src` still shows source. The decline warning is the first thing GDB prints, so it scrolls away easily:
+
+```text
+warning: File ".../xv6-riscv/.gdbinit" auto-loading has been declined by your `auto-load safe-path' ...
+```
+
+![GDB TUI over kernel/main.c with status exec No process; c and n print The program is not being run.; info b lists software breakpoints at 0x0 in main at user/secret.c:12, uvmalloc at kernel/vm.c:264, and kalloc at kernel/kalloc.c:80](images/riscv-14-gdb-no-target-auto-load-declined.png)
+
+_A no-target session after setting breakpoints. The status line reads `exec No process`; `c` and `n` print `The program is not being run.`; and `info b` lists three plain `breakpoint` entries, none of which was inserted. Meanwhile `make qemu-gdb` in terminal 1 is still halted by `-S`, so its console stays blank and **does not accept `secret abcd`** until GDB attaches and continues._
+
+| Check                                | Healthy session                                    | No-target session                       |
+| ------------------------------------ | -------------------------------------------------- | --------------------------------------- |
+| **TUI status line**                  | `remote Thread 1.1`                                | `exec No process`                       |
+| **`info target`**                    | Lists `Remote target using gdb-specific protocol:` | Lists only `Local exec file:`           |
+| **`hbreak FUNC`**                    | `Hardware assisted breakpoint N at ...`            | `No hardware breakpoint support ...`    |
+| **Terminal 1 after `make qemu-gdb`** | Boots once GDB continues                           | Blank forever; typed input goes nowhere |
+
+**Fix:** quit GDB, then attach again from the repository root with `gdb-multiarch -x .gdbinit kernel/kernel`, or trust the repository once as described in [the session setup](#start-qemu-halted-and-attach-gdb). `make qemu-gdb` can keep running; it is still waiting for the connection.
+
+<a id="duplicate-breakpoints-same-pc"></a>
+
+##### Several breakpoints on one line: `Note: breakpoint 1 also set at pc 0x0.`
+
+**Q: Why can `user/secret.c:12` carry breakpoints 1, 4, and 5 at once?** Every `break` or `hbreak` command creates a **new, independent breakpoint object**, even at an address that already has one. GDB allows this because each object can carry its own type, condition, ignore count, and `commands`; it only prints a `Note:` so the duplicate is not accidental:
+
+![GDB after Ctrl-C in scheduler: add-symbol-file user/_secret 0, hbreak secret.c main as breakpoint 1, b uvmalloc and b kalloc as 2 and 3, then a second hbreak and a break on secret.c main print Note lines and create breakpoints 4 and 5; info breakpoints lists 1 and 4 as hw breakpoint and 5 as breakpoint, all at 0x0 in main at user/secret.c:12](images/riscv-15-gdb-duplicate-user-breakpoints-secret-main.png)
+
+_A healthy session: the hart was interrupted in `scheduler()`, so this time `hbreak` succeeds. Breakpoints 1 and 4 are `hw breakpoint` objects and 5 is a software `breakpoint`, all at `0x0`. They all describe the same stop at the same PC, so the duplicates add nothing but clutter._
+
+Remove the extras with `delete 4 5`, and run `info breakpoints` before `continue` to confirm only the intended stops remain.
+
+<a id="user-function-names-need-a-source-file"></a>
+
+##### Naming user functions: `b kalloc` versus `secret.c:main`
+
+**Q: Must every user breakpoint use `hbreak -source secret.c -function main`, or does a bare name work as `b kalloc` does?** A bare name works when it is **unique across every loaded symbol file**. `kalloc` exists only in `kernel/kernel`, but after `add-symbol-file user/_secret 0` GDB searches both files, and user-library names collide with kernel ones:
+
+```gdb
+(gdb) break main
+Breakpoint 1 at 0x0: main. (2 locations)
+(gdb) break memset
+Breakpoint 3 at 0xd0: memset. (2 locations)
+(gdb) break strcpy
+Breakpoint 2 at 0x5e: file user/ulib.c, line 24.
+```
+
+`info breakpoints` shows `main` resolved to both `user/secret.c:12` and `kernel/main.c:13`, and `memset` to both `user/ulib.c` and `kernel/string.c`. `strcpy` is unique because `kernel/string.c` defines only `strncpy` and `safestrcpy`.
+
+| Location form                                | Resolves to                    | Use for                                         |
+| -------------------------------------------- | ------------------------------ | ----------------------------------------------- |
+| **`b kalloc`**                               | One kernel function            | Kernel names; user names absent from the kernel |
+| **`hbreak secret.c:main`**                   | `main` in `user/secret.c` only | Any user name that the kernel also defines      |
+| **`hbreak -source secret.c -function main`** | The same, as explicit options  | Scripts, where the option names document intent |
+| **`hbreak user/secret.c:12`**                | One source line                | A stop past the function's first line           |
+
+The `-source`/`-function` form is not required; `secret.c:main` is the equivalent linespec. Keep the file qualifier for any user symbol, since which names collide depends on the kernel, not on the program.
+
+<a id="console-freezes-after-b-kalloc"></a>
+
+##### Why the xv6 console freezes after `b kalloc` or `b uvmalloc`
+
+**Q: Why does terminal 1 get stuck after setting breakpoints in GDB?** Whenever GDB shows `(gdb)`, **the whole machine is paused**, so the console cannot run the shell; see [the handoff table](#the-two-terminal-handoff-which-terminal-acts-next). Two cases cause it:
+
+1. **No `continue` yet.** After `Ctrl-C` and the breakpoint commands, the hart stays stopped until `continue`. xv6 echoes keystrokes from its own `consoleintr` in `kernel/console.c`, so nothing you type even appears until the hart runs again.
+2. **A broad kernel breakpoint fires first.** `kalloc` and `uvmalloc` serve every process, and the shell allocates before `secret` exists: `sh` forks a child, and `kfork` reaches `kalloc` through `allocproc` (the trapframe, then `proc_pagetable` → `uvmcreate` and `mappages` → `walk`) and through `uvmcopy`. The first stop after typing `secret abcd` is `kalloc` in **pid 2, the shell**, not in `secret`.
+
+**Recorded count.** With the breakpoints from the screenshot above, typing `secret abcd` hit `kalloc` **46 times** and `uvmalloc` **4 times** before `secret.c:main` stopped. Each hit returns `(gdb)` and refreezes the console, which looks like a hang unless you watch terminal 2. The count comes from `ignore 3 100000` followed by `info breakpoints`, whose `already hit` line counts ignored hits too.
+
+**Narrow kernel breakpoints to the process you care about:**
+
+- **Condition on the exec path:** `break kexec if $_streq(path, "secret")` stops only for `secret`; set `kalloc` or `uvmalloc` breakpoints after it fires. `$_streq` runs inside GDB, so the condition calls no guest code.
+- **Follow one page:** record a physical address, then `break kfree if (uint64)pa == $datapa`. The [attack lab's trace](labs/15-syscall-attack.md#trace-secrets-data-page-through-uvmalloc-kfree-and-kalloc-in-gdb) records the full recipe.
+- **Skip known hits:** `ignore N COUNT` passes over the next `COUNT` hits of breakpoint `N` without stopping.
+
 ## GDB command reference: run control, breakpoints, inspection, and harts
 
 **Most xv6 sessions need about twenty commands.** Each table groups commands by the question they answer; the short form is what GDB accepts at the prompt, and the examples come from this tree. Pressing Enter on an empty line repeats the previous command, and after `x` it continues from the next address.
@@ -586,6 +691,34 @@ _Legend: request red-white for your input, decision blue for routing, data movem
 **Add or change breakpoints while the target is stopped**: at the connect stop, at another breakpoint, or after the interrupt task. GDB inserts breakpoints only into a stopped target, and [Pause does not interrupt this launch](#vs-code-pause-does-not-interrupt-qemu-use-the-interrupt-task), so a breakpoint clicked while the hart runs is not reliably in place before the code it guards executes.
 
 **For another user program, substitute its ELF in the [user-stop recipe](#vs-code-user-stop-sleepcmain).** Nothing in `.vscode/` names `sleep`: the `sleep.c` breakpoint is a gutter click, and `user/_sleep` appears only in the Debug Console command. To debug `user/ls.c`, click its gutter, interrupt at the `$ ` prompt, run `-exec add-symbol-file user/_ls 0`, then type `ls`. Load one user ELF at a time, because every xv6 user program is linked at address `0x0`; see [reused addresses](#break-source-versus-hbreak).
+
+#### Breakpoints on lines the preprocessor removed
+
+**A breakpoint on a line that `#ifdef` or `#ifndef` compiled out cannot stop there; GDB moves it to the next line that has code.** The compiler emitted no instructions for that line, so it has no address of its own. The `LAB=syscall` build is the common case, because `-DLAB_SYSCALL` removes three `memset` scrub lines:
+
+| Requested line       | Source on that line             | GDB places it at                           | First hit                                                     |
+| -------------------- | ------------------------------- | ------------------------------------------ | ------------------------------------------------------------- |
+| `kernel/vm.c:275`    | `memset(mem, 0, PGSIZE);`       | `uvmalloc`, line 277, `mappages`           | Every page `uvmalloc` maps, from the first `exec` during boot |
+| `kernel/kalloc.c:91` | `memset((char *)r, 5, PGSIZE);` | `kalloc`, line 93, `return`                | Every `kalloc`                                                |
+| `kernel/kalloc.c:62` | `memset(pa, 1, PGSIZE);`        | `kfree`, line 65; the stop reports line 67 | `kinit`'s `freerange`, before the shell exists                |
+
+**The stop happens, but on a line you did not mark, and often too early.** The `kfree` case fires during boot, on the first page above `end`, so a session that expected a stop after typing a command sees one before the `$ ` prompt. The reported line can differ from the breakpoint's line too: address `0x80000044` begins line 67 in the line table, because `r = (struct run *)pa;` on line 65 produced no instruction of its own.
+
+**Check a line before trusting a gutter breakpoint on it.** Each command works in the Debug Console with the `-exec` prefix:
+
+```gdb
+(gdb) info line kernel/kalloc.c:62
+Line 62 of "kernel/kalloc.c" is at address 0x80000044 <kfree+40> but contains no code.
+(gdb) break kernel/kalloc.c:62
+Breakpoint 1 at 0x80000044: file kernel/kalloc.c, line 65.
+(gdb) info breakpoints
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x0000000080000044 in kfree at kernel/kalloc.c:65
+```
+
+GDB's MI reply to cppdbg carries both lines, as `line="65"` and `original-location="kernel/kalloc.c:62"`. How VS Code then draws the moved breakpoint was not recorded. Its editor gives no warning either: this repository has no `c_cpp_properties.json` defining `LAB_SYSCALL`, so IntelliSense does not grey out the `#ifndef LAB_SYSCALL` block.
+
+**Break on a line that exists.** To catch the moment a page is handed out, use `kalloc.c:93`, which the lab note's [page trace](labs/15-syscall-attack.md#trace-secrets-data-page-through-uvmalloc-kfree-and-kalloc-in-gdb) conditions on one address; `kfree`'s own entry works the same way. List every guarded block with `grep -n -A3 LAB_ kernel/*.c`; other labs' `#ifdef LAB_NET` and `#ifdef LAB_PGTBL` blocks in `kernel/vm.c` are missing from this build for the same reason.
 
 <a id="vs-code-kernel-stop-syspause"></a>
 
@@ -956,6 +1089,7 @@ QEMU exposes the emulated harts to GDB as debugger threads. Those entries are ex
 | **GDB cannot insert the breakpoint**                                       | The requested breakpoint type or address is unavailable in the current target state.                                         | Confirm the QEMU remote connection, use `hbreak`, and check `info breakpoints`; do not replace it with a software breakpoint in read-only user text.                                              |
 | **A local is `<optimized out>` or nonsensical**                            | The compiler optimized it or the stop is before its initialization.                                                          | Check the highlighted source line and step past the assignment before printing the value; [`num` in `syscall`](#why-print-num-shows-optimized-out) is a worked example.                           |
 | **`The program is not being run.` and `No symbol "p" in current context`** | GDB has no target: QEMU was started with `make qemu`, which has no GDB stub, so `.gdbinit`'s `target remote` failed.         | Start QEMU with `make qemu-gdb`, attach GDB again, and set breakpoints before `c`.                                                                                                                |
+| **`hbreak` prints `No hardware breakpoint support in the target.`**        | GDB was started without `-x .gdbinit` and declined to auto-load it, so it never ran `target remote`; QEMU stays halted.      | Reattach with `gdb-multiarch -x .gdbinit kernel/kernel`; see [why `hbreak` fails](#hbreak-no-hardware-breakpoint-support).                                                                        |
 | **VS Code's Pause does nothing; Call Stack stays `Running`**               | cppdbg does not know `.gdbinit` attached a remote target, so it never sends `-exec-interrupt`.                               | Run the task **xv6: interrupt GDB (Pause)**; see [the warning](#vs-code-pause-does-not-interrupt-qemu-use-the-interrupt-task).                                                                    |
 | **A `launch.json` breakpoint never stops the session**                     | A plain `break` in `setupCommands` runs before cppdbg loads symbols and is silently dropped.                                 | Use `-break-insert -f`; see [why](#vs-code-launch-breakpoints-why-break-insert-f).                                                                                                                |
 | **`b *80001d58` prints `Invalid number "80001d58".`**                      | GDB uses decimal input by default; the address needs a hex prefix.                                                           | Write the address in hex: `b *0x80001d58`.                                                                                                                                                        |

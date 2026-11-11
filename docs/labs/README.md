@@ -22,8 +22,9 @@ One note per lab exercise that needed more thinking than typing: what the exerci
 | **[10-util-sh-tab-completion.md](10-util-sh-tab-completion.md)** | `util`    | shell: tab completion (optional, easy) — the console line discipline that hides Tab                          |
 | **[11-util-sh-history.md](11-util-sh-history.md)**               | `util`    | shell: history (optional, moderate) — what one command line is, and which process owns it                    |
 | **[12-syscall-using-gdb.md](12-syscall-using-gdb.md)**           | `syscall` | Using gdb (easy) — stopping in `syscall()`, decoding saved and live registers, and tracing a kernel panic    |
-| **[13-syscall-sandbox.md](13-syscall-sandbox.md)** | `syscall` | Sandbox a command (moderate) — syscall masks, process lifetime, and rejection before dispatch |
-| **[14-syscall-sandbox-path.md](14-syscall-sandbox-path.md)** | `syscall` | Sandbox with allowed pathnames (easy) — a per-process pathname exception for masked `open` and `exec` |
+| **[13-syscall-sandbox.md](13-syscall-sandbox.md)**               | `syscall` | Sandbox a command (moderate) — syscall masks, process lifetime, and rejection before dispatch                |
+| **[14-syscall-sandbox-path.md](14-syscall-sandbox-path.md)**     | `syscall` | Sandbox with allowed pathnames (easy) — a per-process pathname exception for masked `open` and `exec`        |
+| **[15-syscall-attack.md](15-syscall-attack.md)**                 | `syscall` | Attack xv6 (moderate) — reading a dead process's secret from unscrubbed freed pages via eager `sbrk`         |
 
 **Graded answers are spoilers.** Each lab note keeps them in its final `## Solution walkthrough`. `answers-syscall.txt` at the repository root is a symlink to [12-syscall-using-gdb.md](12-syscall-using-gdb.md#solution-walkthrough), because `grade-lab-syscall` opens that exact path.
 
